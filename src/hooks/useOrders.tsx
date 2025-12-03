@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { toast } from "@/hooks/use-toast";
 
-export type OrderStatus = 'pending' | 'in_progress' | 'delivered' | 'completed' | 'disputed' | 'refunded' | 'cancelled';
+export type OrderStatus = 'pending' | 'in_progress' | 'delivered' | 'completed' | 'disputed' | 'refunded' | 'cancelled' | 'draft' | 'escrow_locked';
 
 export interface Order {
   id: string;
