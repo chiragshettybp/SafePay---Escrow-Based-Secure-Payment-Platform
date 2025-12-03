@@ -55,9 +55,9 @@ export function usePaymentFlow() {
 
       // Add demo merchants for testing
       const demoMerchants: MerchantOption[] = [
-        { id: 'demo-merchant-001', name: 'TechStore Pro' },
-        { id: 'demo-merchant-002', name: 'Digital Services Co.' },
-        { id: 'demo-merchant-003', name: 'Creative Agency Hub' },
+        { id: '00000000-0000-0000-0000-000000000001', name: 'TechStore Pro' },
+        { id: '00000000-0000-0000-0000-000000000002', name: 'Digital Services Co.' },
+        { id: '00000000-0000-0000-0000-000000000003', name: 'Creative Agency Hub' },
       ];
 
       return [...merchantList, ...demoMerchants];

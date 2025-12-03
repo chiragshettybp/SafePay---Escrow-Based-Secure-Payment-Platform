@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Order, OrderStatus } from "@/hooks/useOrders";
-import { Eye, MoreHorizontal, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { Eye, MoreHorizontal, CheckCircle, AlertTriangle, Loader2, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface OrdersTableProps {
@@ -133,13 +133,21 @@ export function OrdersTable({ orders, isLoading, onConfirmDelivery, isConfirming
                           View Details
                         </Link>
                       </DropdownMenuItem>
-                      {order.status === "delivered" && (
-                        <DropdownMenuItem onClick={() => setConfirmOrderId(order.id)}>
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Confirm Delivery
+                      <DropdownMenuItem asChild>
+                        <Link to={`/orders/${order.id}/tracking`}>
+                          <Truck className="h-4 w-4 mr-2" />
+                          Track Order
+                        </Link>
+                      </DropdownMenuItem>
+                      {(order.status === "delivered" || order.status === "escrow_locked" || order.status === "in_progress") && (
+                        <DropdownMenuItem asChild>
+                          <Link to={`/orders/${order.id}/confirm`}>
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Confirm Delivery
+                          </Link>
                         </DropdownMenuItem>
                       )}
-                      {(order.status === "pending" || order.status === "in_progress" || order.status === "delivered") && (
+                      {(order.status === "pending" || order.status === "in_progress" || order.status === "delivered" || order.status === "escrow_locked") && (
                         <DropdownMenuItem asChild>
                           <Link to={`/orders/${order.id}/report`}>
                             <AlertTriangle className="h-4 w-4 mr-2" />
@@ -186,16 +194,12 @@ export function OrdersTable({ orders, isLoading, onConfirmDelivery, isConfirming
               <Button asChild variant="outline" size="sm" className="flex-1">
                 <Link to={`/orders/${order.id}`}>View Details</Link>
               </Button>
-              {order.status === "delivered" && (
-                <Button
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setConfirmOrderId(order.id)}
-                >
-                  Confirm Delivery
+              {(order.status === "delivered" || order.status === "escrow_locked" || order.status === "in_progress") && (
+                <Button asChild size="sm" className="flex-1">
+                  <Link to={`/orders/${order.id}/confirm`}>Confirm</Link>
                 </Button>
               )}
-              {(order.status === "pending" || order.status === "in_progress" || order.status === "delivered") && (
+              {(order.status === "pending" || order.status === "in_progress" || order.status === "delivered" || order.status === "escrow_locked") && (
                 <Button asChild variant="destructive" size="sm" className="flex-1">
                   <Link to={`/orders/${order.id}/report`}>Report</Link>
                 </Button>

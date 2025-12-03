@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      delivery_proofs: {
+        Row: {
+          created_at: string
+          customer_id: string
+          file_path: string
+          id: string
+          notes: string | null
+          order_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          file_path: string
+          id?: string
+          notes?: string | null
+          order_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          file_path?: string
+          id?: string
+          notes?: string | null
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_proofs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       disputes: {
         Row: {
           created_at: string
@@ -95,6 +130,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_events: {
+        Row: {
+          created_at: string
+          description: string | null
+          event_type: string
+          id: string
+          metadata: Json | null
+          order_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          order_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          order_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_events_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
@@ -223,6 +296,88 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      tracking: {
+        Row: {
+          carrier: string | null
+          created_at: string
+          estimated_delivery: string | null
+          id: string
+          location: string | null
+          order_id: string
+          status: string
+          tracking_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          carrier?: string | null
+          created_at?: string
+          estimated_delivery?: string | null
+          id?: string
+          location?: string | null
+          order_id: string
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          carrier?: string | null
+          created_at?: string
+          estimated_delivery?: string | null
+          id?: string
+          location?: string | null
+          order_id?: string
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracking_events: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          location: string | null
+          occurred_at: string
+          status: string
+          tracking_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          occurred_at?: string
+          status: string
+          tracking_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          occurred_at?: string
+          status?: string
+          tracking_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_events_tracking_id_fkey"
+            columns: ["tracking_id"]
+            isOneToOne: false
+            referencedRelation: "tracking"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

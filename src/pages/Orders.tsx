@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { OrdersTable } from "@/components/dashboard/OrdersTable";
+import { OrderMetrics } from "@/components/orders/OrderMetrics";
 import { useOrders, OrderStatus } from "@/hooks/useOrders";
 import { Filter } from "lucide-react";
 import {
@@ -15,6 +16,7 @@ import { PageTransition } from "@/components/layout/PageTransition";
 const statusOptions: { value: string; label: string }[] = [
   { value: "all", label: "All Orders" },
   { value: "pending", label: "Pending" },
+  { value: "escrow_locked", label: "Escrow Locked" },
   { value: "in_progress", label: "In Progress" },
   { value: "delivered", label: "Delivered" },
   { value: "completed", label: "Completed" },
@@ -28,6 +30,7 @@ export default function Orders() {
 
   const {
     orders,
+    metrics,
     isLoading,
     confirmDelivery,
     isConfirming,
@@ -75,6 +78,9 @@ export default function Orders() {
               </Select>
             </div>
           </div>
+
+          {/* Metrics Cards */}
+          <OrderMetrics metrics={metrics} isLoading={isLoading} />
 
           {/* Orders Table */}
           <OrdersTable
