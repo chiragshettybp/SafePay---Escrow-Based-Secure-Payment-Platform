@@ -46,6 +46,8 @@ const statusConfig: Record<OrderStatus, { label: string; variant: "default" | "s
   disputed: { label: "Disputed", variant: "destructive" },
   refunded: { label: "Refunded", variant: "outline" },
   cancelled: { label: "Cancelled", variant: "destructive" },
+  draft: { label: "Draft", variant: "secondary" },
+  escrow_locked: { label: "Escrow Locked", variant: "default" },
 };
 
 export function OrdersTable({ orders, isLoading, onConfirmDelivery, isConfirming }: OrdersTableProps) {
