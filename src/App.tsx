@@ -12,6 +12,8 @@ import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
 import OrderDetails from "./pages/OrderDetails";
+import OrderTracking from "./pages/OrderTracking";
+import ConfirmDelivery from "./pages/ConfirmDelivery";
 import ReportIssue from "./pages/ReportIssue";
 import NewPayment from "./pages/NewPayment";
 import PaymentReview from "./pages/PaymentReview";
@@ -36,6 +38,8 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/orders/:orderId" element={<OrderDetails />} />
+            <Route path="/orders/:orderId/tracking" element={<OrderTracking />} />
+            <Route path="/orders/:orderId/confirm" element={<ConfirmDelivery />} />
             <Route path="/orders/:orderId/report" element={<ReportIssue />} />
             <Route path="/payment/new" element={<NewPayment />} />
             <Route path="/payment/review/:orderId" element={<PaymentReview />} />

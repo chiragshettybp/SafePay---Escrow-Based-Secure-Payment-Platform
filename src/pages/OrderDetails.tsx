@@ -1,21 +1,12 @@
-import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { useOrder, useOrders } from "@/hooks/useOrders";
+import { useOrder, OrderStatus } from "@/hooks/useOrders";
+import { useOrderEvents } from "@/hooks/useOrderEvents";
+import { OrderTimeline } from "@/components/orders/OrderTimeline";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
   ArrowLeft,
   Package,
@@ -25,33 +16,27 @@ import {
   CheckCircle,
   AlertTriangle,
   Loader2,
-  Clock,
+  Truck,
 } from "lucide-react";
 import { PageTransition } from "@/components/layout/PageTransition";
 
-const statusConfig = {
-  pending: { label: "Pending", variant: "secondary" as const, color: "text-secondary" },
-  in_progress: { label: "In Progress", variant: "default" as const, color: "text-primary" },
-  delivered: { label: "Delivered", variant: "default" as const, color: "text-primary" },
-  completed: { label: "Completed", variant: "outline" as const, color: "text-success" },
-  disputed: { label: "Disputed", variant: "destructive" as const, color: "text-destructive" },
-  refunded: { label: "Refunded", variant: "outline" as const, color: "text-muted-foreground" },
-  cancelled: { label: "Cancelled", variant: "destructive" as const, color: "text-destructive" },
+const statusConfig: Record<OrderStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; color: string }> = {
+  pending: { label: "Pending", variant: "secondary", color: "text-secondary" },
+  draft: { label: "Draft", variant: "secondary", color: "text-muted-foreground" },
+  escrow_locked: { label: "Escrow Locked", variant: "default", color: "text-primary" },
+  in_progress: { label: "In Progress", variant: "default", color: "text-primary" },
+  delivered: { label: "Delivered", variant: "default", color: "text-primary" },
+  completed: { label: "Completed", variant: "outline", color: "text-success" },
+  disputed: { label: "Disputed", variant: "destructive", color: "text-destructive" },
+  refunded: { label: "Refunded", variant: "outline", color: "text-muted-foreground" },
+  cancelled: { label: "Cancelled", variant: "destructive", color: "text-destructive" },
 };
 
 export default function OrderDetails() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const { data: order, isLoading } = useOrder(orderId || "");
-  const { confirmDelivery, isConfirming } = useOrders();
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-
-  const handleConfirmDelivery = () => {
-    if (order) {
-      confirmDelivery(order.id);
-      setShowConfirmDialog(false);
-    }
-  };
+  const { data: orderEvents, isLoading: eventsLoading } = useOrderEvents(orderId || "");
 
   if (isLoading) {
     return (
@@ -138,82 +123,47 @@ export default function OrderDetails() {
                       <p className="font-medium text-foreground">${order.amount.toFixed(2)}</p>
                     </div>
                   </div>
+
+                  {order.expected_delivery_date && (
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 sm:col-span-2">
+                      <Calendar className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Expected Delivery</p>
+                        <p className="font-medium text-foreground">
+                          {format(new Date(order.expected_delivery_date), "MMMM d, yyyy")}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             {/* Timeline */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Timeline
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 rounded-full bg-primary mt-2" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Order Created</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(order.created_at), "MMM d, yyyy 'at' h:mm a")}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {order.expected_delivery_date && (
-                    <div className="flex items-start gap-3">
-                      <div className="w-2 h-2 rounded-full bg-warning mt-2" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Expected Delivery</p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(order.expected_delivery_date), "MMM d, yyyy")}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {order.delivered_at && (
-                    <div className="flex items-start gap-3">
-                      <div className="w-2 h-2 rounded-full bg-success mt-2" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Delivered</p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(order.delivered_at), "MMM d, yyyy 'at' h:mm a")}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {order.completed_at && (
-                    <div className="flex items-start gap-3">
-                      <div className="w-2 h-2 rounded-full bg-success mt-2" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Completed</p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(order.completed_at), "MMM d, yyyy 'at' h:mm a")}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            <OrderTimeline events={orderEvents || []} isLoading={eventsLoading} />
           </div>
 
           {/* Actions */}
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col sm:flex-row gap-3">
-                {order.status === "delivered" && (
-                  <Button onClick={() => setShowConfirmDialog(true)} className="flex-1 sm:flex-none">
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Confirm Delivery
+                <Button asChild variant="outline" className="flex-1 sm:flex-none">
+                  <Link to={`/orders/${order.id}/tracking`}>
+                    <Truck className="h-4 w-4 mr-2" />
+                    Track Order
+                  </Link>
+                </Button>
+
+                {(order.status === "delivered" || order.status === "escrow_locked" || order.status === "in_progress") && (
+                  <Button asChild className="flex-1 sm:flex-none">
+                    <Link to={`/orders/${order.id}/confirm`}>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Confirm Delivery
+                    </Link>
                   </Button>
                 )}
                 
-                {(order.status === "pending" || order.status === "in_progress" || order.status === "delivered") && (
+                {(order.status === "pending" || order.status === "in_progress" || order.status === "delivered" || order.status === "escrow_locked") && (
                   <Button asChild variant="destructive" className="flex-1 sm:flex-none">
                     <Link to={`/orders/${order.id}/report`}>
                       <AlertTriangle className="h-4 w-4 mr-2" />
@@ -223,37 +173,12 @@ export default function OrderDetails() {
                 )}
                 
                 <Button asChild variant="outline" className="flex-1 sm:flex-none">
-                  <Link to="/dashboard">Back to Dashboard</Link>
+                  <Link to="/orders">Back to Orders</Link>
                 </Button>
               </div>
             </CardContent>
           </Card>
         </div>
-
-        {/* Confirm Dialog */}
-        <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirm Delivery</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to confirm delivery? This will release the payment of ${order.amount.toFixed(2)} to the merchant. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirmDelivery} disabled={isConfirming}>
-                {isConfirming ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Confirming...
-                  </>
-                ) : (
-                  "Confirm Delivery"
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </PageTransition>
     </DashboardLayout>
   );
