@@ -60,7 +60,7 @@ export default function ReportIssue() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const { data: order, isLoading: orderLoading } = useOrder(orderId || "");
-  const { createDispute, isCreating, uploadDocument } = useDisputes();
+  const { createDispute, isCreatingDispute, uploadDocument } = useDisputes();
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -123,6 +123,7 @@ export default function ReportIssue() {
       order_id: orderId,
       reason: data.reason,
       description: data.description,
+      issue_type: "other",
       documents: documentPaths,
     }, {
       onSuccess: () => {
@@ -299,10 +300,10 @@ export default function ReportIssue() {
                   <div className="flex flex-col sm:flex-row gap-3 pt-4">
                     <Button
                       type="submit"
-                      disabled={isCreating || uploading}
+                      disabled={isCreatingDispute || uploading}
                       className="flex-1 sm:flex-none"
                     >
-                      {isCreating || uploading ? (
+                      {isCreatingDispute || uploading ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           {uploading ? "Uploading..." : "Submitting..."}

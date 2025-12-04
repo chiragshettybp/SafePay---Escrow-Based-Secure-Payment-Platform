@@ -49,15 +49,130 @@ export type Database = {
           },
         ]
       }
+      dispute_comments: {
+        Row: {
+          created_at: string
+          dispute_id: string
+          id: string
+          is_admin: boolean | null
+          message: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dispute_id: string
+          id?: string
+          is_admin?: boolean | null
+          message: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dispute_id?: string
+          id?: string
+          is_admin?: boolean | null
+          message?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispute_comments_dispute_id_fkey"
+            columns: ["dispute_id"]
+            isOneToOne: false
+            referencedRelation: "disputes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispute_files: {
+        Row: {
+          created_at: string
+          dispute_id: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          dispute_id: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          dispute_id?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispute_files_dispute_id_fkey"
+            columns: ["dispute_id"]
+            isOneToOne: false
+            referencedRelation: "disputes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispute_updates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          dispute_id: string
+          id: string
+          status: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          dispute_id: string
+          id?: string
+          status?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          dispute_id?: string
+          id?: string
+          status?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispute_updates_dispute_id_fkey"
+            columns: ["dispute_id"]
+            isOneToOne: false
+            referencedRelation: "disputes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       disputes: {
         Row: {
           created_at: string
           customer_id: string
           description: string
           documents: string[] | null
+          final_decision: string | null
           id: string
+          issue_type: string | null
+          merchant_responded: boolean | null
           order_id: string
           reason: string
+          refund_amount: number | null
           resolution_notes: string | null
           status: Database["public"]["Enums"]["dispute_status"]
           updated_at: string
@@ -67,9 +182,13 @@ export type Database = {
           customer_id: string
           description: string
           documents?: string[] | null
+          final_decision?: string | null
           id?: string
+          issue_type?: string | null
+          merchant_responded?: boolean | null
           order_id: string
           reason: string
+          refund_amount?: number | null
           resolution_notes?: string | null
           status?: Database["public"]["Enums"]["dispute_status"]
           updated_at?: string
@@ -79,9 +198,13 @@ export type Database = {
           customer_id?: string
           description?: string
           documents?: string[] | null
+          final_decision?: string | null
           id?: string
+          issue_type?: string | null
+          merchant_responded?: boolean | null
           order_id?: string
           reason?: string
+          refund_amount?: number | null
           resolution_notes?: string | null
           status?: Database["public"]["Enums"]["dispute_status"]
           updated_at?: string
