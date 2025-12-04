@@ -92,10 +92,13 @@ export function usePaymentFlow() {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       navigate(`/payment/review/${data.id}`);
     },
-    onError: (error) => {
+    onError: (error: Error) => {
+      const message = error.message === "Not authenticated" 
+        ? "Please log in to create a payment."
+        : "Failed to create payment draft. Please try again.";
       toast({
         title: "Error",
-        description: "Failed to create payment draft. Please try again.",
+        description: message,
         variant: "destructive",
       });
       console.error("Draft creation error:", error);
