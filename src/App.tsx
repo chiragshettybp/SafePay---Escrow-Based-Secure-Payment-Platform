@@ -18,6 +18,10 @@ import ReportIssue from "./pages/ReportIssue";
 import NewPayment from "./pages/NewPayment";
 import PaymentReview from "./pages/PaymentReview";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import RaiseDispute from "./pages/RaiseDispute";
+import DisputeUpload from "./pages/DisputeUpload";
+import DisputeStatus from "./pages/DisputeStatus";
+import DisputeResult from "./pages/DisputeResult";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,10 +41,14 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/orders" element={<Orders />} />
-            <Route path="/orders/:orderId" element={<OrderDetails />} />
-            <Route path="/orders/:orderId/tracking" element={<OrderTracking />} />
-            <Route path="/orders/:orderId/confirm" element={<ConfirmDelivery />} />
-            <Route path="/orders/:orderId/report" element={<ReportIssue />} />
+            <Route path="/order/:orderId" element={<OrderDetails />} />
+            <Route path="/order/:orderId/tracking" element={<OrderTracking />} />
+            <Route path="/order/:orderId/confirm" element={<ConfirmDelivery />} />
+            <Route path="/order/:orderId/report" element={<ReportIssue />} />
+            <Route path="/dispute/:orderId/raise" element={<RaiseDispute />} />
+            <Route path="/dispute/:disputeId/upload" element={<DisputeUpload />} />
+            <Route path="/dispute/:disputeId/status" element={<DisputeStatus />} />
+            <Route path="/dispute/:disputeId/result" element={<DisputeResult />} />
             <Route path="/payment/new" element={<NewPayment />} />
             <Route path="/payment/review/:orderId" element={<PaymentReview />} />
             <Route path="/payment/success/:orderId" element={<PaymentSuccess />} />
