@@ -11,6 +11,8 @@ import {
   ChevronRight,
   Shield,
   Plus,
+  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
@@ -24,6 +26,8 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Plus, label: "New Payment", href: "/payment/new", highlight: true },
   { icon: ShoppingBag, label: "Orders", href: "/orders" },
+  { icon: AlertTriangle, label: "Disputes", href: "/disputes" },
+  { icon: RotateCcw, label: "Refunds", href: "/refunds" },
   { icon: Wallet, label: "Wallet", href: "/wallet" },
   { icon: Settings, label: "Settings", href: "/settings" },
   { icon: HelpCircle, label: "Support", href: "/support" },
