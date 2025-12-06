@@ -30,6 +30,7 @@ import RefundFailed from "./pages/RefundFailed";
 import Wallet from "./pages/Wallet";
 import WalletTransactions from "./pages/WalletTransactions";
 import WalletBankAccount from "./pages/WalletBankAccount";
+import WalletWithdraw from "./pages/WalletWithdraw";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,7 @@ const App = () => (
             <Route path="/wallet" element={<Wallet />} />
             <Route path="/wallet/transactions" element={<WalletTransactions />} />
             <Route path="/wallet/bank-account" element={<WalletBankAccount />} />
+            <Route path="/wallet/withdraw" element={<WalletWithdraw />} />
             <Route path="/payment/new" element={<NewPayment />} />
             <Route path="/payment/review/:orderId" element={<PaymentReview />} />
             <Route path="/payment/success/:orderId" element={<PaymentSuccess />} />

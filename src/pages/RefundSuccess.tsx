@@ -1,20 +1,63 @@
 import { useParams, Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { CheckCircle, Download, ArrowRight, CreditCard, Clock, FileText } from 'lucide-react';
+import { CheckCircle, Download, ArrowRight, CreditCard, Clock, FileText, Wallet } from 'lucide-react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRefund } from '@/hooks/useRefunds';
+import { useWallet } from '@/hooks/useWallet';
 import { supabase } from '@/integrations/supabase/client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
 const RefundSuccess = () => {
   const { refundId } = useParams<{ refundId: string }>();
   const { refund, events, isLoading, isLoadingEvents } = useRefund(refundId);
+  const { wallet, creditFromRefund } = useWallet();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [walletCredited, setWalletCredited] = useState(false);
+  const creditAttemptedRef = useRef(false);
+
+  // Auto-credit wallet when refund is successful
+  useEffect(() => {
+    const creditWallet = async () => {
+      if (
+        refund?.status === 'success' &&
+        wallet?.id &&
+        !walletCredited &&
+        !creditAttemptedRef.current
+      ) {
+        creditAttemptedRef.current = true;
+        
+        // Check if already credited by looking for existing transaction
+        const { data: existingTx } = await supabase
+          .from('wallet_transactions')
+          .select('id')
+          .eq('reference_id', refund.id)
+          .eq('reference_type', 'refund')
+          .maybeSingle();
+
+        if (!existingTx) {
+          try {
+            await creditFromRefund.mutateAsync({
+              refundId: refund.id,
+              amount: refund.amount,
+              orderId: refund.order_id,
+            });
+            setWalletCredited(true);
+          } catch (error) {
+            console.error('Failed to credit wallet:', error);
+          }
+        } else {
+          setWalletCredited(true);
+        }
+      }
+    };
+
+    creditWallet();
+  }, [refund, wallet?.id, walletCredited, creditFromRefund]);
 
   const handleDownloadReceipt = async () => {
     if (!refund?.receipt_url) {
@@ -85,8 +128,28 @@ const RefundSuccess = () => {
               </div>
               <h1 className="text-2xl font-bold text-green-600 mb-2">Refund Successful!</h1>
               <p className="text-muted-foreground">
-                Your refund has been processed and credited to your account
+                Your refund has been processed and credited to your wallet
               </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Wallet Credit Notice */}
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
+                <Wallet className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">Wallet Credited</p>
+                <p className="text-sm text-muted-foreground">
+                  ₹{refund.amount.toLocaleString()} has been added to your wallet balance
+                </p>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/wallet">View Wallet</Link>
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -108,11 +171,8 @@ const RefundSuccess = () => {
               <div className="bg-muted/50 rounded-lg p-4">
                 <p className="text-sm text-muted-foreground">Credited To</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <CreditCard className="h-4 w-4" />
-                  <span className="font-medium capitalize">{refund.payment_method || 'Original Payment Method'}</span>
-                  {refund.payment_method_last4 && (
-                    <span className="text-muted-foreground">•••• {refund.payment_method_last4}</span>
-                  )}
+                  <Wallet className="h-4 w-4" />
+                  <span className="font-medium">Wallet Balance</span>
                 </div>
               </div>
             </div>
@@ -224,6 +284,12 @@ const RefundSuccess = () => {
         <div className="flex flex-col sm:flex-row gap-3">
           <Button variant="outline" asChild className="flex-1">
             <Link to={`/order/${refund.order_id}`}>View Order Details</Link>
+          </Button>
+          <Button variant="outline" asChild className="flex-1">
+            <Link to="/wallet">
+              <Wallet className="h-4 w-4 mr-2" />
+              Go to Wallet
+            </Link>
           </Button>
           <Button asChild className="flex-1">
             <Link to="/orders">

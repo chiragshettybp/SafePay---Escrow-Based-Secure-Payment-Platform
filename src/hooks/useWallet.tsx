@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
@@ -123,6 +123,145 @@ export function useWallet() {
       return data as BankAccount[];
     },
     enabled: !!user?.id,
+  });
+
+  // Credit wallet from refund
+  const creditFromRefund = useMutation({
+    mutationFn: async ({
+      refundId,
+      amount,
+      orderId,
+    }: {
+      refundId: string;
+      amount: number;
+      orderId: string;
+    }) => {
+      if (!user?.id || !wallet?.id) throw new Error("Wallet not available");
+
+      // Create wallet transaction
+      const { error: txError } = await supabase
+        .from("wallet_transactions")
+        .insert({
+          wallet_id: wallet.id,
+          customer_id: user.id,
+          type: "refund",
+          amount,
+          description: `Refund credited for order ${orderId.slice(0, 8)}`,
+          status: "success",
+          reference_id: refundId,
+          reference_type: "refund",
+        });
+
+      if (txError) throw txError;
+
+      // Update wallet balance
+      const { error: walletError } = await supabase
+        .from("wallets")
+        .update({ 
+          balance: wallet.balance + amount,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", wallet.id);
+
+      if (walletError) throw walletError;
+
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["wallet-transactions"] });
+      toast({
+        title: "Refund Credited",
+        description: "The refund has been added to your wallet balance.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Withdraw to bank account
+  const withdrawToBank = useMutation({
+    mutationFn: async ({
+      bankAccountId,
+      amount,
+    }: {
+      bankAccountId: string;
+      amount: number;
+    }) => {
+      if (!user?.id || !wallet?.id) throw new Error("Wallet not available");
+      
+      if (amount <= 0) throw new Error("Amount must be greater than 0");
+      if (amount > wallet.balance) throw new Error("Insufficient wallet balance");
+
+      // Verify bank account exists and is verified
+      const { data: bankAccount, error: bankError } = await supabase
+        .from("bank_accounts")
+        .select("*")
+        .eq("id", bankAccountId)
+        .eq("customer_id", user.id)
+        .single();
+
+      if (bankError || !bankAccount) throw new Error("Bank account not found");
+      if (bankAccount.verification_status !== "verified") {
+        throw new Error("Bank account must be verified for withdrawals");
+      }
+
+      // Create withdrawal transaction (pending)
+      const { data: transaction, error: txError } = await supabase
+        .from("wallet_transactions")
+        .insert({
+          wallet_id: wallet.id,
+          customer_id: user.id,
+          type: "withdrawal",
+          amount,
+          description: `Withdrawal to ${bankAccount.bank_name} ••••${bankAccount.account_number.slice(-4)}`,
+          status: "pending",
+          reference_id: bankAccountId,
+          reference_type: "bank_account",
+          metadata: {
+            bank_name: bankAccount.bank_name,
+            account_last4: bankAccount.account_number.slice(-4),
+            ifsc_code: bankAccount.ifsc_code,
+          },
+        })
+        .select()
+        .single();
+
+      if (txError) throw txError;
+
+      // Deduct from wallet balance
+      const { error: walletError } = await supabase
+        .from("wallets")
+        .update({ 
+          balance: wallet.balance - amount,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", wallet.id);
+
+      if (walletError) throw walletError;
+
+      return transaction;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["wallet-transactions"] });
+      toast({
+        title: "Withdrawal Initiated",
+        description: "Your withdrawal request has been submitted. Funds will be credited within 2-3 business days.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Withdrawal Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   // Add bank account mutation
@@ -306,6 +445,10 @@ export function useWallet() {
       transactions
         ?.filter((t) => t.type === "refund" && t.status === "pending")
         .reduce((sum, t) => sum + t.amount, 0) || 0,
+    pendingWithdrawals:
+      transactions
+        ?.filter((t) => t.type === "withdrawal" && t.status === "pending")
+        .reduce((sum, t) => sum + t.amount, 0) || 0,
   };
 
   return {
@@ -319,5 +462,7 @@ export function useWallet() {
     addBankAccount,
     updateBankAccount,
     deleteBankAccount,
+    creditFromRefund,
+    withdrawToBank,
   };
 }
