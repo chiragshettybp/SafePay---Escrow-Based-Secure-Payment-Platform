@@ -22,6 +22,7 @@ import RaiseDispute from "./pages/RaiseDispute";
 import DisputeUpload from "./pages/DisputeUpload";
 import DisputeStatus from "./pages/DisputeStatus";
 import DisputeResult from "./pages/DisputeResult";
+import Refunds from "./pages/Refunds";
 import RefundInitiated from "./pages/RefundInitiated";
 import RefundSuccess from "./pages/RefundSuccess";
 import RefundFailed from "./pages/RefundFailed";
@@ -52,6 +53,7 @@ const App = () => (
             <Route path="/dispute/:disputeId/upload" element={<DisputeUpload />} />
             <Route path="/dispute/:disputeId/status" element={<DisputeStatus />} />
             <Route path="/dispute/:disputeId/result" element={<DisputeResult />} />
+            <Route path="/refunds" element={<Refunds />} />
             <Route path="/refund/:refundId" element={<RefundInitiated />} />
             <Route path="/refund/:refundId/success" element={<RefundSuccess />} />
             <Route path="/refund/:refundId/failed" element={<RefundFailed />} />
