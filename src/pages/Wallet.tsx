@@ -74,13 +74,21 @@ export default function Wallet() {
                 Manage your balance, transactions, and bank accounts
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 onClick={() => navigate("/wallet/transactions")}
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 View Transactions
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate("/wallet/withdraw")}
+                disabled={!wallet?.balance || wallet.balance <= 0}
+              >
+                <ArrowUpRight className="h-4 w-4 mr-2" />
+                Withdraw
               </Button>
               <Button onClick={() => navigate("/wallet/bank-account")}>
                 <Plus className="h-4 w-4 mr-2" />
