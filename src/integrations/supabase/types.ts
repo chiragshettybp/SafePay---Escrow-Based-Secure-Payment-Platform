@@ -420,6 +420,116 @@ export type Database = {
         }
         Relationships: []
       }
+      refund_events: {
+        Row: {
+          created_at: string
+          description: string | null
+          event_type: string
+          id: string
+          metadata: Json | null
+          refund_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          refund_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          refund_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_events_refund_id_fkey"
+            columns: ["refund_id"]
+            isOneToOne: false
+            referencedRelation: "refunds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      refunds: {
+        Row: {
+          amount: number
+          created_at: string
+          credited_at: string | null
+          customer_id: string
+          dispute_id: string | null
+          failure_reason: string | null
+          id: string
+          order_id: string
+          payment_method: string | null
+          payment_method_last4: string | null
+          reason: string
+          receipt_url: string | null
+          retry_allowed: boolean | null
+          status: string
+          transaction_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          credited_at?: string | null
+          customer_id: string
+          dispute_id?: string | null
+          failure_reason?: string | null
+          id?: string
+          order_id: string
+          payment_method?: string | null
+          payment_method_last4?: string | null
+          reason: string
+          receipt_url?: string | null
+          retry_allowed?: boolean | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          credited_at?: string | null
+          customer_id?: string
+          dispute_id?: string | null
+          failure_reason?: string | null
+          id?: string
+          order_id?: string
+          payment_method?: string | null
+          payment_method_last4?: string | null
+          reason?: string
+          receipt_url?: string | null
+          retry_allowed?: boolean | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refunds_dispute_id_fkey"
+            columns: ["dispute_id"]
+            isOneToOne: false
+            referencedRelation: "disputes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tracking: {
         Row: {
           carrier: string | null
