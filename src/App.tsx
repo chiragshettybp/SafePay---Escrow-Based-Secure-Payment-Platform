@@ -27,6 +27,9 @@ import Refunds from "./pages/Refunds";
 import RefundInitiated from "./pages/RefundInitiated";
 import RefundSuccess from "./pages/RefundSuccess";
 import RefundFailed from "./pages/RefundFailed";
+import Wallet from "./pages/Wallet";
+import WalletTransactions from "./pages/WalletTransactions";
+import WalletBankAccount from "./pages/WalletBankAccount";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +62,9 @@ const App = () => (
             <Route path="/refund/:refundId" element={<RefundInitiated />} />
             <Route path="/refund/:refundId/success" element={<RefundSuccess />} />
             <Route path="/refund/:refundId/failed" element={<RefundFailed />} />
+            <Route path="/wallet" element={<Wallet />} />
+            <Route path="/wallet/transactions" element={<WalletTransactions />} />
+            <Route path="/wallet/bank-account" element={<WalletBankAccount />} />
             <Route path="/payment/new" element={<NewPayment />} />
             <Route path="/payment/review/:orderId" element={<PaymentReview />} />
             <Route path="/payment/success/:orderId" element={<PaymentSuccess />} />
