@@ -22,6 +22,9 @@ import RaiseDispute from "./pages/RaiseDispute";
 import DisputeUpload from "./pages/DisputeUpload";
 import DisputeStatus from "./pages/DisputeStatus";
 import DisputeResult from "./pages/DisputeResult";
+import RefundInitiated from "./pages/RefundInitiated";
+import RefundSuccess from "./pages/RefundSuccess";
+import RefundFailed from "./pages/RefundFailed";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -49,6 +52,9 @@ const App = () => (
             <Route path="/dispute/:disputeId/upload" element={<DisputeUpload />} />
             <Route path="/dispute/:disputeId/status" element={<DisputeStatus />} />
             <Route path="/dispute/:disputeId/result" element={<DisputeResult />} />
+            <Route path="/refund/:refundId" element={<RefundInitiated />} />
+            <Route path="/refund/:refundId/success" element={<RefundSuccess />} />
+            <Route path="/refund/:refundId/failed" element={<RefundFailed />} />
             <Route path="/payment/new" element={<NewPayment />} />
             <Route path="/payment/review/:orderId" element={<PaymentReview />} />
             <Route path="/payment/success/:orderId" element={<PaymentSuccess />} />
