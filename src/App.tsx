@@ -34,6 +34,9 @@ import WalletWithdraw from "./pages/WalletWithdraw";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 import Kyc from "./pages/Kyc";
+import MerchantLogin from "./pages/MerchantLogin";
+import MerchantSignup from "./pages/MerchantSignup";
+import MerchantVerify from "./pages/MerchantVerify";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -76,6 +79,10 @@ const App = () => (
             <Route path="/payment/new" element={<NewPayment />} />
             <Route path="/payment/review/:orderId" element={<PaymentReview />} />
             <Route path="/payment/success/:orderId" element={<PaymentSuccess />} />
+            {/* Merchant Routes */}
+            <Route path="/merchant/login" element={<MerchantLogin />} />
+            <Route path="/merchant/signup" element={<MerchantSignup />} />
+            <Route path="/merchant/verify" element={<MerchantVerify />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
