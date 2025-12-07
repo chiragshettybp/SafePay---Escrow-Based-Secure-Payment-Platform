@@ -264,6 +264,69 @@ export type Database = {
           },
         ]
       }
+      kyc_records: {
+        Row: {
+          address: string | null
+          address_proof_url: string | null
+          country: string | null
+          created_at: string
+          date_of_birth: string | null
+          full_legal_name: string | null
+          id: string
+          id_back_url: string | null
+          id_front_url: string | null
+          id_number: string | null
+          pincode: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          selfie_url: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          address_proof_url?: string | null
+          country?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          full_legal_name?: string | null
+          id?: string
+          id_back_url?: string | null
+          id_front_url?: string | null
+          id_number?: string | null
+          pincode?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          address_proof_url?: string | null
+          country?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          full_legal_name?: string | null
+          id?: string
+          id_back_url?: string | null
+          id_front_url?: string | null
+          id_number?: string | null
+          pincode?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_url?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
