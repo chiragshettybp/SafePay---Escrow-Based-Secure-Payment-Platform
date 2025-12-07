@@ -31,6 +31,9 @@ import Wallet from "./pages/Wallet";
 import WalletTransactions from "./pages/WalletTransactions";
 import WalletBankAccount from "./pages/WalletBankAccount";
 import WalletWithdraw from "./pages/WalletWithdraw";
+import Profile from "./pages/Profile";
+import EditProfile from "./pages/EditProfile";
+import Kyc from "./pages/Kyc";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,6 +70,9 @@ const App = () => (
             <Route path="/wallet/transactions" element={<WalletTransactions />} />
             <Route path="/wallet/bank-account" element={<WalletBankAccount />} />
             <Route path="/wallet/withdraw" element={<WalletWithdraw />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/profile/edit" element={<EditProfile />} />
+            <Route path="/profile/kyc" element={<Kyc />} />
             <Route path="/payment/new" element={<NewPayment />} />
             <Route path="/payment/review/:orderId" element={<PaymentReview />} />
             <Route path="/payment/success/:orderId" element={<PaymentSuccess />} />
