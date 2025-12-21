@@ -1,3 +1,4 @@
+import type React from "react";
 import { useLocation, Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useRef } from "react";
@@ -38,22 +39,32 @@ export function MerchantSidebar({ isCollapsed, onToggle, onNavClick, isMobile }:
   const location = useLocation();
   const { merchant, logout } = useMerchantAuth();
 
-  // Swipe gesture handling
-  const touchStartX = useRef<number>(0);
-  const touchEndX = useRef<number>(0);
+  // Swipe-left to close (mobile)
+  const touchStart = useRef({ x: 0, y: 0 });
+  const touchLast = useRef({ x: 0, y: 0 });
+  const hasMoved = useRef(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
+    const t = e.touches[0];
+    touchStart.current = { x: t.clientX, y: t.clientY };
+    touchLast.current = { x: t.clientX, y: t.clientY };
+    hasMoved.current = false;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.touches[0].clientX;
+    const t = e.touches[0];
+    touchLast.current = { x: t.clientX, y: t.clientY };
+    hasMoved.current = true;
   };
 
   const handleTouchEnd = () => {
-    const swipeDistance = touchStartX.current - touchEndX.current;
-    // If swiped left more than 50px, close the sidebar
-    if (swipeDistance > 50 && onNavClick) {
+    if (!isMobile || !onNavClick || !hasMoved.current) return;
+
+    const dx = touchStart.current.x - touchLast.current.x;
+    const dy = touchStart.current.y - touchLast.current.y;
+
+    // Close only on a clear left-swipe (avoid closing on taps/scroll)
+    if (dx > 60 && Math.abs(dx) > Math.abs(dy) * 1.2) {
       onNavClick();
     }
   };
@@ -85,7 +96,9 @@ export function MerchantSidebar({ isCollapsed, onToggle, onNavClick, isMobile }:
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-50 flex flex-col bg-card border-r border-border transition-all duration-300",
+        isMobile
+          ? "h-full bg-card border-r border-border flex flex-col"
+          : "fixed inset-y-0 left-0 z-50 flex flex-col bg-card border-r border-border transition-all duration-300",
         isCollapsed ? "w-16" : "w-64"
       )}
       onTouchStart={handleTouchStart}
