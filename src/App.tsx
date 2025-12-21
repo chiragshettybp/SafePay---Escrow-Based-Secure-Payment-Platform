@@ -44,6 +44,10 @@ import MerchantEditTracking from "./pages/MerchantEditTracking";
 import MerchantDeliveryProof from "./pages/MerchantDeliveryProof";
 import MerchantSettings from "./pages/MerchantSettings";
 import MerchantRouteRoot from "./pages/MerchantRouteRoot";
+import MerchantDisputes from "./pages/MerchantDisputes";
+import MerchantDisputeResponse from "./pages/MerchantDisputeResponse";
+import MerchantDisputeUpload from "./pages/MerchantDisputeUpload";
+import MerchantDisputeResult from "./pages/MerchantDisputeResult";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -97,6 +101,10 @@ const App = () => (
               <Route path="order/:orderId/tracking/edit" element={<MerchantEditTracking />} />
               <Route path="order/:orderId/delivery-proof" element={<MerchantDeliveryProof />} />
               <Route path="settings" element={<MerchantSettings />} />
+              <Route path="disputes" element={<MerchantDisputes />} />
+              <Route path="dispute/:disputeId/respond" element={<MerchantDisputeResponse />} />
+              <Route path="dispute/:disputeId/upload" element={<MerchantDisputeUpload />} />
+              <Route path="dispute/:disputeId/result" element={<MerchantDisputeResult />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

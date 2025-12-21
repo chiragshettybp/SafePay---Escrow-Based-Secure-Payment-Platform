@@ -167,6 +167,41 @@ export type Database = {
           },
         ]
       }
+      dispute_responses: {
+        Row: {
+          created_at: string
+          dispute_id: string
+          id: string
+          merchant_id: string
+          response_text: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dispute_id: string
+          id?: string
+          merchant_id: string
+          response_text: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dispute_id?: string
+          id?: string
+          merchant_id?: string
+          response_text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispute_responses_dispute_id_fkey"
+            columns: ["dispute_id"]
+            isOneToOne: false
+            referencedRelation: "disputes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dispute_updates: {
         Row: {
           created_at: string
@@ -326,6 +361,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      merchant_evidence: {
+        Row: {
+          created_at: string
+          description: string | null
+          dispute_id: string
+          evidence_type: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          merchant_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          dispute_id: string
+          evidence_type?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          merchant_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          dispute_id?: string
+          evidence_type?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          merchant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_evidence_dispute_id_fkey"
+            columns: ["dispute_id"]
+            isOneToOne: false
+            referencedRelation: "disputes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       merchants: {
         Row: {
