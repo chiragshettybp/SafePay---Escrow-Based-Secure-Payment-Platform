@@ -87,7 +87,7 @@ export default function MerchantSignup() {
     try {
       // Check if email already exists
       const { data: existingMerchant } = await supabase
-        .from("merchants" as any)
+        .from("merchants")
         .select("id")
         .eq("email", data.email)
         .maybeSingle();
@@ -137,7 +137,7 @@ export default function MerchantSignup() {
       }
 
       // Create merchant record
-      const { error: merchantError } = await supabase.from("merchants" as any).insert({
+      const { error: merchantError } = await supabase.from("merchants").insert({
         user_id: authData.user.id,
         business_name: data.businessName,
         email: data.email,
