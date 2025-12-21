@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { merchantSupabase } from "@/integrations/supabase/merchantClient";
 
 const signupSchema = z.object({
   businessName: z.string().min(2, "Business name must be at least 2 characters"),
@@ -85,8 +85,8 @@ export default function MerchantSignup() {
     setIsLoading(true);
 
     try {
-      // Check if email already exists
-      const { data: existingMerchant } = await supabase
+      // Check if email already exists in merchants table
+      const { data: existingMerchant } = await merchantSupabase
         .from("merchants")
         .select("id")
         .eq("email", data.email)
@@ -102,10 +102,10 @@ export default function MerchantSignup() {
         return;
       }
 
-      // Create auth user (store merchant details in user metadata; merchant profile is created after email verification/login)
-      const redirectUrl = `${window.location.origin}/merchant/verify`;
+      // Use callback route for verification redirect
+      const redirectUrl = `${window.location.origin}/merchant/auth/callback`;
 
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data: authData, error: authError } = await merchantSupabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {

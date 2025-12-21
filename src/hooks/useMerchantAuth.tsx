@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { merchantSupabase } from "@/integrations/supabase/merchantClient";
 
 interface Merchant {
   id: string;
@@ -13,7 +13,6 @@ interface Merchant {
   gst_number: string | null;
   address: string | null;
   status: string;
-  logo_url: string | null;
 }
 
 interface MerchantAuthContextType {
@@ -24,10 +23,11 @@ interface MerchantAuthContextType {
   isAuthenticated: boolean;
   isEmailVerified: boolean;
   isMerchant: boolean;
+  isApproved: boolean;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<{ error: Error | null }>;
   signup: (data: MerchantSignupData) => Promise<{ error: Error | null }>;
   logout: () => Promise<void>;
-  resendVerificationEmail: () => Promise<{ error: Error | null }>;
+  resendVerificationEmail: (email?: string) => Promise<{ error: Error | null }>;
   refreshMerchant: () => Promise<void>;
 }
 
@@ -67,7 +67,7 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
         u.email.split("@")[0] ??
         "Merchant";
 
-      const { error } = await supabase
+      const { error } = await merchantSupabase
         .from("merchants")
         .upsert(
           {
@@ -85,7 +85,7 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
 
-      await supabase.auth.updateUser({
+      await merchantSupabase.auth.updateUser({
         data: {
           ...meta,
           merchant_profile_created: true,
@@ -97,7 +97,7 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchMerchant = async (userId: string) => {
-    const { data, error } = await supabase
+    const { data, error } = await merchantSupabase
       .from("merchants")
       .select("*")
       .eq("user_id", userId)
@@ -118,7 +118,7 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const checkMerchantRole = async (userId: string) => {
-    const { data } = await supabase
+    const { data } = await merchantSupabase
       .from("user_roles")
       .select("role")
       .eq("user_id", userId)
@@ -129,13 +129,15 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Set up auth state listener FIRST
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = merchantSupabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
+        // Defer Supabase calls with setTimeout to prevent deadlock
         setTimeout(() => {
           void ensureMerchantProfile(session.user).then(() => {
             fetchMerchant(session.user.id);
@@ -147,7 +149,8 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // THEN check for existing session
+    merchantSupabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -169,7 +172,7 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
     rememberMe?: boolean
   ): Promise<{ error: Error | null }> => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await merchantSupabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -179,19 +182,22 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (data.user) {
-        // If this user signed up as a merchant but their profile/role wasn't created yet,
-        // create it now (after authentication) and then validate role.
+        // Create merchant profile if needed
         await ensureMerchantProfile(data.user);
 
+        // Check for merchant role
         const hasMerchantRole = await checkMerchantRole(data.user.id);
         if (!hasMerchantRole) {
-          await supabase.auth.signOut();
+          await merchantSupabase.auth.signOut();
           return {
             error: new Error(
               "This account is not registered as a merchant. Please use the merchant signup."
             ),
           };
         }
+
+        // Fetch merchant data
+        await fetchMerchant(data.user.id);
       }
 
       if (rememberMe) {
@@ -208,9 +214,10 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (data: MerchantSignupData): Promise<{ error: Error | null }> => {
     try {
-      const redirectUrl = `${window.location.origin}/merchant/verify`;
+      // Use the callback route for email verification
+      const redirectUrl = `${window.location.origin}/merchant/auth/callback`;
 
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data: authData, error: authError } = await merchantSupabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
@@ -237,7 +244,6 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
         return { error: new Error("Failed to create user account") };
       }
 
-      // Merchant profile will be created after verification/login (needs an authenticated session for RLS)
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -245,7 +251,7 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    await merchantSupabase.auth.signOut();
     setUser(null);
     setSession(null);
     setMerchant(null);
@@ -254,17 +260,21 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
     navigate("/merchant/login");
   };
 
-  const resendVerificationEmail = async (): Promise<{ error: Error | null }> => {
+  const resendVerificationEmail = async (email?: string): Promise<{ error: Error | null }> => {
     try {
-      if (!user?.email) {
+      const targetEmail = email || user?.email;
+      
+      if (!targetEmail) {
         return { error: new Error("No email address found") };
       }
 
-      const { error } = await supabase.auth.resend({
+      const redirectUrl = `${window.location.origin}/merchant/auth/callback`;
+
+      const { error } = await merchantSupabase.auth.resend({
         type: "signup",
-        email: user.email,
+        email: targetEmail,
         options: {
-          emailRedirectTo: `${window.location.origin}/merchant/verify`,
+          emailRedirectTo: redirectUrl,
         },
       });
 
@@ -285,6 +295,7 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isEmailVerified = user?.email_confirmed_at != null;
+  const isApproved = merchant?.status === "active";
 
   return (
     <MerchantAuthContext.Provider
@@ -296,6 +307,7 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!session,
         isEmailVerified,
         isMerchant,
+        isApproved,
         login,
         signup,
         logout,
