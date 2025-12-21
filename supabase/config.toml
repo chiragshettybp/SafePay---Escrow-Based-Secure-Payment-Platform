@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.admin-confirm-merchant]
 verify_jwt = true
+
+[functions.release-escrow]
+verify_jwt = true

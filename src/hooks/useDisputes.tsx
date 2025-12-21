@@ -181,39 +181,50 @@ export function useDisputes() {
     },
   });
 
-  // Withdraw dispute
+  // Withdraw dispute and release escrow to merchant
   const withdrawDispute = useMutation({
-    mutationFn: async (disputeId: string) => {
+    mutationFn: async ({ disputeId, orderId }: { disputeId: string; orderId: string }) => {
       if (!user?.id) throw new Error("Not authenticated");
 
-      const { error } = await supabase
-        .from("disputes")
-        .update({ status: "closed" })
-        .eq("id", disputeId)
-        .eq("customer_id", user.id);
+      // Call the release-escrow edge function to release funds AND close the dispute
+      const { data, error } = await supabase.functions.invoke('release-escrow', {
+        body: {
+          orderId,
+          reason: 'dispute_withdrawn',
+          disputeId
+        }
+      });
 
       if (error) throw error;
+      
+      if (data?.error) {
+        throw new Error(data.error);
+      }
 
-      // Add update entry
-      await supabase.from("dispute_updates").insert({
-        dispute_id: disputeId,
-        title: "Dispute Withdrawn",
-        description: "Customer withdrew the dispute.",
-        status: "closed",
-        created_by: "customer",
-      });
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["disputes"] });
-      toast({
-        title: "Dispute Withdrawn",
-        description: "Your dispute has been withdrawn.",
-      });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["order-metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      
+      if (data?.alreadyReleased) {
+        toast({
+          title: "Dispute Withdrawn",
+          description: "The dispute has been withdrawn. Order was already completed.",
+        });
+      } else {
+        toast({
+          title: "Dispute Withdrawn",
+          description: "Your dispute has been withdrawn and payment released to the merchant.",
+        });
+      }
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: "Failed to withdraw dispute.",
+        description: error.message || "Failed to withdraw dispute.",
         variant: "destructive",
       });
     },

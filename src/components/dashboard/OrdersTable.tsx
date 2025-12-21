@@ -139,7 +139,16 @@ export function OrdersTable({ orders, isLoading, onConfirmDelivery, isConfirming
                           Track Order
                         </Link>
                       </DropdownMenuItem>
-                      {(order.status === "delivered" || order.status === "escrow_locked" || order.status === "in_progress") && (
+                      {order.status === "delivered" && (
+                        <DropdownMenuItem 
+                          onClick={() => setConfirmOrderId(order.id)}
+                          className="text-green-600"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Confirm Delivery
+                        </DropdownMenuItem>
+                      )}
+                      {(order.status === "escrow_locked" || order.status === "in_progress") && (
                         <DropdownMenuItem asChild>
                           <Link to={`/order/${order.id}/confirm`}>
                             <CheckCircle className="h-4 w-4 mr-2" />
@@ -194,7 +203,17 @@ export function OrdersTable({ orders, isLoading, onConfirmDelivery, isConfirming
               <Button asChild variant="outline" size="sm" className="flex-1">
                 <Link to={`/order/${order.id}`}>View Details</Link>
               </Button>
-              {(order.status === "delivered" || order.status === "escrow_locked" || order.status === "in_progress") && (
+              {order.status === "delivered" && (
+                <Button 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => setConfirmOrderId(order.id)}
+                  disabled={isConfirming}
+                >
+                  {isConfirming ? "..." : "Confirm"}
+                </Button>
+              )}
+              {(order.status === "escrow_locked" || order.status === "in_progress") && (
                 <Button asChild size="sm" className="flex-1">
                   <Link to={`/order/${order.id}/confirm`}>Confirm</Link>
                 </Button>
