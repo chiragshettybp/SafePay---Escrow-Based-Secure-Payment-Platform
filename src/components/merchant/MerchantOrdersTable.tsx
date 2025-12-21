@@ -151,6 +151,39 @@ export function MerchantOrdersTable({
                         View Details
                       </Link>
                     </DropdownMenuItem>
+                    {["pending", "escrow_locked"].includes(order.status) && (
+                      <DropdownMenuItem asChild>
+                        <Link
+                          to={`/merchant/order/${order.id}/tracking/add`}
+                          className="flex items-center gap-2"
+                        >
+                          <Truck className="h-4 w-4" />
+                          Add Tracking
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
+                    {order.status === "in_progress" && (
+                      <DropdownMenuItem asChild>
+                        <Link
+                          to={`/merchant/order/${order.id}/tracking/edit`}
+                          className="flex items-center gap-2"
+                        >
+                          <Truck className="h-4 w-4" />
+                          Edit Tracking
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
+                    {["in_progress", "delivered"].includes(order.status) && (
+                      <DropdownMenuItem asChild>
+                        <Link
+                          to={`/merchant/order/${order.id}/delivery-proof`}
+                          className="flex items-center gap-2"
+                        >
+                          <Truck className="h-4 w-4" />
+                          Upload Delivery Proof
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                     {canUpdateStatus(order.status) && (
                       <DropdownMenuItem
                         onClick={() => onUpdateStatus?.(order.id, "in_progress")}
@@ -222,38 +255,39 @@ export function MerchantOrdersTable({
             <span>{format(new Date(order.created_at), "MMM dd, yyyy")}</span>
           </div>
 
-          <div className="flex gap-2 pt-2">
-            <Button asChild variant="outline" size="sm" className="flex-1">
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Button asChild variant="outline" size="sm" className="flex-1 min-w-[80px]">
               <Link to={`/merchant/order/${order.id}`}>
                 <Eye className="h-4 w-4 mr-1.5" />
                 View
               </Link>
             </Button>
-            {canUpdateStatus(order.status) && (
-              <Button
-                variant="default"
-                size="sm"
-                className="flex-1"
-                onClick={() =>
-                  onUpdateStatus?.(
-                    order.id,
-                    order.status === "in_progress" ? "delivered" : "in_progress"
-                  )
-                }
-                disabled={isUpdating}
-              >
-                {isUpdating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <Truck className="h-4 w-4 mr-1.5" />
-                    {order.status === "in_progress" ? "Delivered" : "Ship"}
-                  </>
-                )}
+            {["pending", "escrow_locked"].includes(order.status) && (
+              <Button asChild variant="default" size="sm" className="flex-1 min-w-[100px]">
+                <Link to={`/merchant/order/${order.id}/tracking/add`}>
+                  <Truck className="h-4 w-4 mr-1.5" />
+                  Add Tracking
+                </Link>
+              </Button>
+            )}
+            {order.status === "in_progress" && (
+              <Button asChild variant="default" size="sm" className="flex-1 min-w-[100px]">
+                <Link to={`/merchant/order/${order.id}/tracking/edit`}>
+                  <Truck className="h-4 w-4 mr-1.5" />
+                  Edit Tracking
+                </Link>
+              </Button>
+            )}
+            {["in_progress", "delivered"].includes(order.status) && (
+              <Button asChild variant="secondary" size="sm" className="flex-1 min-w-[100px]">
+                <Link to={`/merchant/order/${order.id}/delivery-proof`}>
+                  <Truck className="h-4 w-4 mr-1.5" />
+                  Upload Proof
+                </Link>
               </Button>
             )}
             {order.status === "disputed" && (
-              <Button asChild variant="destructive" size="sm" className="flex-1">
+              <Button asChild variant="destructive" size="sm" className="flex-1 min-w-[80px]">
                 <Link to={`/merchant/dispute/${order.id}`}>
                   <MessageSquare className="h-4 w-4 mr-1.5" />
                   Respond
