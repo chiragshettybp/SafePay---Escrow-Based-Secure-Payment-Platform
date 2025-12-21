@@ -1,1 +1,7 @@
 project_id = "sgpefhfmcykwtfqfwzcq"
+
+[functions.merchant-signup]
+verify_jwt = false
+
+[functions.admin-confirm-merchant]
+verify_jwt = true
