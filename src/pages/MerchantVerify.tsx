@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Mail, Loader2, CheckCircle2, RefreshCw, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,11 @@ export default function MerchantVerify() {
   const [isVerified, setIsVerified] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  const location = useLocation();
+  const emailFromQuery = new URLSearchParams(location.search).get("email");
+  const [userEmail, setUserEmail] = useState<string | null>(emailFromQuery);
+
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -33,34 +37,78 @@ export default function MerchantVerify() {
     }
   }, [resendCooldown]);
 
+  const ensureMerchantProfile = async (user: any) => {
+    const meta = (user?.user_metadata ?? {}) as any;
+    if (meta?.is_merchant !== true) return;
+    if (!user?.email) return;
+
+    const profile = (meta?.merchant_profile ?? {}) as any;
+    const businessName =
+      profile?.business_name ?? meta?.business_name ?? user.email?.split("@")[0] ?? "Merchant";
+
+    const { error } = await supabase
+      .from("merchants")
+      .upsert(
+        {
+          user_id: user.id,
+          business_name: businessName,
+          email: user.email,
+          phone: profile?.phone ?? meta?.phone ?? null,
+          category: profile?.category ?? null,
+          gst_number: profile?.gst_number ?? null,
+          address: profile?.address ?? null,
+          status: "active",
+        },
+        { onConflict: "user_id" }
+      );
+
+    if (!error) {
+      await supabase.auth.updateUser({
+        data: {
+          ...meta,
+          merchant_profile_created: true,
+        },
+      });
+    }
+
+    return error;
+  };
+
   const checkVerificationStatus = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (!user) {
         setIsLoading(false);
         return;
       }
 
-      setUserEmail(user.email || null);
+      setUserEmail(user.email || emailFromQuery || null);
 
       if (user.email_confirmed_at) {
         setIsVerified(true);
-        
-        // Update merchant status
-        await supabase
-          .from("merchants" as any)
-          .update({ status: "active" })
-          .eq("user_id", user.id);
+
+        const merchantProfileError = await ensureMerchantProfile(user);
+        if (merchantProfileError) {
+          toast({
+            title: "Verified, but setup incomplete",
+            description:
+              "Your email is verified, but we couldn't finish setting up your merchant profile. Please try logging in again.",
+            variant: "destructive",
+          });
+          return;
+        }
 
         toast({
           title: "Email Verified!",
-          description: "Your account is now active.",
+          description: "Your merchant account is now active.",
         });
 
         setTimeout(() => {
           navigate("/merchant/dashboard");
-        }, 2000);
+        }, 1200);
       }
     } catch (error) {
       console.error("Error checking verification:", error);

@@ -51,9 +51,54 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
   const [isMerchant, setIsMerchant] = useState(false);
   const navigate = useNavigate();
 
+  const ensureMerchantProfile = async (u: User) => {
+    try {
+      const meta = (u.user_metadata ?? {}) as any;
+      const isMerchantSignup = meta?.is_merchant === true;
+      const alreadyCreated = meta?.merchant_profile_created === true;
+
+      if (!isMerchantSignup || alreadyCreated) return;
+      if (!u.email) return;
+
+      const profile = (meta?.merchant_profile ?? {}) as any;
+      const businessName =
+        profile?.business_name ??
+        meta?.business_name ??
+        u.email.split("@")[0] ??
+        "Merchant";
+
+      const { error } = await supabase
+        .from("merchants")
+        .upsert(
+          {
+            user_id: u.id,
+            business_name: businessName,
+            email: u.email,
+            phone: profile?.phone ?? meta?.phone ?? null,
+            category: profile?.category ?? null,
+            gst_number: profile?.gst_number ?? null,
+            address: profile?.address ?? null,
+            status: u.email_confirmed_at ? "active" : "pending_verification",
+          },
+          { onConflict: "user_id" }
+        );
+
+      if (error) throw error;
+
+      await supabase.auth.updateUser({
+        data: {
+          ...meta,
+          merchant_profile_created: true,
+        },
+      });
+    } catch (error) {
+      console.error("Error ensuring merchant profile:", error);
+    }
+  };
+
   const fetchMerchant = async (userId: string) => {
     const { data, error } = await supabase
-      .from("merchants" as any)
+      .from("merchants")
       .select("*")
       .eq("user_id", userId)
       .maybeSingle();
@@ -84,28 +129,32 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
 
-        if (session?.user) {
-          setTimeout(() => {
+      if (session?.user) {
+        setTimeout(() => {
+          void ensureMerchantProfile(session.user).then(() => {
             fetchMerchant(session.user.id);
-          }, 0);
-        } else {
-          setMerchant(null);
-          setIsMerchant(false);
-        }
+          });
+        }, 0);
+      } else {
+        setMerchant(null);
+        setIsMerchant(false);
       }
-    );
+    });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        fetchMerchant(session.user.id);
+        void ensureMerchantProfile(session.user).then(() => {
+          fetchMerchant(session.user.id);
+        });
       }
 
       setIsLoading(false);
@@ -114,7 +163,11 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string, rememberMe?: boolean): Promise<{ error: Error | null }> => {
+  const login = async (
+    email: string,
+    password: string,
+    rememberMe?: boolean
+  ): Promise<{ error: Error | null }> => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -125,12 +178,19 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
         return { error };
       }
 
-      // Verify this user is a merchant
       if (data.user) {
+        // If this user signed up as a merchant but their profile/role wasn't created yet,
+        // create it now (after authentication) and then validate role.
+        await ensureMerchantProfile(data.user);
+
         const hasMerchantRole = await checkMerchantRole(data.user.id);
         if (!hasMerchantRole) {
           await supabase.auth.signOut();
-          return { error: new Error("This account is not registered as a merchant. Please use the merchant signup.") };
+          return {
+            error: new Error(
+              "This account is not registered as a merchant. Please use the merchant signup."
+            ),
+          };
         }
       }
 
@@ -150,16 +210,21 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
     try {
       const redirectUrl = `${window.location.origin}/merchant/verify`;
 
-      // Create the auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            business_name: data.businessName,
-            phone: data.phone || null,
             is_merchant: true,
+            merchant_profile_created: false,
+            merchant_profile: {
+              business_name: data.businessName,
+              phone: data.phone || null,
+              category: data.category || null,
+              gst_number: data.gstNumber || null,
+              address: data.address || null,
+            },
           },
         },
       });
@@ -172,23 +237,7 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
         return { error: new Error("Failed to create user account") };
       }
 
-      // Create the merchant record
-      const { error: merchantError } = await supabase.from("merchants" as any).insert({
-        user_id: authData.user.id,
-        business_name: data.businessName,
-        email: data.email,
-        phone: data.phone || null,
-        category: data.category || null,
-        gst_number: data.gstNumber || null,
-        address: data.address || null,
-        status: "pending_verification",
-      });
-
-      if (merchantError) {
-        console.error("Error creating merchant record:", merchantError);
-        return { error: merchantError };
-      }
-
+      // Merchant profile will be created after verification/login (needs an authenticated session for RLS)
       return { error: null };
     } catch (error) {
       return { error: error as Error };
