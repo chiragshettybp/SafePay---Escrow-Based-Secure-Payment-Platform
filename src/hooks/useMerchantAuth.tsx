@@ -21,13 +21,11 @@ interface MerchantAuthContextType {
   merchant: Merchant | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  isEmailVerified: boolean;
   isMerchant: boolean;
   isApproved: boolean;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<{ error: Error | null }>;
   signup: (data: MerchantSignupData) => Promise<{ error: Error | null }>;
   logout: () => Promise<void>;
-  resendVerificationEmail: (email?: string) => Promise<{ error: Error | null }>;
   refreshMerchant: () => Promise<void>;
 }
 
@@ -53,44 +51,32 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
 
   const ensureMerchantProfile = async (u: User) => {
     try {
-      const meta = (u.user_metadata ?? {}) as any;
-      const isMerchantSignup = meta?.is_merchant === true;
-      const alreadyCreated = meta?.merchant_profile_created === true;
-
-      if (!isMerchantSignup || alreadyCreated) return;
       if (!u.email) return;
 
-      const profile = (meta?.merchant_profile ?? {}) as any;
-      const businessName =
-        profile?.business_name ??
-        meta?.business_name ??
-        u.email.split("@")[0] ??
-        "Merchant";
-
-      const { error } = await merchantSupabase
+      const { data: existing, error: fetchError } = await merchantSupabase
         .from("merchants")
-        .upsert(
-          {
-            user_id: u.id,
-            business_name: businessName,
-            email: u.email,
-            phone: profile?.phone ?? meta?.phone ?? null,
-            category: profile?.category ?? null,
-            gst_number: profile?.gst_number ?? null,
-            address: profile?.address ?? null,
-            status: "active", // Auto-approve all merchants
-          },
-          { onConflict: "user_id" }
-        );
+        .select("id")
+        .eq("user_id", u.id)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+      if (existing) return;
+
+      // Fallback only: in normal flow, the merchant profile is created server-side.
+      const businessName = u.email.split("@")[0] ?? "Merchant";
+
+      const { error } = await merchantSupabase.from("merchants").insert({
+        user_id: u.id,
+        business_name: businessName,
+        email: u.email,
+        phone: null,
+        category: null,
+        gst_number: null,
+        address: null,
+        status: "active",
+      });
 
       if (error) throw error;
-
-      await merchantSupabase.auth.updateUser({
-        data: {
-          ...meta,
-          merchant_profile_created: true,
-        },
-      });
     } catch (error) {
       console.error("Error ensuring merchant profile:", error);
     }
@@ -214,33 +200,20 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (data: MerchantSignupData): Promise<{ error: Error | null }> => {
     try {
-      const redirectUrl = `${window.location.origin}/merchant/settings`;
-
-      const { data: authData, error: authError } = await merchantSupabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            is_merchant: true,
-            merchant_profile_created: false,
-            merchant_profile: {
-              business_name: data.businessName,
-              phone: data.phone || null,
-              category: data.category || null,
-              gst_number: data.gstNumber || null,
-              address: data.address || null,
-            },
-          },
+      const { error } = await merchantSupabase.functions.invoke("merchant-signup", {
+        body: {
+          email: data.email,
+          password: data.password,
+          businessName: data.businessName,
+          phone: data.phone || null,
+          category: data.category || null,
+          gstNumber: data.gstNumber || null,
+          address: data.address || null,
         },
       });
 
-      if (authError) {
-        return { error: authError };
-      }
-
-      if (!authData.user) {
-        return { error: new Error("Failed to create user account") };
+      if (error) {
+        return { error };
       }
 
       return { error: null };
@@ -259,33 +232,6 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
     navigate("/merchant/login");
   };
 
-  const resendVerificationEmail = async (email?: string): Promise<{ error: Error | null }> => {
-    try {
-      const targetEmail = email || user?.email;
-
-      if (!targetEmail) {
-        return { error: new Error("No email address found") };
-      }
-
-      const redirectUrl = `${window.location.origin}/merchant/settings`;
-
-      const { error } = await merchantSupabase.auth.resend({
-        type: "signup",
-        email: targetEmail,
-        options: {
-          emailRedirectTo: redirectUrl,
-        },
-      });
-
-      if (error) {
-        return { error };
-      }
-
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
 
   const refreshMerchant = async () => {
     if (user) {
@@ -293,7 +239,6 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const isEmailVerified = user?.email_confirmed_at != null;
   const isApproved = merchant?.status === "active";
 
   return (
@@ -304,13 +249,11 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
         merchant,
         isLoading,
         isAuthenticated: !!session,
-        isEmailVerified,
         isMerchant,
         isApproved,
         login,
         signup,
         logout,
-        resendVerificationEmail,
         refreshMerchant,
       }}
     >

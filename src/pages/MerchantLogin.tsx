@@ -46,9 +46,13 @@ export default function MerchantLogin() {
       });
 
       if (authError) {
+        const msg = authError.message?.toLowerCase().includes("email not confirmed")
+          ? "Merchant email confirmation has been disabled. Please create a new merchant account with a fresh email (or delete the unconfirmed user in Supabase Auth and sign up again)."
+          : authError.message;
+
         toast({
           title: "Login Failed",
-          description: authError.message,
+          description: msg,
           variant: "destructive",
         });
         setIsLoading(false);
