@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { DashboardHeader } from "./DashboardHeader";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useSwipeLeftClose } from "@/hooks/useSwipeLeftClose";
 import { Loader2 } from "lucide-react";
 
 interface DashboardLayoutProps {
@@ -36,6 +37,11 @@ export function DashboardLayout({ children, searchQuery = "", onSearchChange }: 
     return null;
   }
 
+  const mobileSwipe = useSwipeLeftClose({
+    enabled: mobileSidebarOpen,
+    onClose: () => setMobileSidebarOpen(false),
+  });
+
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Sidebar */}
@@ -56,8 +62,9 @@ export function DashboardLayout({ children, searchQuery = "", onSearchChange }: 
 
       {/* Mobile Sidebar */}
       <div
+        {...mobileSwipe}
         className={cn(
-          "fixed inset-y-0 left-0 z-40 lg:hidden transition-transform duration-300",
+          "fixed inset-y-0 left-0 z-40 w-64 touch-pan-y lg:hidden transition-transform duration-300",
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
