@@ -327,6 +327,48 @@ export type Database = {
         }
         Relationships: []
       }
+      merchants: {
+        Row: {
+          address: string | null
+          business_name: string
+          category: string | null
+          created_at: string
+          email: string
+          gst_number: string | null
+          id: string
+          phone: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          business_name: string
+          category?: string | null
+          created_at?: string
+          email: string
+          gst_number?: string | null
+          id?: string
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          business_name?: string
+          category?: string | null
+          created_at?: string
+          email?: string
+          gst_number?: string | null
+          id?: string
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
