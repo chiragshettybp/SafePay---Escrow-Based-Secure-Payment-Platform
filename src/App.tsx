@@ -53,6 +53,10 @@ import MerchantBankAccount from "./pages/MerchantBankAccount";
 import MerchantWithdraw from "./pages/MerchantWithdraw";
 import MerchantWithdrawSuccess from "./pages/MerchantWithdrawSuccess";
 import MerchantPayoutHistory from "./pages/MerchantPayoutHistory";
+import MerchantNotifications from "./pages/MerchantNotifications";
+import MerchantNotificationDetail from "./pages/MerchantNotificationDetail";
+import MerchantNotificationPreferences from "./pages/MerchantNotificationPreferences";
+import MerchantNotificationsArchive from "./pages/MerchantNotificationsArchive";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -115,6 +119,10 @@ const App = () => (
               <Route path="payouts/withdraw" element={<MerchantWithdraw />} />
               <Route path="payouts/success/:payoutId" element={<MerchantWithdrawSuccess />} />
               <Route path="payouts/history" element={<MerchantPayoutHistory />} />
+              <Route path="notifications" element={<MerchantNotifications />} />
+              <Route path="notifications/:notificationId" element={<MerchantNotificationDetail />} />
+              <Route path="notifications/preferences" element={<MerchantNotificationPreferences />} />
+              <Route path="notifications/archive" element={<MerchantNotificationsArchive />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
