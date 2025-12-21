@@ -123,22 +123,28 @@ export default function MerchantVerify() {
     setIsResending(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      if (!user?.email) {
+      const email = user?.email || emailFromQuery || userEmail;
+
+      if (!email) {
         toast({
           title: "Error",
-          description: "No email address found. Please try logging in again.",
+          description: "No email address found. Please go back and sign up again.",
           variant: "destructive",
         });
         return;
       }
 
+      const redirectUrl = `${window.location.origin}/merchant/verify?email=${encodeURIComponent(email)}`;
+
       const { error } = await supabase.auth.resend({
         type: "signup",
-        email: user.email,
+        email,
         options: {
-          emailRedirectTo: `${window.location.origin}/merchant/verify`,
+          emailRedirectTo: redirectUrl,
         },
       });
 
@@ -153,7 +159,8 @@ export default function MerchantVerify() {
 
       toast({
         title: "Email Sent!",
-        description: "Verification email has been sent again.",
+        description:
+          "Verification email has been sent again. Check spam/junk if you don't see it within 1-2 minutes.",
       });
 
       setResendCooldown(60);
