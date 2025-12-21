@@ -109,7 +109,7 @@ export function OrdersTable({ orders, isLoading, onConfirmDelivery, isConfirming
                   {order.product_name}
                 </TableCell>
                 <TableCell className="text-right font-medium">
-                  ${order.amount.toFixed(2)}
+                  ₹{order.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </TableCell>
                 <TableCell>
                   <Badge variant={statusConfig[order.status].variant}>
@@ -174,39 +174,39 @@ export function OrdersTable({ orders, isLoading, onConfirmDelivery, isConfirming
       </div>
 
       {/* Mobile Cards */}
-      <div className="md:hidden space-y-3">
+      <div className="md:hidden space-y-2 sm:space-y-3">
         {orders.map((order) => (
           <div
             key={order.id}
-            className="p-4 rounded-xl border border-border bg-card space-y-3"
+            className="p-3 sm:p-4 rounded-xl border border-border bg-card space-y-2 sm:space-y-3"
           >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="font-medium text-foreground">{order.product_name}</p>
-                <p className="text-sm text-muted-foreground">{order.merchant_name}</p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-foreground text-sm sm:text-base truncate">{order.product_name}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">{order.merchant_name}</p>
               </div>
-              <Badge variant={statusConfig[order.status].variant}>
+              <Badge variant={statusConfig[order.status].variant} className="text-[10px] sm:text-xs flex-shrink-0">
                 {statusConfig[order.status].label}
               </Badge>
             </div>
             
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-xs sm:text-sm">
               <span className="text-muted-foreground">
                 {format(new Date(order.created_at), "MMM d, yyyy")}
               </span>
               <span className="font-semibold text-foreground">
-                ${order.amount.toFixed(2)}
+                ₹{order.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
 
             <div className="flex gap-2 pt-2 border-t border-border">
-              <Button asChild variant="outline" size="sm" className="flex-1">
-                <Link to={`/order/${order.id}`}>View Details</Link>
+              <Button asChild variant="outline" size="sm" className="flex-1 h-9 text-xs sm:text-sm">
+                <Link to={`/order/${order.id}`}>View</Link>
               </Button>
               {order.status === "delivered" && (
                 <Button 
                   size="sm" 
-                  className="flex-1"
+                  className="flex-1 h-9 text-xs sm:text-sm"
                   onClick={() => setConfirmOrderId(order.id)}
                   disabled={isConfirming}
                 >
@@ -214,12 +214,12 @@ export function OrdersTable({ orders, isLoading, onConfirmDelivery, isConfirming
                 </Button>
               )}
               {(order.status === "escrow_locked" || order.status === "in_progress") && (
-                <Button asChild size="sm" className="flex-1">
+                <Button asChild size="sm" className="flex-1 h-9 text-xs sm:text-sm">
                   <Link to={`/order/${order.id}/confirm`}>Confirm</Link>
                 </Button>
               )}
               {(order.status === "pending" || order.status === "in_progress" || order.status === "delivered" || order.status === "escrow_locked") && (
-                <Button asChild variant="destructive" size="sm" className="flex-1">
+                <Button asChild variant="destructive" size="sm" className="flex-1 h-9 text-xs sm:text-sm">
                   <Link to={`/order/${order.id}/report`}>Report</Link>
                 </Button>
               )}

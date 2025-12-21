@@ -134,4 +134,56 @@
   .hover-scale {
     @apply transition-transform duration-200 hover:scale-[1.02];
   }
+
+  /* Mobile-first utilities */
+  .mobile-container {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  .mobile-card {
+    @apply p-4 sm:p-6 rounded-xl border border-border bg-card;
+  }
+
+  .mobile-btn {
+    @apply min-h-[44px] min-w-[44px] px-4;
+  }
+
+  .mobile-touch-target {
+    @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
+  }
+
+  .mobile-text-balance {
+    text-wrap: balance;
+  }
+
+  .mobile-stack {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4;
+  }
+
+  .mobile-grid-2 {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4;
+  }
+
+  .mobile-grid-3 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4;
+  }
+
+  .mobile-grid-4 {
+    @apply grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4;
+  }
+
+  /* Improved spacing for mobile */
+  .mobile-section {
+    @apply space-y-4 sm:space-y-6;
+  }
+
+  /* Safe area for sticky buttons */
+  .mobile-sticky-bottom {
+    @apply fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-lg border-t border-border z-40 lg:relative lg:p-0 lg:bg-transparent lg:border-0 lg:backdrop-blur-none;
+  }
+
+  /* Better touch feedback */
+  .touch-highlight {
+    @apply active:scale-[0.98] transition-transform;
+  }
 }

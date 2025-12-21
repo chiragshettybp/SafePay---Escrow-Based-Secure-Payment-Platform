@@ -28,48 +28,57 @@ export function DashboardHeader({ onMenuClick, searchQuery, onSearchChange }: Da
   const { profile, logout } = useSupabaseAuth();
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-background/80 backdrop-blur-lg border-b border-border">
-      <div className="h-full px-4 lg:px-6 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-30 h-14 sm:h-16 bg-background/80 backdrop-blur-lg border-b border-border">
+      <div className="h-full px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-2 sm:gap-4">
         {/* Mobile Menu Button */}
         <Button
           variant="ghost"
           size="icon"
-          className="lg:hidden"
+          className="lg:hidden h-10 w-10"
           onClick={onMenuClick}
         >
           <Menu className="h-5 w-5" />
         </Button>
 
-        {/* Search */}
-        <div className="flex-1 max-w-md hidden sm:block">
+        {/* Search - hidden on mobile, show icon instead */}
+        <div className="flex-1 max-w-md hidden md:block">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search orders..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-10 bg-card border-border"
+              className="pl-10 bg-card border-border h-9"
             />
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Mobile Search Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden h-10 w-10"
+        >
+          <Search className="h-5 w-5" />
+        </Button>
+
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
+              <Button variant="ghost" size="icon" className="relative h-10 w-10">
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
                   <Badge
                     variant="destructive"
-                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                    className="absolute -top-0.5 -right-0.5 h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center p-0 text-[10px] sm:text-xs"
                   >
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </Badge>
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuContent align="end" className="w-72 sm:w-80">
               <DropdownMenuLabel className="flex items-center justify-between">
                 Notifications
                 {unreadCount > 0 && (
@@ -116,28 +125,28 @@ export function DashboardHeader({ onMenuClick, searchQuery, onSearchChange }: Da
           {/* Profile */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="h-10 w-10">
                 <User className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>
                 <div>
-                  <p className="font-medium">{profile?.full_name || "User"}</p>
+                  <p className="font-medium text-sm">{profile?.full_name || "User"}</p>
                   <p className="text-xs text-muted-foreground">Customer Account</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link to="/settings">Settings</Link>
+                <Link to="/settings" className="cursor-pointer">Settings</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link to="/support">Support</Link>
+                <Link to="/support" className="cursor-pointer">Support</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={logout}
-                className="text-destructive focus:text-destructive"
+                className="text-destructive focus:text-destructive cursor-pointer"
               >
                 Logout
               </DropdownMenuItem>
