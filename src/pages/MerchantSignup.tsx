@@ -102,16 +102,24 @@ export default function MerchantSignup() {
         return;
       }
 
-      // Create auth user
+      // Create auth user (store merchant details in user metadata; merchant profile is created after email verification/login)
+      const redirectUrl = `${window.location.origin}/merchant/verify`;
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/merchant/verify`,
+          emailRedirectTo: redirectUrl,
           data: {
-            business_name: data.businessName,
-            phone: data.phone || null,
             is_merchant: true,
+            merchant_profile_created: false,
+            merchant_profile: {
+              business_name: data.businessName,
+              phone: data.phone || null,
+              category: data.category || null,
+              gst_number: data.gstNumber || null,
+              address: data.address || null,
+            },
           },
         },
       });
@@ -136,35 +144,12 @@ export default function MerchantSignup() {
         return;
       }
 
-      // Create merchant record
-      const { error: merchantError } = await supabase.from("merchants").insert({
-        user_id: authData.user.id,
-        business_name: data.businessName,
-        email: data.email,
-        phone: data.phone || null,
-        category: data.category || null,
-        gst_number: data.gstNumber || null,
-        address: data.address || null,
-        status: "pending_verification",
-      });
-
-      if (merchantError) {
-        console.error("Merchant creation error:", merchantError);
-        toast({
-          title: "Account Created",
-          description: "Your account was created but there was an issue with the merchant profile. Please contact support.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
       toast({
         title: "Account Created!",
-        description: "Please check your email to verify your account.",
+        description: "Check your email to verify. We'll finish setting up your merchant profile after verification.",
       });
 
-      navigate("/merchant/verify");
+      navigate(`/merchant/verify?email=${encodeURIComponent(data.email)}`);
     } catch (error) {
       toast({
         title: "Error",
