@@ -37,6 +37,8 @@ import Kyc from "./pages/Kyc";
 import MerchantLogin from "./pages/MerchantLogin";
 import MerchantSignup from "./pages/MerchantSignup";
 import MerchantDashboard from "./pages/MerchantDashboard";
+import MerchantSettings from "./pages/MerchantSettings";
+import MerchantRouteRoot from "./pages/MerchantRouteRoot";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -80,9 +82,12 @@ const App = () => (
             <Route path="/payment/review/:orderId" element={<PaymentReview />} />
             <Route path="/payment/success/:orderId" element={<PaymentSuccess />} />
             {/* Merchant Routes */}
-            <Route path="/merchant/login" element={<MerchantLogin />} />
-            <Route path="/merchant/signup" element={<MerchantSignup />} />
-            <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
+            <Route path="/merchant" element={<MerchantRouteRoot />}>
+              <Route path="login" element={<MerchantLogin />} />
+              <Route path="signup" element={<MerchantSignup />} />
+              <Route path="dashboard" element={<MerchantDashboard />} />
+              <Route path="settings" element={<MerchantSettings />} />
+            </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

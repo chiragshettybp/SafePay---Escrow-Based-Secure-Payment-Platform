@@ -19,20 +19,18 @@ export function MerchantLayout({
 }: MerchantLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const { isAuthenticated, isLoading, isMerchant, isEmailVerified } = useMerchantAuth();
+  const { isAuthenticated, isLoading, isMerchant } = useMerchantAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
         navigate("/merchant/login");
-      } else if (!isEmailVerified) {
-        navigate("/merchant/verify");
       } else if (!isMerchant) {
         navigate("/merchant/login");
       }
     }
-  }, [isAuthenticated, isLoading, isMerchant, isEmailVerified, navigate]);
+  }, [isAuthenticated, isLoading, isMerchant, navigate]);
 
   if (isLoading) {
     return (

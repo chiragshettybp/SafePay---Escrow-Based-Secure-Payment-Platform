@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MerchantAuthProvider } from "@/hooks/useMerchantAuth";
+import { Seo } from "@/components/seo/Seo";
 
 function MerchantDashboardContent() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -60,6 +60,11 @@ function MerchantDashboardContent() {
 
   return (
     <MerchantLayout searchQuery={searchQuery} onSearchChange={setSearchQuery}>
+      <Seo
+        title="Merchant Dashboard | Safepay"
+        description="Manage escrow orders, shipments, disputes, and payouts from your Safepay merchant dashboard."
+        canonicalPath="/merchant/dashboard"
+      />
       <div className="space-y-6">
         {/* Welcome Header */}
         <div>
@@ -201,9 +206,5 @@ function MerchantDashboardContent() {
 }
 
 export default function MerchantDashboard() {
-  return (
-    <MerchantAuthProvider>
-      <MerchantDashboardContent />
-    </MerchantAuthProvider>
-  );
+  return <MerchantDashboardContent />;
 }
