@@ -37,6 +37,11 @@ import Kyc from "./pages/Kyc";
 import MerchantLogin from "./pages/MerchantLogin";
 import MerchantSignup from "./pages/MerchantSignup";
 import MerchantDashboard from "./pages/MerchantDashboard";
+import MerchantOrders from "./pages/MerchantOrders";
+import MerchantOrderDetails from "./pages/MerchantOrderDetails";
+import MerchantAddTracking from "./pages/MerchantAddTracking";
+import MerchantEditTracking from "./pages/MerchantEditTracking";
+import MerchantDeliveryProof from "./pages/MerchantDeliveryProof";
 import MerchantSettings from "./pages/MerchantSettings";
 import MerchantRouteRoot from "./pages/MerchantRouteRoot";
 import NotFound from "./pages/NotFound";
@@ -86,6 +91,11 @@ const App = () => (
               <Route path="login" element={<MerchantLogin />} />
               <Route path="signup" element={<MerchantSignup />} />
               <Route path="dashboard" element={<MerchantDashboard />} />
+              <Route path="orders" element={<MerchantOrders />} />
+              <Route path="order/:orderId" element={<MerchantOrderDetails />} />
+              <Route path="order/:orderId/tracking/add" element={<MerchantAddTracking />} />
+              <Route path="order/:orderId/tracking/edit" element={<MerchantEditTracking />} />
+              <Route path="order/:orderId/delivery-proof" element={<MerchantDeliveryProof />} />
               <Route path="settings" element={<MerchantSettings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
