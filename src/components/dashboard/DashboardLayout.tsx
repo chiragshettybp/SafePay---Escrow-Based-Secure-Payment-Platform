@@ -65,6 +65,7 @@ export function DashboardLayout({ children, searchQuery = "", onSearchChange }: 
           isCollapsed={false}
           onToggle={() => setMobileSidebarOpen(false)}
           onNavClick={() => setMobileSidebarOpen(false)}
+          isMobile={true}
         />
       </div>
 
