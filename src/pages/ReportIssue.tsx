@@ -127,7 +127,7 @@ export default function ReportIssue() {
       documents: documentPaths,
     }, {
       onSuccess: () => {
-        navigate(`/orders/${orderId}`);
+        navigate(`/order/${orderId}`);
       },
     });
   };

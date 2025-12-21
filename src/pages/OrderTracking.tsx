@@ -213,18 +213,18 @@ export default function OrderTracking() {
             <CardContent className="pt-6">
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button asChild variant="outline" className="flex-1">
-                  <Link to={`/orders/${orderId}`}>View Order Details</Link>
+                  <Link to={`/order/${orderId}`}>View Order Details</Link>
                 </Button>
                 {order.status === "delivered" && (
                   <Button asChild className="flex-1">
-                    <Link to={`/orders/${orderId}/confirm`}>
+                    <Link to={`/order/${orderId}/confirm`}>
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Confirm Delivery
                     </Link>
                   </Button>
                 )}
                 <Button asChild variant="destructive" className="flex-1">
-                  <Link to={`/orders/${orderId}/report`}>
+                  <Link to={`/order/${orderId}/report`}>
                     <AlertTriangle className="h-4 w-4 mr-2" />
                     Report Issue
                   </Link>

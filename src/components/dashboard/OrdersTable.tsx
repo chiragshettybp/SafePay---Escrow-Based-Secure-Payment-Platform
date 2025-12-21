@@ -128,20 +128,20 @@ export function OrdersTable({ orders, isLoading, onConfirmDelivery, isConfirming
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem asChild>
-                        <Link to={`/orders/${order.id}`}>
+                        <Link to={`/order/${order.id}`}>
                           <Eye className="h-4 w-4 mr-2" />
                           View Details
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link to={`/orders/${order.id}/tracking`}>
+                        <Link to={`/order/${order.id}/tracking`}>
                           <Truck className="h-4 w-4 mr-2" />
                           Track Order
                         </Link>
                       </DropdownMenuItem>
                       {(order.status === "delivered" || order.status === "escrow_locked" || order.status === "in_progress") && (
                         <DropdownMenuItem asChild>
-                          <Link to={`/orders/${order.id}/confirm`}>
+                          <Link to={`/order/${order.id}/confirm`}>
                             <CheckCircle className="h-4 w-4 mr-2" />
                             Confirm Delivery
                           </Link>
@@ -149,7 +149,7 @@ export function OrdersTable({ orders, isLoading, onConfirmDelivery, isConfirming
                       )}
                       {(order.status === "pending" || order.status === "in_progress" || order.status === "delivered" || order.status === "escrow_locked") && (
                         <DropdownMenuItem asChild>
-                          <Link to={`/orders/${order.id}/report`}>
+                          <Link to={`/order/${order.id}/report`}>
                             <AlertTriangle className="h-4 w-4 mr-2" />
                             Report Issue
                           </Link>
@@ -192,16 +192,16 @@ export function OrdersTable({ orders, isLoading, onConfirmDelivery, isConfirming
 
             <div className="flex gap-2 pt-2 border-t border-border">
               <Button asChild variant="outline" size="sm" className="flex-1">
-                <Link to={`/orders/${order.id}`}>View Details</Link>
+                <Link to={`/order/${order.id}`}>View Details</Link>
               </Button>
               {(order.status === "delivered" || order.status === "escrow_locked" || order.status === "in_progress") && (
                 <Button asChild size="sm" className="flex-1">
-                  <Link to={`/orders/${order.id}/confirm`}>Confirm</Link>
+                  <Link to={`/order/${order.id}/confirm`}>Confirm</Link>
                 </Button>
               )}
               {(order.status === "pending" || order.status === "in_progress" || order.status === "delivered" || order.status === "escrow_locked") && (
                 <Button asChild variant="destructive" size="sm" className="flex-1">
-                  <Link to={`/orders/${order.id}/report`}>Report</Link>
+                  <Link to={`/order/${order.id}/report`}>Report</Link>
                 </Button>
               )}
             </div>
