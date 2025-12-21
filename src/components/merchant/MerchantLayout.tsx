@@ -73,6 +73,7 @@ export function MerchantLayout({
           isCollapsed={false}
           onToggle={() => setMobileSidebarOpen(false)}
           onNavClick={() => setMobileSidebarOpen(false)}
+          isMobile={true}
         />
       </div>
 

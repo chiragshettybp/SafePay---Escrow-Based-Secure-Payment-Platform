@@ -1,5 +1,6 @@
 import { useLocation, Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useRef } from "react";
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -11,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  X,
 } from "lucide-react";
 import { useMerchantAuth } from "@/hooks/useMerchantAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,6 +21,7 @@ interface MerchantSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   onNavClick?: () => void;
+  isMobile?: boolean;
 }
 
 const navItems = [
@@ -31,12 +34,43 @@ const navItems = [
   { icon: Settings, label: "Settings", href: "/merchant/settings" },
 ];
 
-export function MerchantSidebar({ isCollapsed, onToggle, onNavClick }: MerchantSidebarProps) {
+export function MerchantSidebar({ isCollapsed, onToggle, onNavClick, isMobile }: MerchantSidebarProps) {
   const location = useLocation();
   const { merchant, logout } = useMerchantAuth();
 
-  const handleNavClick = () => {
-    onNavClick?.();
+  // Swipe gesture handling
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    const swipeDistance = touchStartX.current - touchEndX.current;
+    // If swiped left more than 50px, close the sidebar
+    if (swipeDistance > 50 && onNavClick) {
+      onNavClick();
+    }
+  };
+
+  const handleNavClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onNavClick) {
+      onNavClick();
+    }
+  };
+
+  const handleClose = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onNavClick) {
+      onNavClick();
+    }
   };
 
   const getInitials = (name: string) => {
@@ -54,27 +88,39 @@ export function MerchantSidebar({ isCollapsed, onToggle, onNavClick }: MerchantS
         "fixed inset-y-0 left-0 z-50 flex flex-col bg-card border-r border-border transition-all duration-300",
         isCollapsed ? "w-16" : "w-64"
       )}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Logo Section */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-border">
         {!isCollapsed && (
-          <div className="flex items-center gap-2">
+          <Link to="/merchant/dashboard" className="flex items-center gap-2" onClick={handleNavClick}>
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">SP</span>
             </div>
             <span className="font-semibold text-foreground">SafePay</span>
-          </div>
+          </Link>
         )}
-        <button
-          onClick={onToggle}
-          className="p-1.5 rounded-lg hover:bg-accent transition-colors"
-        >
-          {isCollapsed ? (
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          ) : (
-            <ChevronLeft className="h-5 w-5 text-muted-foreground" />
-          )}
-        </button>
+        {isMobile ? (
+          <button
+            onClick={handleClose}
+            className="p-1.5 rounded-lg hover:bg-accent transition-colors"
+          >
+            <X className="h-5 w-5 text-muted-foreground" />
+          </button>
+        ) : (
+          <button
+            onClick={onToggle}
+            className="p-1.5 rounded-lg hover:bg-accent transition-colors"
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <ChevronLeft className="h-5 w-5 text-muted-foreground" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Navigation */}

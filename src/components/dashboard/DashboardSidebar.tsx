@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useState, useRef } from "react";
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -13,6 +14,7 @@ import {
   Plus,
   AlertTriangle,
   RotateCcw,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
@@ -21,6 +23,7 @@ interface DashboardSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   onNavClick?: () => void;
+  isMobile?: boolean;
 }
 
 const navItems = [
@@ -34,12 +37,43 @@ const navItems = [
   { icon: HelpCircle, label: "Support", href: "/support" },
 ];
 
-export function DashboardSidebar({ isCollapsed, onToggle, onNavClick }: DashboardSidebarProps) {
+export function DashboardSidebar({ isCollapsed, onToggle, onNavClick, isMobile }: DashboardSidebarProps) {
   const location = useLocation();
   const { logout, profile } = useSupabaseAuth();
+  
+  // Swipe gesture handling
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
 
-  const handleNavClick = () => {
-    onNavClick?.();
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    const swipeDistance = touchStartX.current - touchEndX.current;
+    // If swiped left more than 50px, close the sidebar
+    if (swipeDistance > 50 && onNavClick) {
+      onNavClick();
+    }
+  };
+
+  const handleNavClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onNavClick) {
+      onNavClick();
+    }
+  };
+
+  const handleClose = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onNavClick) {
+      onNavClick();
+    }
   };
 
   return (
@@ -48,29 +82,43 @@ export function DashboardSidebar({ isCollapsed, onToggle, onNavClick }: Dashboar
         "fixed left-0 top-0 z-40 h-screen bg-card border-r border-border transition-all duration-300 flex flex-col",
         isCollapsed ? "w-16" : "w-64"
       )}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Logo */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-border">
         {!isCollapsed && (
-          <Link to="/dashboard" className="flex items-center gap-2">
+          <Link to="/dashboard" className="flex items-center gap-2" onClick={handleNavClick}>
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <Shield className="h-5 w-5 text-primary" />
             </div>
             <span className="font-semibold text-foreground">SafePay</span>
           </Link>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onToggle}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          {isCollapsed ? (
-            <ChevronRight className="h-5 w-5" />
-          ) : (
-            <ChevronLeft className="h-5 w-5" />
-          )}
-        </Button>
+        {isMobile ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggle}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-5 w-5" />
+            ) : (
+              <ChevronLeft className="h-5 w-5" />
+            )}
+          </Button>
+        )}
       </div>
 
       {/* Navigation */}
