@@ -7,30 +7,22 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, AlertTriangle, Clock, CheckCircle, XCircle, Eye } from "lucide-react";
+import { Search, AlertTriangle, Clock, CheckCircle, XCircle, Eye, ChevronRight } from "lucide-react";
 import { useDisputes } from "@/hooks/useDisputes";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const statusConfig = {
-  open: { label: "Open", icon: AlertTriangle, variant: "destructive" as const },
-  under_review: { label: "Under Review", icon: Clock, variant: "secondary" as const },
-  resolved: { label: "Resolved", icon: CheckCircle, variant: "default" as const },
-  closed: { label: "Closed", icon: XCircle, variant: "outline" as const },
+  open: { label: "Open", icon: AlertTriangle, variant: "destructive" as const, color: "text-destructive" },
+  under_review: { label: "Under Review", icon: Clock, variant: "secondary" as const, color: "text-amber-500" },
+  resolved: { label: "Resolved", icon: CheckCircle, variant: "default" as const, color: "text-green-500" },
+  closed: { label: "Closed", icon: XCircle, variant: "outline" as const, color: "text-muted-foreground" },
 };
 
 export default function Disputes() {
@@ -64,142 +56,135 @@ export default function Disputes() {
   return (
     <DashboardLayout>
       <PageTransition>
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-2xl font-semibold text-foreground">Disputes</h1>
-            <p className="text-muted-foreground">Manage and track your order disputes</p>
+        <div className="space-y-4 sm:space-y-6 pb-6">
+          {/* Page Header */}
+          <div className="px-1">
+            <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Disputes</h1>
+            <p className="text-sm text-muted-foreground">Manage and track your order disputes</p>
           </div>
 
-          {/* Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{metrics.total}</div>
-                <p className="text-xs text-muted-foreground">Total Disputes</p>
+          {/* Metrics - Compact Grid */}
+          <div className="grid grid-cols-4 gap-2 sm:gap-4">
+            <Card className="bg-card/50">
+              <CardContent className="p-3 sm:p-4 text-center">
+                <div className="text-lg sm:text-2xl font-bold">{metrics.total}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">Total</p>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold text-destructive">{metrics.open}</div>
-                <p className="text-xs text-muted-foreground">Open</p>
+            <Card className="bg-card/50">
+              <CardContent className="p-3 sm:p-4 text-center">
+                <div className="text-lg sm:text-2xl font-bold text-destructive">{metrics.open}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">Open</p>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold text-secondary-foreground">{metrics.underReview}</div>
-                <p className="text-xs text-muted-foreground">Under Review</p>
+            <Card className="bg-card/50">
+              <CardContent className="p-3 sm:p-4 text-center">
+                <div className="text-lg sm:text-2xl font-bold text-amber-500">{metrics.underReview}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">Review</p>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold text-primary">{metrics.resolved}</div>
-                <p className="text-xs text-muted-foreground">Resolved</p>
+            <Card className="bg-card/50">
+              <CardContent className="p-3 sm:p-4 text-center">
+                <div className="text-lg sm:text-2xl font-bold text-green-500">{metrics.resolved}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground leading-tight">Resolved</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Filters */}
-          <Card>
-            <CardHeader>
-              <CardTitle>All Disputes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search disputes..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="under_review">Under Review</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* Filters - Mobile Optimized */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search disputes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-11"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-[160px] h-11">
+                <SelectValue placeholder="Filter status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="under_review">Under Review</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-              {isLoadingDisputes ? (
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
-                  ))}
-                </div>
-              ) : filteredDisputes.length === 0 ? (
-                <div className="text-center py-12">
-                  <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-foreground">No disputes found</h3>
-                  <p className="text-muted-foreground">
-                    {searchQuery || statusFilter !== "all"
-                      ? "Try adjusting your filters"
-                      : "You haven't raised any disputes yet"}
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Dispute ID</TableHead>
-                        <TableHead>Reason</TableHead>
-                        <TableHead>Issue Type</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredDisputes.map((dispute) => {
-                        const config = statusConfig[dispute.status as keyof typeof statusConfig];
-                        const StatusIcon = config?.icon || AlertTriangle;
-                        return (
-                          <TableRow key={dispute.id}>
-                            <TableCell className="font-mono text-sm">
-                              {dispute.id.slice(0, 8)}...
-                            </TableCell>
-                            <TableCell className="max-w-[200px] truncate">
-                              {dispute.reason}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{dispute.issue_type || "General"}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={config?.variant || "secondary"} className="gap-1">
-                                <StatusIcon className="h-3 w-3" />
-                                {config?.label || dispute.status}
+          {/* Disputes List - Mobile Cards */}
+          {isLoadingDisputes ? (
+            <div className="space-y-3">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-24 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : filteredDisputes.length === 0 ? (
+            <Card className="bg-card/50">
+              <CardContent className="py-12 text-center">
+                <AlertTriangle className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <h3 className="text-base font-medium text-foreground mb-1">No disputes found</h3>
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery || statusFilter !== "all"
+                    ? "Try adjusting your filters"
+                    : "You haven't raised any disputes yet"}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {filteredDisputes.map((dispute) => {
+                const config = statusConfig[dispute.status as keyof typeof statusConfig];
+                const StatusIcon = config?.icon || AlertTriangle;
+                
+                return (
+                  <Card 
+                    key={dispute.id} 
+                    className="bg-card/50 active:scale-[0.99] transition-transform cursor-pointer hover:bg-accent/30"
+                    onClick={() => navigate(`/dispute/${dispute.id}/status`)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0 space-y-2">
+                          {/* Status Badge & ID */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={config?.variant || "secondary"} className="gap-1 text-xs">
+                              <StatusIcon className="h-3 w-3" />
+                              {config?.label || dispute.status}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground font-mono">
+                              #{dispute.id.slice(0, 8)}
+                            </span>
+                          </div>
+                          
+                          {/* Reason */}
+                          <p className="font-medium text-sm line-clamp-1">{dispute.reason}</p>
+                          
+                          {/* Issue Type & Date */}
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                {dispute.issue_type || "General"}
                               </Badge>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {format(new Date(dispute.created_at), "MMM d, yyyy")}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => navigate(`/dispute/${dispute.id}/status`)}
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                View
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                            </span>
+                            <span>•</span>
+                            <span>{format(new Date(dispute.created_at), "MMM d, yyyy")}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Arrow */}
+                        <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0 mt-1" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
       </PageTransition>
     </DashboardLayout>

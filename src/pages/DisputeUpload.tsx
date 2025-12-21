@@ -54,7 +54,6 @@ export default function DisputeUpload() {
     const newFiles = Array.from(fileList);
     
     for (const file of newFiles) {
-      // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         continue;
       }
@@ -68,7 +67,6 @@ export default function DisputeUpload() {
       setUploadingFiles(prev => [...prev, uploadingFile]);
 
       try {
-        // Simulate progress
         const progressInterval = setInterval(() => {
           setUploadingFiles(prev => 
             prev.map(f => 
@@ -131,11 +129,11 @@ export default function DisputeUpload() {
     return (
       <DashboardLayout>
         <PageTransition>
-          <div className="space-y-6">
+          <div className="space-y-4 p-1">
             <Skeleton className="h-8 w-48" />
             <Card className="glass-card">
-              <CardContent className="py-12">
-                <Skeleton className="h-40 w-full" />
+              <CardContent className="py-8">
+                <Skeleton className="h-32 w-full" />
               </CardContent>
             </Card>
           </div>
@@ -148,15 +146,15 @@ export default function DisputeUpload() {
     return (
       <DashboardLayout>
         <PageTransition>
-          <div className="min-h-[60vh] flex items-center justify-center">
-            <Card className="w-full max-w-md glass-card text-center">
-              <CardContent className="pt-6">
-                <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">Dispute Not Found</h2>
-                <p className="text-muted-foreground mb-6">
-                  The dispute you're looking for doesn't exist.
+          <div className="min-h-[60vh] flex items-center justify-center px-4">
+            <Card className="w-full max-w-sm glass-card text-center">
+              <CardContent className="pt-6 pb-6">
+                <AlertTriangle className="h-10 w-10 text-destructive mx-auto mb-3" />
+                <h2 className="text-lg font-semibold mb-2">Dispute Not Found</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  The dispute doesn't exist.
                 </p>
-                <Button onClick={() => navigate("/orders")}>
+                <Button onClick={() => navigate("/orders")} className="w-full">
                   Back to Orders
                 </Button>
               </CardContent>
@@ -172,37 +170,38 @@ export default function DisputeUpload() {
       <PageTransition>
         <div className="min-h-[calc(100vh-120px)] flex flex-col">
           {/* Header */}
-          <div className="mb-6">
+          <div className="mb-4 px-1">
             <Button
               variant="ghost"
               size="sm"
-              className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
+              className="mb-3 -ml-2 text-muted-foreground hover:text-foreground h-9"
               onClick={() => navigate(-1)}
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-4 w-4 mr-1.5" />
               Back
             </Button>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2">
-              <Upload className="h-7 w-7 text-primary" />
-              Upload Evidence
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Provide supporting documents for your dispute
+            <div className="flex items-center gap-2">
+              <Upload className="h-5 w-5 text-primary" />
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+                Upload Evidence
+              </h1>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Provide supporting documents
             </p>
           </div>
 
-          <div className="flex-1 pb-24 sm:pb-6 space-y-6">
-            {/* Info Banner */}
-            <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-              <div className="flex items-start gap-3">
-                <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                <div className="text-sm">
+          <div className="flex-1 pb-24 space-y-4 px-1">
+            {/* Info Banner - Compact */}
+            <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+              <div className="flex items-start gap-2.5">
+                <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                <div className="text-xs">
                   <p className="font-medium text-primary mb-1">What evidence helps?</p>
-                  <ul className="text-muted-foreground space-y-1 list-disc list-inside">
-                    <li>Screenshots of conversations with the merchant</li>
-                    <li>Photos of damaged or wrong items</li>
-                    <li>Delivery receipts or tracking information</li>
-                    <li>Any other relevant documentation</li>
+                  <ul className="text-muted-foreground space-y-0.5 list-disc list-inside">
+                    <li>Screenshots of merchant conversations</li>
+                    <li>Photos of damaged/wrong items</li>
+                    <li>Delivery receipts or tracking info</li>
                   </ul>
                 </div>
               </div>
@@ -210,21 +209,22 @@ export default function DisputeUpload() {
 
             {/* Upload Area */}
             <Card className="glass-card">
-              <CardHeader>
-                <CardTitle>Upload Files</CardTitle>
-                <CardDescription>
-                  Drag and drop files or click to browse (max 10MB per file)
+              <CardHeader className="pb-2 px-4 pt-4">
+                <CardTitle className="text-base">Upload Files</CardTitle>
+                <CardDescription className="text-xs">
+                  Tap to browse (max 10MB per file)
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Drop Zone */}
+              <CardContent className="space-y-3 px-4 pb-4">
+                {/* Drop Zone - Touch Optimized */}
                 <div
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   className={`
-                    border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
-                    transition-colors duration-200
+                    border-2 border-dashed rounded-xl p-6 text-center cursor-pointer
+                    transition-colors duration-200 min-h-[120px] flex flex-col items-center justify-center
+                    active:scale-[0.99]
                     ${dragOver 
                       ? "border-primary bg-primary/10" 
                       : "border-border hover:border-primary/50 hover:bg-muted/30"
@@ -240,37 +240,34 @@ export default function DisputeUpload() {
                     className="hidden"
                     onChange={(e) => e.target.files && handleFiles(e.target.files)}
                   />
-                  <Upload className={`h-12 w-12 mx-auto mb-4 ${dragOver ? "text-primary" : "text-muted-foreground"}`} />
-                  <p className="font-medium mb-1">
-                    {dragOver ? "Drop files here" : "Drag & drop files here"}
+                  <Upload className={`h-8 w-8 mb-2 ${dragOver ? "text-primary" : "text-muted-foreground"}`} />
+                  <p className="text-sm font-medium">
+                    {dragOver ? "Drop files here" : "Tap to upload files"}
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    or click to browse
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Supports: Images, PDF, Word documents
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Images, PDF, Word documents
                   </p>
                 </div>
 
                 {/* Uploading Files */}
                 {uploadingFiles.length > 0 && (
-                  <div className="space-y-3">
-                    <p className="text-sm font-medium">Uploading</p>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Uploading</p>
                     {uploadingFiles.map((uploadFile, index) => (
-                      <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                        <div className="text-muted-foreground">
+                      <div key={index} className="flex items-center gap-2.5 p-2.5 rounded-lg bg-muted/30">
+                        <div className="text-muted-foreground shrink-0">
                           {getFileIcon(uploadFile.file.type)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{uploadFile.file.name}</p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs font-medium truncate">{uploadFile.file.name}</p>
+                          <p className="text-[10px] text-muted-foreground">
                             {formatFileSize(uploadFile.file.size)}
                           </p>
                           {uploadFile.status === "uploading" && (
-                            <Progress value={uploadFile.progress} className="h-1 mt-2" />
+                            <Progress value={uploadFile.progress} className="h-1 mt-1.5" />
                           )}
                         </div>
-                        <div>
+                        <div className="shrink-0">
                           {uploadFile.status === "uploading" && (
                             <Loader2 className="h-4 w-4 animate-spin text-primary" />
                           )}
@@ -281,10 +278,13 @@ export default function DisputeUpload() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
-                              onClick={() => removeUploadingFile(uploadFile.file)}
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeUploadingFile(uploadFile.file);
+                              }}
                             >
-                              <X className="h-4 w-4 text-destructive" />
+                              <X className="h-3.5 w-3.5 text-destructive" />
                             </Button>
                           )}
                         </div>
@@ -295,64 +295,47 @@ export default function DisputeUpload() {
 
                 {/* Previously Uploaded Files */}
                 {files.length > 0 && (
-                  <div className="space-y-3">
-                    <p className="text-sm font-medium">Uploaded Evidence ({files.length})</p>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Uploaded ({files.length})
+                    </p>
                     {files.map((file) => (
-                      <div key={file.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                        <div className="text-muted-foreground">
+                      <div key={file.id} className="flex items-center gap-2.5 p-2.5 rounded-lg bg-muted/30">
+                        <div className="text-muted-foreground shrink-0">
                           {getFileIcon(file.file_type || "")}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{file.file_name}</p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs font-medium truncate">{file.file_name}</p>
+                          <p className="text-[10px] text-muted-foreground">
                             {file.file_size ? formatFileSize(file.file_size) : "Unknown size"}
                           </p>
                         </div>
-                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                       </div>
                     ))}
                   </div>
                 )}
-
-                {/* Desktop Buttons */}
-                <div className="hidden sm:flex gap-3 pt-4">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => navigate(`/dispute/${disputeId}/status`)}
-                  >
-                    Skip for Now
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    onClick={() => navigate(`/dispute/${disputeId}/status`)}
-                    disabled={isUploadingFile}
-                  >
-                    {hasUploads ? "Continue to Status" : "Continue Without Files"}
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Mobile Sticky Buttons */}
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-lg border-t border-border sm:hidden">
-            <div className="flex gap-3">
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-lg border-t border-border z-40">
+            <div className="flex gap-3 max-w-lg mx-auto">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="flex-1 h-12"
                 onClick={() => navigate(`/dispute/${disputeId}/status`)}
               >
                 Skip
               </Button>
               <Button
-                className="flex-1"
+                className="flex-1 h-12"
                 onClick={() => navigate(`/dispute/${disputeId}/status`)}
                 disabled={isUploadingFile}
               >
-                Continue
-                <ArrowRight className="h-4 w-4 ml-2" />
+                {hasUploads ? "Continue" : "Skip & Continue"}
+                <ArrowRight className="h-4 w-4 ml-1.5" />
               </Button>
             </div>
           </div>
