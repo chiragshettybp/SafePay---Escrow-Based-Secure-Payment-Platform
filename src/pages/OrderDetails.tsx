@@ -148,7 +148,7 @@ export default function OrderDetails() {
             <CardContent className="pt-6">
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button asChild variant="outline" className="flex-1 sm:flex-none">
-                  <Link to={`/orders/${order.id}/tracking`}>
+                  <Link to={`/order/${order.id}/tracking`}>
                     <Truck className="h-4 w-4 mr-2" />
                     Track Order
                   </Link>
@@ -156,7 +156,7 @@ export default function OrderDetails() {
 
                 {(order.status === "delivered" || order.status === "escrow_locked" || order.status === "in_progress") && (
                   <Button asChild className="flex-1 sm:flex-none">
-                    <Link to={`/orders/${order.id}/confirm`}>
+                    <Link to={`/order/${order.id}/confirm`}>
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Confirm Delivery
                     </Link>
@@ -165,7 +165,7 @@ export default function OrderDetails() {
                 
                 {(order.status === "pending" || order.status === "in_progress" || order.status === "delivered" || order.status === "escrow_locked") && (
                   <Button asChild variant="destructive" className="flex-1 sm:flex-none">
-                    <Link to={`/orders/${order.id}/report`}>
+                    <Link to={`/order/${order.id}/report`}>
                       <AlertTriangle className="h-4 w-4 mr-2" />
                       Report Issue
                     </Link>

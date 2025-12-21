@@ -104,7 +104,7 @@ export default function ConfirmDelivery() {
         description: "Payment has been released to the merchant.",
       });
 
-      navigate(`/orders/${orderId}`);
+      navigate(`/order/${orderId}`);
     } catch (error) {
       toast({
         title: "Error",
@@ -158,7 +158,7 @@ export default function ConfirmDelivery() {
               This order is not eligible for delivery confirmation. Current status: {order.status}
             </p>
             <Button asChild>
-              <Link to={`/orders/${orderId}`}>View Order Details</Link>
+              <Link to={`/order/${orderId}`}>View Order Details</Link>
             </Button>
           </div>
         </PageTransition>
