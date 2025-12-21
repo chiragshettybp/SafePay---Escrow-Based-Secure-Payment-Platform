@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { DashboardSidebar } from "./DashboardSidebar";
 import { DashboardHeader } from "./DashboardHeader";
@@ -18,12 +18,24 @@ export function DashboardLayout({ children, searchQuery = "", onSearchChange }: 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { isAuthenticated, isLoading } = useSupabaseAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       navigate("/customer-login");
     }
   }, [isAuthenticated, isLoading, navigate]);
+
+  // If navigation happens, always close the mobile drawer (prevents "stuck open" state)
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
+
+  // Must be declared before any early return to keep hooks order stable
+  const mobileSwipe = useSwipeLeftClose({
+    enabled: mobileSidebarOpen,
+    onClose: () => setMobileSidebarOpen(false),
+  });
 
   if (isLoading) {
     return (
@@ -36,11 +48,6 @@ export function DashboardLayout({ children, searchQuery = "", onSearchChange }: 
   if (!isAuthenticated) {
     return null;
   }
-
-  const mobileSwipe = useSwipeLeftClose({
-    enabled: mobileSidebarOpen,
-    onClose: () => setMobileSidebarOpen(false),
-  });
 
   return (
     <div className="min-h-screen bg-background">
