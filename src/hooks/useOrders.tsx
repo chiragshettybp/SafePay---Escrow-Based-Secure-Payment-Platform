@@ -80,32 +80,49 @@ export function useOrders(statusFilter?: OrderStatus | null) {
     enabled: !!user?.id,
   });
 
-  // Confirm delivery mutation
+  // Confirm delivery mutation - releases escrow to merchant
   const confirmDelivery = useMutation({
     mutationFn: async (orderId: string) => {
-      const { error } = await supabase
-        .from('orders')
-        .update({ 
-          status: 'completed' as OrderStatus,
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', orderId)
-        .eq('customer_id', user?.id);
+      if (!user?.id) throw new Error("Not authenticated");
+
+      // Call the release-escrow edge function
+      const { data, error } = await supabase.functions.invoke('release-escrow', {
+        body: {
+          orderId,
+          reason: 'delivery_confirmed'
+        }
+      });
 
       if (error) throw error;
+      
+      // Check if the response indicates an error
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['order-metrics'] });
-      toast({
-        title: "Delivery Confirmed",
-        description: "The order has been marked as completed.",
-      });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      
+      if (data?.alreadyReleased) {
+        toast({
+          title: "Already Completed",
+          description: "This order has already been completed.",
+        });
+      } else {
+        toast({
+          title: "Delivery Confirmed",
+          description: "Payment has been released to the merchant.",
+        });
+      }
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: "Failed to confirm delivery. Please try again.",
+        description: error.message || "Failed to confirm delivery. Please try again.",
         variant: "destructive",
       });
     },

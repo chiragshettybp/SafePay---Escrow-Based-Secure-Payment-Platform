@@ -70,8 +70,8 @@ export default function DisputeStatus() {
   };
 
   const handleWithdraw = () => {
-    if (!disputeId) return;
-    withdrawDispute(disputeId, {
+    if (!disputeId || !dispute?.order_id) return;
+    withdrawDispute({ disputeId, orderId: dispute.order_id }, {
       onSuccess: () => navigate("/orders"),
     });
   };
