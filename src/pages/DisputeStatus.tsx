@@ -58,7 +58,7 @@ export default function DisputeStatus() {
     addComment,
     isAddingComment
   } = useDisputeDetails(disputeId || "");
-  const { withdrawDispute, isWithdrawing } = useDisputes();
+  const { withdrawDispute, isWithdrawing, closeDisputeAndConfirmDelivery, isClosingDispute } = useDisputes();
 
   const [newComment, setNewComment] = useState("");
 
@@ -72,6 +72,13 @@ export default function DisputeStatus() {
   const handleWithdraw = () => {
     if (!disputeId || !dispute?.order_id) return;
     withdrawDispute({ disputeId, orderId: dispute.order_id }, {
+      onSuccess: () => navigate("/orders"),
+    });
+  };
+
+  const handleCloseDisputeAndConfirm = () => {
+    if (!disputeId || !dispute?.order_id) return;
+    closeDisputeAndConfirmDelivery({ disputeId, orderId: dispute.order_id }, {
       onSuccess: () => navigate("/orders"),
     });
   };
@@ -411,40 +418,80 @@ export default function DisputeStatus() {
                       View Order Details
                     </Button>
                     
-                    {dispute.status === "open" && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" className="w-full">
-                            Withdraw Dispute
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Withdraw Dispute?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to withdraw this dispute? This action cannot be undone.
-                              The funds will remain in escrow until you confirm delivery or take other action.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={handleWithdraw}
-                              disabled={isWithdrawing}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              {isWithdrawing ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                  Withdrawing...
-                                </>
-                              ) : (
-                                "Withdraw"
-                              )}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                    {(dispute.status === "open" || dispute.status === "under_review") && (
+                      <>
+                        {/* Close Dispute & Confirm Delivery */}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button className="w-full bg-green-600 hover:bg-green-700">
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Close Dispute & Confirm Delivery
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirm Delivery & Close Dispute?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will close your dispute and confirm that you received the order. 
+                                The escrowed payment will be released to the merchant immediately.
+                                This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={handleCloseDisputeAndConfirm}
+                                disabled={isClosingDispute}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                {isClosingDispute ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    Processing...
+                                  </>
+                                ) : (
+                                  "Confirm & Release Payment"
+                                )}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+
+                        {/* Withdraw Dispute */}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" className="w-full">
+                              Withdraw Dispute
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Withdraw Dispute?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to withdraw this dispute? This action cannot be undone.
+                                The escrowed payment will be released to the merchant.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={handleWithdraw}
+                                disabled={isWithdrawing}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                {isWithdrawing ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    Withdrawing...
+                                  </>
+                                ) : (
+                                  "Withdraw"
+                                )}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
                     )}
                   </CardContent>
                 </Card>

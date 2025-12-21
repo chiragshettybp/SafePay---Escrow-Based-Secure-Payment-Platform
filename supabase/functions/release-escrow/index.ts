@@ -7,7 +7,7 @@ const corsHeaders = {
 
 interface ReleaseEscrowRequest {
   orderId: string;
-  reason: "delivery_confirmed" | "dispute_withdrawn" | "dispute_resolved" | "merchant_won";
+  reason: "delivery_confirmed" | "dispute_withdrawn" | "dispute_resolved" | "merchant_won" | "close_dispute_confirm_delivery";
   disputeId?: string;
 }
 
@@ -145,12 +145,18 @@ Deno.serve(async (req) => {
     }
 
     // 3. If this is from a dispute, update the dispute status
-    if (disputeId && (reason === "dispute_withdrawn" || reason === "dispute_resolved" || reason === "merchant_won")) {
+    if (disputeId && (reason === "dispute_withdrawn" || reason === "dispute_resolved" || reason === "merchant_won" || reason === "close_dispute_confirm_delivery")) {
+      const finalDecision = reason === "dispute_withdrawn" 
+        ? "Customer withdrew dispute" 
+        : reason === "close_dispute_confirm_delivery"
+        ? "Customer confirmed delivery"
+        : "Merchant won";
+      
       const { error: updateDisputeError } = await supabase
         .from("disputes")
         .update({ 
           status: "closed",
-          final_decision: reason === "dispute_withdrawn" ? "Customer withdrew dispute" : "Merchant won",
+          final_decision: finalDecision,
           updated_at: now
         })
         .eq("id", disputeId);
@@ -160,15 +166,56 @@ Deno.serve(async (req) => {
       }
 
       // Add dispute update entry
+      const updateTitle = reason === "dispute_withdrawn" 
+        ? "Dispute Withdrawn & Escrow Released" 
+        : reason === "close_dispute_confirm_delivery"
+        ? "Customer Confirmed Delivery & Closed Dispute"
+        : "Dispute Resolved - Merchant Won";
+      
+      const updateDescription = reason === "dispute_withdrawn" 
+        ? "Customer withdrew the dispute. Escrow funds have been released to the merchant."
+        : reason === "close_dispute_confirm_delivery"
+        ? "Customer confirmed the delivery and closed the dispute. Escrow funds have been released to the merchant."
+        : "The dispute has been resolved in favor of the merchant. Escrow funds have been released.";
+      
       await supabase.from("dispute_updates").insert({
         dispute_id: disputeId,
-        title: reason === "dispute_withdrawn" ? "Dispute Withdrawn & Escrow Released" : "Dispute Resolved - Merchant Won",
-        description: reason === "dispute_withdrawn" 
-          ? "Customer withdrew the dispute. Escrow funds have been released to the merchant."
-          : "The dispute has been resolved in favor of the merchant. Escrow funds have been released.",
+        title: updateTitle,
+        description: updateDescription,
         status: "closed",
         created_by: "system",
       });
+    }
+    
+    // 3b. If delivery confirmed on a disputed order (without specific disputeId), find and close any open disputes
+    if (reason === "delivery_confirmed" && !disputeId && order.status === "disputed") {
+      // Find any open disputes for this order
+      const { data: openDisputes } = await supabase
+        .from("disputes")
+        .select("id")
+        .eq("order_id", orderId)
+        .in("status", ["open", "under_review"]);
+      
+      if (openDisputes && openDisputes.length > 0) {
+        for (const d of openDisputes) {
+          await supabase
+            .from("disputes")
+            .update({ 
+              status: "closed",
+              final_decision: "Customer confirmed delivery",
+              updated_at: now
+            })
+            .eq("id", d.id);
+          
+          await supabase.from("dispute_updates").insert({
+            dispute_id: d.id,
+            title: "Dispute Closed - Delivery Confirmed",
+            description: "Customer confirmed delivery. Escrow funds have been released to the merchant.",
+            status: "closed",
+            created_by: "system",
+          });
+        }
+      }
     }
 
     // 4. Create order event
