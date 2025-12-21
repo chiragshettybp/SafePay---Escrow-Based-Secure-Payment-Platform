@@ -102,24 +102,13 @@ export default function MerchantSignup() {
         return;
       }
 
-      // Use callback route for verification redirect
-      const redirectUrl = `${window.location.origin}/merchant/auth/callback`;
-
+      // Sign up without email verification
       const { data: authData, error: authError } = await merchantSupabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
-          emailRedirectTo: redirectUrl,
           data: {
             is_merchant: true,
-            merchant_profile_created: false,
-            merchant_profile: {
-              business_name: data.businessName,
-              phone: data.phone || null,
-              category: data.category || null,
-              gst_number: data.gstNumber || null,
-              address: data.address || null,
-            },
           },
         },
       });
@@ -144,12 +133,35 @@ export default function MerchantSignup() {
         return;
       }
 
-      toast({
-        title: "Account Created!",
-        description: "Check your email to verify. We'll finish setting up your merchant profile after verification.",
+      // Create merchant profile directly
+      const { error: merchantError } = await merchantSupabase.from("merchants").insert({
+        user_id: authData.user.id,
+        email: data.email,
+        business_name: data.businessName,
+        phone: data.phone || null,
+        category: data.category || null,
+        gst_number: data.gstNumber || null,
+        address: data.address || null,
+        status: "pending_verification",
       });
 
-      navigate(`/merchant/verify?email=${encodeURIComponent(data.email)}`);
+      if (merchantError) {
+        console.error("Merchant profile creation error:", merchantError);
+        toast({
+          title: "Profile Creation Failed",
+          description: "Account created but profile setup failed. Please contact support.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      toast({
+        title: "Account Created!",
+        description: "Welcome! Your merchant account is ready.",
+      });
+
+      navigate("/merchant/dashboard");
     } catch (error) {
       toast({
         title: "Error",
