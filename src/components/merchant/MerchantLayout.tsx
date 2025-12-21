@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { MerchantSidebar } from "./MerchantSidebar";
 import { MerchantHeader } from "./MerchantHeader";
@@ -22,6 +22,7 @@ export function MerchantLayout({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { isAuthenticated, isLoading, isMerchant } = useMerchantAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (!isLoading) {
@@ -32,6 +33,17 @@ export function MerchantLayout({
       }
     }
   }, [isAuthenticated, isLoading, isMerchant, navigate]);
+
+  // If navigation happens, always close the mobile drawer (prevents "stuck open" state)
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
+
+  // Must be declared before any early return to keep hooks order stable
+  const mobileSwipe = useSwipeLeftClose({
+    enabled: mobileSidebarOpen,
+    onClose: () => setMobileSidebarOpen(false),
+  });
 
   if (isLoading) {
     return (
@@ -44,11 +56,6 @@ export function MerchantLayout({
   if (!isAuthenticated || !isMerchant) {
     return null;
   }
-
-  const mobileSwipe = useSwipeLeftClose({
-    enabled: mobileSidebarOpen,
-    onClose: () => setMobileSidebarOpen(false),
-  });
 
   return (
     <div className="min-h-screen bg-background">
