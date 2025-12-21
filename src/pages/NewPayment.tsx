@@ -126,63 +126,73 @@ export default function NewPayment() {
                   {/* Merchant Selection */}
                   <div className="space-y-2">
                     <Label htmlFor="merchant">Select Merchant *</Label>
-                    <Popover open={merchantOpen} onOpenChange={setMerchantOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={merchantOpen}
-                          className={cn(
-                            "w-full justify-between",
-                            !selectedMerchant && "text-muted-foreground"
-                          )}
-                          disabled={isMerchantsLoading}
-                        >
-                          {isMerchantsLoading ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                              Loading merchants...
-                            </>
-                          ) : selectedMerchant ? (
-                            selectedMerchant.name
-                          ) : (
-                            "Search for a merchant..."
-                          )}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Search merchant..." />
-                          <CommandList>
-                            <CommandEmpty>No merchant found.</CommandEmpty>
-                            <CommandGroup>
-                              {merchants.map((merchant) => (
-                                <CommandItem
-                                  key={merchant.id}
-                                  value={merchant.name}
-                                  onSelect={() => {
-                                    setSelectedMerchant(merchant);
-                                    setMerchantOpen(false);
-                                    setErrors((prev) => ({ ...prev, merchant_id: "" }));
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      selectedMerchant?.id === merchant.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {merchant.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                    {isMerchantsLoading ? (
+                      <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm text-muted-foreground">Loading merchants...</span>
+                      </div>
+                    ) : merchants.length === 0 ? (
+                      <div className="p-4 bg-muted/50 rounded-lg text-center">
+                        <p className="text-sm text-muted-foreground">
+                          No merchants available yet.
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Merchants need to sign up and be approved first.
+                        </p>
+                      </div>
+                    ) : (
+                      <Popover open={merchantOpen} onOpenChange={setMerchantOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={merchantOpen}
+                            className={cn(
+                              "w-full justify-between",
+                              !selectedMerchant && "text-muted-foreground"
+                            )}
+                          >
+                            {selectedMerchant ? (
+                              selectedMerchant.name
+                            ) : (
+                              "Search for a merchant..."
+                            )}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search merchant..." />
+                            <CommandList>
+                              <CommandEmpty>No merchant found.</CommandEmpty>
+                              <CommandGroup>
+                                {merchants.map((merchant) => (
+                                  <CommandItem
+                                    key={merchant.id}
+                                    value={merchant.name}
+                                    onSelect={() => {
+                                      setSelectedMerchant(merchant);
+                                      setMerchantOpen(false);
+                                      setErrors((prev) => ({ ...prev, merchant_id: "" }));
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        selectedMerchant?.id === merchant.id
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      )}
+                                    />
+                                    {merchant.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    )}
                     {errors.merchant_id && (
                       <p className="text-sm text-destructive">{errors.merchant_id}</p>
                     )}

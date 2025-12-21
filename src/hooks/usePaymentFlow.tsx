@@ -24,43 +24,25 @@ export function usePaymentFlow() {
   const navigate = useNavigate();
   const [draftOrderId, setDraftOrderId] = useState<string | null>(null);
 
-  // Fetch merchants (users with merchant role) + demo merchants
+  // Fetch real merchants from the merchants table
   const { data: merchants, isLoading: isMerchantsLoading } = useQuery({
     queryKey: ['merchants'],
     queryFn: async () => {
+      // Fetch approved/active merchants from the merchants table
       const { data, error } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'merchant');
+        .from('merchants')
+        .select('user_id, business_name, email, status')
+        .eq('status', 'active');
 
       if (error) throw error;
 
-      let merchantList: MerchantOption[] = [];
+      // Map to MerchantOption format
+      const merchantList: MerchantOption[] = (data || []).map(m => ({
+        id: m.user_id,
+        name: m.business_name,
+      }));
 
-      // Get profiles for merchant users
-      const merchantIds = data.map(r => r.user_id);
-      if (merchantIds.length > 0) {
-        const { data: profiles, error: profileError } = await supabase
-          .from('profiles')
-          .select('user_id, full_name')
-          .in('user_id', merchantIds);
-
-        if (!profileError && profiles) {
-          merchantList = profiles.map(p => ({
-            id: p.user_id,
-            name: p.full_name || `Merchant ${p.user_id.slice(0, 8)}`,
-          }));
-        }
-      }
-
-      // Add demo merchants for testing
-      const demoMerchants: MerchantOption[] = [
-        { id: '00000000-0000-0000-0000-000000000001', name: 'TechStore Pro' },
-        { id: '00000000-0000-0000-0000-000000000002', name: 'Digital Services Co.' },
-        { id: '00000000-0000-0000-0000-000000000003', name: 'Creative Agency Hub' },
-      ];
-
-      return [...merchantList, ...demoMerchants];
+      return merchantList;
     },
     enabled: !!user?.id,
   });
