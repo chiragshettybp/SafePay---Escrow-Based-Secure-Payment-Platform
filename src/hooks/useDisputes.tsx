@@ -253,6 +253,104 @@ export function useDisputes() {
     return fileName;
   };
 
+  // Close dispute and confirm delivery (release escrow)
+  const closeDisputeAndConfirmDelivery = useMutation({
+    mutationFn: async ({ disputeId, orderId }: { disputeId: string; orderId: string }) => {
+      if (!user?.id) throw new Error("Not authenticated");
+
+      // Call the release-escrow edge function to close dispute AND release funds
+      const { data, error } = await supabase.functions.invoke('release-escrow', {
+        body: {
+          orderId,
+          reason: 'close_dispute_confirm_delivery',
+          disputeId
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["disputes"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["order-metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      
+      if (data?.alreadyReleased) {
+        toast({
+          title: "Dispute Closed",
+          description: "The dispute has been closed. Order was already completed.",
+        });
+      } else {
+        toast({
+          title: "Delivery Confirmed",
+          description: "Dispute closed and payment released to the merchant.",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to close dispute and confirm delivery.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Confirm delivery after dispute is resolved (release escrow)
+  const confirmDeliveryAfterDispute = useMutation({
+    mutationFn: async ({ disputeId, orderId }: { disputeId: string; orderId: string }) => {
+      if (!user?.id) throw new Error("Not authenticated");
+
+      // Call the release-escrow edge function
+      const { data, error } = await supabase.functions.invoke('release-escrow', {
+        body: {
+          orderId,
+          reason: 'delivery_confirmed',
+          disputeId
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["disputes"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["order-metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      
+      if (data?.alreadyReleased) {
+        toast({
+          title: "Delivery Confirmed",
+          description: "Order was already completed.",
+        });
+      } else {
+        toast({
+          title: "Delivery Confirmed",
+          description: "Payment has been released to the merchant.",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to confirm delivery.",
+        variant: "destructive",
+      });
+    },
+  });
+
   return {
     disputes: disputes || [],
     isLoadingDisputes,
@@ -260,6 +358,10 @@ export function useDisputes() {
     isCreatingDispute: createDispute.isPending,
     withdrawDispute: withdrawDispute.mutate,
     isWithdrawing: withdrawDispute.isPending,
+    closeDisputeAndConfirmDelivery: closeDisputeAndConfirmDelivery.mutate,
+    isClosingDispute: closeDisputeAndConfirmDelivery.isPending,
+    confirmDeliveryAfterDispute: confirmDeliveryAfterDispute.mutate,
+    isConfirmingDelivery: confirmDeliveryAfterDispute.isPending,
     uploadDocument,
     ISSUE_TYPES,
   };

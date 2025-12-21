@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { PageTransition } from "@/components/layout/PageTransition";
@@ -6,7 +7,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useDisputeDetails } from "@/hooks/useDisputes";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useDisputeDetails, useDisputes } from "@/hooks/useDisputes";
+import { useOrders } from "@/hooks/useOrders";
 import { format } from "date-fns";
 import { 
   ArrowLeft, 
@@ -16,15 +29,17 @@ import {
   DollarSign,
   FileText,
   Clock,
-  Download,
   Home,
-  Eye
+  Eye,
+  Loader2
 } from "lucide-react";
 
 export default function DisputeResult() {
   const { disputeId } = useParams<{ disputeId: string }>();
   const navigate = useNavigate();
   const { dispute, updates, files, isLoadingDispute } = useDisputeDetails(disputeId || "");
+  const { confirmDeliveryAfterDispute, isConfirmingDelivery } = useDisputes();
+  const { orders } = useOrders();
 
   if (isLoadingDispute) {
     return (
@@ -93,7 +108,21 @@ export default function DisputeResult() {
   const isCustomerWin = dispute.final_decision === "customer_won" || 
     (dispute.refund_amount && dispute.refund_amount > 0);
   const isPartialRefund = dispute.final_decision === "partial_refund";
-  const isMerchantWin = dispute.final_decision === "merchant_won";
+  const isMerchantWin = dispute.final_decision === "merchant_won" || 
+    dispute.final_decision === "Merchant won" ||
+    dispute.final_decision === "Customer withdrew dispute" ||
+    dispute.final_decision === "Customer confirmed delivery";
+  
+  // Check if order is still not completed (escrow not released yet)
+  const relatedOrder = orders.find(o => o.id === dispute.order_id);
+  const canConfirmDelivery = relatedOrder && relatedOrder.status !== "completed" && relatedOrder.status !== "refunded";
+  
+  const handleConfirmDelivery = () => {
+    if (!disputeId || !dispute?.order_id) return;
+    confirmDeliveryAfterDispute({ disputeId, orderId: dispute.order_id }, {
+      onSuccess: () => navigate("/orders"),
+    });
+  };
 
   const getResultConfig = () => {
     if (dispute.status === "closed") {
@@ -299,6 +328,54 @@ export default function DisputeResult() {
                         <Eye className="h-3 w-3 text-muted-foreground" />
                       </div>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Confirm Delivery Action for resolved disputes */}
+            {canConfirmDelivery && (
+              <Card className="glass-card border-green-500/20 bg-green-500/5">
+                <CardContent className="pt-6">
+                  <div className="text-center space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      If you received your order satisfactorily, confirm delivery to release payment to the merchant.
+                    </p>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button className="w-full sm:w-auto bg-green-600 hover:bg-green-700">
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Confirm Delivery & Release Payment
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Confirm Delivery?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will confirm that you received the order. 
+                            The escrowed payment will be released to the merchant immediately.
+                            This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleConfirmDelivery}
+                            disabled={isConfirmingDelivery}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            {isConfirmingDelivery ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                Processing...
+                              </>
+                            ) : (
+                              "Confirm & Release Payment"
+                            )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </CardContent>
               </Card>
