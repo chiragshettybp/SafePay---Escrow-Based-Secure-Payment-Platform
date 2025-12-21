@@ -48,6 +48,11 @@ import MerchantDisputes from "./pages/MerchantDisputes";
 import MerchantDisputeResponse from "./pages/MerchantDisputeResponse";
 import MerchantDisputeUpload from "./pages/MerchantDisputeUpload";
 import MerchantDisputeResult from "./pages/MerchantDisputeResult";
+import MerchantPayouts from "./pages/MerchantPayouts";
+import MerchantBankAccount from "./pages/MerchantBankAccount";
+import MerchantWithdraw from "./pages/MerchantWithdraw";
+import MerchantWithdrawSuccess from "./pages/MerchantWithdrawSuccess";
+import MerchantPayoutHistory from "./pages/MerchantPayoutHistory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -105,6 +110,11 @@ const App = () => (
               <Route path="dispute/:disputeId/respond" element={<MerchantDisputeResponse />} />
               <Route path="dispute/:disputeId/upload" element={<MerchantDisputeUpload />} />
               <Route path="dispute/:disputeId/result" element={<MerchantDisputeResult />} />
+              <Route path="payouts" element={<MerchantPayouts />} />
+              <Route path="payouts/bank-account" element={<MerchantBankAccount />} />
+              <Route path="payouts/withdraw" element={<MerchantWithdraw />} />
+              <Route path="payouts/success/:payoutId" element={<MerchantWithdrawSuccess />} />
+              <Route path="payouts/history" element={<MerchantPayoutHistory />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

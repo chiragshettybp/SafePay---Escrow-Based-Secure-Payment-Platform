@@ -362,6 +362,54 @@ export type Database = {
         }
         Relationships: []
       }
+      merchant_bank_accounts: {
+        Row: {
+          account_holder_name: string
+          account_number: string
+          account_type: string
+          bank_name: string
+          branch_name: string | null
+          created_at: string
+          id: string
+          ifsc_code: string
+          is_default: boolean
+          is_verified: boolean
+          merchant_id: string
+          updated_at: string
+          verification_status: string
+        }
+        Insert: {
+          account_holder_name: string
+          account_number: string
+          account_type?: string
+          bank_name: string
+          branch_name?: string | null
+          created_at?: string
+          id?: string
+          ifsc_code: string
+          is_default?: boolean
+          is_verified?: boolean
+          merchant_id: string
+          updated_at?: string
+          verification_status?: string
+        }
+        Update: {
+          account_holder_name?: string
+          account_number?: string
+          account_type?: string
+          bank_name?: string
+          branch_name?: string | null
+          created_at?: string
+          id?: string
+          ifsc_code?: string
+          is_default?: boolean
+          is_verified?: boolean
+          merchant_id?: string
+          updated_at?: string
+          verification_status?: string
+        }
+        Relationships: []
+      }
       merchant_evidence: {
         Row: {
           created_at: string
@@ -408,6 +456,98 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      merchant_payouts: {
+        Row: {
+          amount: number
+          bank_account_id: string
+          created_at: string
+          failure_reason: string | null
+          fee: number
+          id: string
+          merchant_id: string
+          net_amount: number
+          notes: string | null
+          processed_at: string | null
+          status: string
+          transaction_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          bank_account_id: string
+          created_at?: string
+          failure_reason?: string | null
+          fee?: number
+          id?: string
+          merchant_id: string
+          net_amount: number
+          notes?: string | null
+          processed_at?: string | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          bank_account_id?: string
+          created_at?: string
+          failure_reason?: string | null
+          fee?: number
+          id?: string
+          merchant_id?: string
+          net_amount?: number
+          notes?: string | null
+          processed_at?: string | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_payouts_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merchant_wallets: {
+        Row: {
+          available_balance: number
+          created_at: string
+          currency: string
+          id: string
+          merchant_id: string
+          pending_balance: number
+          status: string
+          total_paid_out: number
+          updated_at: string
+        }
+        Insert: {
+          available_balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          merchant_id: string
+          pending_balance?: number
+          status?: string
+          total_paid_out?: number
+          updated_at?: string
+        }
+        Update: {
+          available_balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          merchant_id?: string
+          pending_balance?: number
+          status?: string
+          total_paid_out?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       merchants: {
         Row: {
