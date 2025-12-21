@@ -125,7 +125,7 @@ export default function MerchantPayoutHistory() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Completed</p>
-                    <p className="text-xl font-bold text-green-500">${totalCompleted.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-green-500">₹{totalCompleted.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                 </div>
               </CardContent>
@@ -139,7 +139,7 @@ export default function MerchantPayoutHistory() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Processing</p>
-                    <p className="text-xl font-bold text-amber-500">${totalProcessing.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-amber-500">₹{totalProcessing.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                 </div>
               </CardContent>
@@ -153,7 +153,7 @@ export default function MerchantPayoutHistory() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Failed</p>
-                    <p className="text-xl font-bold text-destructive">${totalFailed.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-destructive">₹{totalFailed.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                 </div>
               </CardContent>
@@ -240,9 +240,9 @@ export default function MerchantPayoutHistory() {
                               <TableCell className="font-mono text-sm">
                                 {payout.transaction_id || payout.id.slice(0, 8)}
                               </TableCell>
-                              <TableCell>${payout.amount.toFixed(2)}</TableCell>
+                              <TableCell>₹{payout.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                               <TableCell className="font-semibold">
-                                ${payout.net_amount.toFixed(2)}
+                                ₹{payout.net_amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </TableCell>
                               <TableCell>
                                 {payout.bank_account ? (
@@ -294,7 +294,7 @@ export default function MerchantPayoutHistory() {
                             </Badge>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-2xl font-bold">${payout.net_amount.toFixed(2)}</span>
+                            <span className="text-2xl font-bold">₹{payout.net_amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             <span className="text-sm text-muted-foreground">
                               {format(new Date(payout.created_at), "MMM d, yyyy")}
                             </span>

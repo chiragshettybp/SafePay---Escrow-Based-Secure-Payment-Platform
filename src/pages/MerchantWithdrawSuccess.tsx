@@ -89,7 +89,7 @@ export default function MerchantWithdrawSuccess() {
                 <div className="text-center p-4 rounded-lg bg-muted/30">
                   <p className="text-sm text-muted-foreground mb-1">Amount</p>
                   <p className="text-4xl font-bold text-green-500">
-                    ${payout.net_amount.toFixed(2)}
+                    ₹{payout.net_amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
 

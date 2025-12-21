@@ -79,7 +79,7 @@ export default function MerchantWithdraw() {
     }
 
     if (parsedAmount < MINIMUM_WITHDRAWAL) {
-      setError(`Minimum withdrawal is $${MINIMUM_WITHDRAWAL}`);
+      setError(`Minimum withdrawal is ₹${MINIMUM_WITHDRAWAL}`);
       return;
     }
 
@@ -178,7 +178,7 @@ export default function MerchantWithdraw() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Available Balance</p>
                   <p className="text-3xl font-bold text-green-500">
-                    ${wallet.available_balance.toFixed(2)}
+                    ₹{wallet.available_balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div className="h-14 w-14 rounded-full bg-green-500/10 flex items-center justify-center">
@@ -213,7 +213,7 @@ export default function MerchantWithdraw() {
                 </div>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">
-                    $
+                    ₹
                   </span>
                   <Input
                     id="amount"
@@ -226,7 +226,7 @@ export default function MerchantWithdraw() {
                   />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Minimum withdrawal: ${MINIMUM_WITHDRAWAL}
+                  Minimum withdrawal: ₹{MINIMUM_WITHDRAWAL}
                 </p>
               </div>
 
@@ -294,17 +294,17 @@ export default function MerchantWithdraw() {
                 <div className="p-4 rounded-lg bg-muted/30 space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Withdrawal Amount</span>
-                    <span>${parsedAmount.toFixed(2)}</span>
+                    <span>₹{parsedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   {PAYOUT_FEE_PERCENT > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Processing Fee ({PAYOUT_FEE_PERCENT}%)</span>
-                      <span>-${fee.toFixed(2)}</span>
+                      <span>-₹{fee.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   )}
                   <div className="pt-2 border-t flex items-center justify-between font-semibold">
                     <span>You'll Receive</span>
-                    <span className="text-green-500">${netAmount.toFixed(2)}</span>
+                    <span className="text-green-500">₹{netAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               )}
