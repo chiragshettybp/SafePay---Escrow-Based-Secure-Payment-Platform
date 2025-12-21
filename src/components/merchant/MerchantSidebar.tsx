@@ -25,13 +25,15 @@ interface MerchantSidebarProps {
   isMobile?: boolean;
 }
 
+import { Bell } from "lucide-react";
+
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/merchant/dashboard" },
   { icon: ShoppingBag, label: "Orders", href: "/merchant/orders" },
   { icon: Truck, label: "Shipments", href: "/merchant/shipments" },
   { icon: AlertTriangle, label: "Disputes", href: "/merchant/disputes" },
   { icon: Wallet, label: "Payouts", href: "/merchant/payouts" },
-  { icon: User, label: "Profile", href: "/merchant/profile" },
+  { icon: Bell, label: "Notifications", href: "/merchant/notifications" },
   { icon: Settings, label: "Settings", href: "/merchant/settings" },
 ];
 

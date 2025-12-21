@@ -362,6 +362,45 @@ export type Database = {
         }
         Relationships: []
       }
+      merchant_api_keys: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          merchant_id: string
+          name: string
+          scopes: string[]
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          merchant_id: string
+          name: string
+          scopes?: string[]
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          merchant_id?: string
+          name?: string
+          scopes?: string[]
+        }
+        Relationships: []
+      }
       merchant_bank_accounts: {
         Row: {
           account_holder_name: string
@@ -457,6 +496,135 @@ export type Database = {
           },
         ]
       }
+      merchant_notification_prefs: {
+        Row: {
+          created_at: string
+          dispute_email: boolean
+          dispute_in_app: boolean
+          dispute_sms: boolean
+          id: string
+          merchant_id: string
+          order_email: boolean
+          order_in_app: boolean
+          order_sms: boolean
+          payment_email: boolean
+          payment_in_app: boolean
+          payment_sms: boolean
+          payout_email: boolean
+          payout_in_app: boolean
+          payout_sms: boolean
+          system_email: boolean
+          system_in_app: boolean
+          system_sms: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dispute_email?: boolean
+          dispute_in_app?: boolean
+          dispute_sms?: boolean
+          id?: string
+          merchant_id: string
+          order_email?: boolean
+          order_in_app?: boolean
+          order_sms?: boolean
+          payment_email?: boolean
+          payment_in_app?: boolean
+          payment_sms?: boolean
+          payout_email?: boolean
+          payout_in_app?: boolean
+          payout_sms?: boolean
+          system_email?: boolean
+          system_in_app?: boolean
+          system_sms?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dispute_email?: boolean
+          dispute_in_app?: boolean
+          dispute_sms?: boolean
+          id?: string
+          merchant_id?: string
+          order_email?: boolean
+          order_in_app?: boolean
+          order_sms?: boolean
+          payment_email?: boolean
+          payment_in_app?: boolean
+          payment_sms?: boolean
+          payout_email?: boolean
+          payout_in_app?: boolean
+          payout_sms?: boolean
+          system_email?: boolean
+          system_in_app?: boolean
+          system_sms?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      merchant_notifications: {
+        Row: {
+          archived_at: string | null
+          body: string
+          created_at: string
+          data: Json | null
+          id: string
+          merchant_id: string
+          priority: string
+          read_at: string | null
+          related_dispute_id: string | null
+          related_order_id: string | null
+          status: string
+          title: string
+          type: string
+        }
+        Insert: {
+          archived_at?: string | null
+          body: string
+          created_at?: string
+          data?: Json | null
+          id?: string
+          merchant_id: string
+          priority?: string
+          read_at?: string | null
+          related_dispute_id?: string | null
+          related_order_id?: string | null
+          status?: string
+          title: string
+          type?: string
+        }
+        Update: {
+          archived_at?: string | null
+          body?: string
+          created_at?: string
+          data?: Json | null
+          id?: string
+          merchant_id?: string
+          priority?: string
+          read_at?: string | null
+          related_dispute_id?: string | null
+          related_order_id?: string | null
+          status?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_notifications_related_dispute_id_fkey"
+            columns: ["related_dispute_id"]
+            isOneToOne: false
+            referencedRelation: "disputes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "merchant_notifications_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       merchant_payouts: {
         Row: {
           amount: number
@@ -546,6 +714,45 @@ export type Database = {
           status?: string
           total_paid_out?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      merchant_webhooks: {
+        Row: {
+          created_at: string
+          events: string[]
+          id: string
+          is_active: boolean
+          last_status: number | null
+          last_triggered_at: string | null
+          merchant_id: string
+          secret: string | null
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          events?: string[]
+          id?: string
+          is_active?: boolean
+          last_status?: number | null
+          last_triggered_at?: string | null
+          merchant_id: string
+          secret?: string | null
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          events?: string[]
+          id?: string
+          is_active?: boolean
+          last_status?: number | null
+          last_triggered_at?: string | null
+          merchant_id?: string
+          secret?: string | null
+          updated_at?: string
+          url?: string
         }
         Relationships: []
       }
