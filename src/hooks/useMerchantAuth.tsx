@@ -78,7 +78,7 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
             category: profile?.category ?? null,
             gst_number: profile?.gst_number ?? null,
             address: profile?.address ?? null,
-            status: u.email_confirmed_at ? "active" : "pending_verification",
+            status: "active", // Auto-approve all merchants
           },
           { onConflict: "user_id" }
         );
