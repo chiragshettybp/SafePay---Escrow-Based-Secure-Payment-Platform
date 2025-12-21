@@ -86,61 +86,43 @@ export default function MerchantSignup() {
     setIsLoading(true);
 
     try {
-      const emailRedirectTo = `${window.location.origin}/merchant/settings`;
-
-      const { data: authData, error: authError } = await merchantSupabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          emailRedirectTo,
-          data: {
-            is_merchant: true,
-            merchant_profile_created: false,
-            merchant_profile: {
-              business_name: data.businessName,
-              phone: data.phone || null,
-              category: data.category || null,
-              gst_number: data.gstNumber || null,
-              address: data.address || null,
-            },
-          },
+      const { error: signupError } = await merchantSupabase.functions.invoke("merchant-signup", {
+        body: {
+          email: data.email,
+          password: data.password,
+          businessName: data.businessName,
+          phone: data.phone || null,
+          category: data.category || null,
+          gstNumber: data.gstNumber || null,
+          address: data.address || null,
         },
       });
 
-      if (authError) {
+      if (signupError) {
+        const message = signupError.message?.toLowerCase().includes("already")
+          ? "This email is already registered. Please sign in instead."
+          : signupError.message;
+
         toast({
           title: "Signup Failed",
-          description: authError.message,
+          description: message,
           variant: "destructive",
         });
         return;
       }
 
-      if (!authData.user) {
+      const { error: signInError } = await merchantSupabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+
+      if (signInError) {
         toast({
-          title: "Signup Failed",
-          description: "Unable to create account. Please try again.",
-          variant: "destructive",
+          title: "Account Created",
+          description: "Your merchant account was created. Please sign in to continue.",
         });
+        navigate("/merchant/login");
         return;
-      }
-
-      // Auto-login (only works when email confirmation is disabled or not required).
-      if (!authData.session) {
-        const { error: signInError } = await merchantSupabase.auth.signInWithPassword({
-          email: data.email,
-          password: data.password,
-        });
-
-        if (signInError) {
-          toast({
-            title: "Account Created",
-            description:
-              "Your account was created. Please check your email to confirm (if required), then sign in.",
-          });
-          navigate("/merchant/login");
-          return;
-        }
       }
 
       toast({
