@@ -4,7 +4,7 @@ import { Mail, Loader2, CheckCircle2, RefreshCw, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { merchantSupabase } from "@/integrations/supabase/merchantClient";
 
 export default function MerchantVerify() {
   const [isLoading, setIsLoading] = useState(true);
@@ -46,7 +46,7 @@ export default function MerchantVerify() {
     const businessName =
       profile?.business_name ?? meta?.business_name ?? user.email?.split("@")[0] ?? "Merchant";
 
-    const { error } = await supabase
+    const { error } = await merchantSupabase
       .from("merchants")
       .upsert(
         {
@@ -63,7 +63,7 @@ export default function MerchantVerify() {
       );
 
     if (!error) {
-      await supabase.auth.updateUser({
+      await merchantSupabase.auth.updateUser({
         data: {
           ...meta,
           merchant_profile_created: true,
@@ -78,7 +78,7 @@ export default function MerchantVerify() {
     try {
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await merchantSupabase.auth.getUser();
 
       if (!user) {
         setIsLoading(false);
@@ -125,7 +125,7 @@ export default function MerchantVerify() {
     try {
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await merchantSupabase.auth.getUser();
 
       const email = user?.email || emailFromQuery || userEmail;
 
@@ -138,9 +138,10 @@ export default function MerchantVerify() {
         return;
       }
 
-      const redirectUrl = `${window.location.origin}/merchant/verify?email=${encodeURIComponent(email)}`;
+      // Use the callback route for verification
+      const redirectUrl = `${window.location.origin}/merchant/auth/callback`;
 
-      const { error } = await supabase.auth.resend({
+      const { error } = await merchantSupabase.auth.resend({
         type: "signup",
         email,
         options: {

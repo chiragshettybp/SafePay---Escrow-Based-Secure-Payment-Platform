@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { merchantSupabase } from "@/integrations/supabase/merchantClient";
 import { useMerchantAuth } from "./useMerchantAuth";
 import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
@@ -47,7 +47,7 @@ export function useMerchantOrders(statusFilter?: OrderStatus | null) {
     queryFn: async () => {
       if (!merchant?.user_id) return [];
 
-      let query = supabase
+      let query = merchantSupabase
         .from("orders")
         .select("*")
         .eq("merchant_id", merchant.user_id)
@@ -81,7 +81,7 @@ export function useMerchantOrders(statusFilter?: OrderStatus | null) {
         };
       }
 
-      const { data: allOrders, error } = await supabase
+      const { data: allOrders, error } = await merchantSupabase
         .from("orders")
         .select("*")
         .eq("merchant_id", merchant.user_id);
@@ -128,7 +128,7 @@ export function useMerchantOrders(statusFilter?: OrderStatus | null) {
       orderId: string;
       status: OrderStatus;
     }) => {
-      const { error } = await supabase
+      const { error } = await merchantSupabase
         .from("orders")
         .update({
           status,
@@ -154,7 +154,7 @@ export function useMerchantOrders(statusFilter?: OrderStatus | null) {
   useEffect(() => {
     if (!merchant?.user_id) return;
 
-    const channel = supabase
+    const channel = merchantSupabase
       .channel("merchant-orders-changes")
       .on(
         "postgres_changes",
@@ -172,7 +172,7 @@ export function useMerchantOrders(statusFilter?: OrderStatus | null) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      merchantSupabase.removeChannel(channel);
     };
   }, [merchant?.user_id, queryClient]);
 

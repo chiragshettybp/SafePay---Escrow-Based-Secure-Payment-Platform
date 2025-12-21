@@ -104,7 +104,7 @@ export function MerchantHeader({
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-accent transition-colors">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={merchant?.logo_url || undefined} />
+                <AvatarImage src={undefined} />
                 <AvatarFallback className="bg-primary/10 text-primary text-sm">
                   {merchant?.business_name ? getInitials(merchant.business_name) : "M"}
                 </AvatarFallback>

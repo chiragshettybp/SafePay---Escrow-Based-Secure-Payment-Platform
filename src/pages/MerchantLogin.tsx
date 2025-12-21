@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { merchantSupabase } from "@/integrations/supabase/merchantClient";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -43,7 +43,7 @@ export default function MerchantLogin() {
     setIsLoading(true);
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: authError } = await merchantSupabase.auth.signInWithPassword({
         email: data.email,
         password: data.password,
       });
@@ -69,14 +69,14 @@ export default function MerchantLogin() {
       }
 
       // Check if user is a merchant
-      const { data: merchantData } = await supabase
-        .from("merchants" as any)
+      const { data: merchantData } = await merchantSupabase
+        .from("merchants")
         .select("id, status")
         .eq("user_id", authData.user.id)
         .maybeSingle();
 
       if (!merchantData) {
-        await supabase.auth.signOut();
+        await merchantSupabase.auth.signOut();
         toast({
           title: "Access Denied",
           description: "This account is not registered as a merchant. Please create a merchant account.",

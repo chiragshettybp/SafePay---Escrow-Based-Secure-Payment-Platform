@@ -37,6 +37,7 @@ import Kyc from "./pages/Kyc";
 import MerchantLogin from "./pages/MerchantLogin";
 import MerchantSignup from "./pages/MerchantSignup";
 import MerchantVerify from "./pages/MerchantVerify";
+import MerchantAuthCallback from "./pages/MerchantAuthCallback";
 import MerchantDashboard from "./pages/MerchantDashboard";
 import NotFound from "./pages/NotFound";
 
@@ -84,6 +85,7 @@ const App = () => (
             <Route path="/merchant/login" element={<MerchantLogin />} />
             <Route path="/merchant/signup" element={<MerchantSignup />} />
             <Route path="/merchant/verify" element={<MerchantVerify />} />
+            <Route path="/merchant/auth/callback" element={<MerchantAuthCallback />} />
             <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

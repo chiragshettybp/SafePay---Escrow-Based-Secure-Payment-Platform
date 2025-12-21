@@ -98,7 +98,7 @@ export function MerchantSidebar({ isCollapsed, onToggle }: MerchantSidebarProps)
       <div className="p-4 border-t border-border">
         <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")}>
           <Avatar className="h-9 w-9 flex-shrink-0">
-            <AvatarImage src={merchant?.logo_url || undefined} />
+            <AvatarImage src={undefined} />
             <AvatarFallback className="bg-primary/10 text-primary text-sm">
               {merchant?.business_name ? getInitials(merchant.business_name) : "M"}
             </AvatarFallback>
