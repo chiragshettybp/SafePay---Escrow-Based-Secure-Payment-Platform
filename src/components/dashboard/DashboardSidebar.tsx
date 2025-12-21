@@ -20,6 +20,7 @@ import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 interface DashboardSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
+  onNavClick?: () => void;
 }
 
 const navItems = [
@@ -33,9 +34,13 @@ const navItems = [
   { icon: HelpCircle, label: "Support", href: "/support" },
 ];
 
-export function DashboardSidebar({ isCollapsed, onToggle }: DashboardSidebarProps) {
+export function DashboardSidebar({ isCollapsed, onToggle, onNavClick }: DashboardSidebarProps) {
   const location = useLocation();
   const { logout, profile } = useSupabaseAuth();
+
+  const handleNavClick = () => {
+    onNavClick?.();
+  };
 
   return (
     <aside
@@ -78,6 +83,7 @@ export function DashboardSidebar({ isCollapsed, onToggle }: DashboardSidebarProp
             <Link
               key={item.href}
               to={item.href}
+              onClick={handleNavClick}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
                 isActive
