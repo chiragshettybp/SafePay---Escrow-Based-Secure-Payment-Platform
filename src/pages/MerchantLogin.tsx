@@ -20,10 +20,6 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-interface MerchantRecord {
-  id: string;
-  status: string;
-}
 
 export default function MerchantLogin() {
   const [showPassword, setShowPassword] = useState(false);
@@ -87,11 +83,6 @@ export default function MerchantLogin() {
         return;
       }
 
-      // Check email verification
-      if (!authData.user.email_confirmed_at) {
-        navigate("/merchant/verify");
-        return;
-      }
 
       if (rememberMe) {
         localStorage.setItem("merchantRememberMe", "true");
