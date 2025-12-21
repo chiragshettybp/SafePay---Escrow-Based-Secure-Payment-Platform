@@ -90,7 +90,7 @@ export default function MerchantPayouts() {
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Available Balance</p>
                     <p className="text-2xl font-bold text-green-500">
-                      ${(wallet?.available_balance || 0).toFixed(2)}
+                      ₹{(wallet?.available_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">Ready to withdraw</p>
                   </div>
@@ -108,7 +108,7 @@ export default function MerchantPayouts() {
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Pending Release</p>
                     <p className="text-2xl font-bold text-amber-500">
-                      ${(wallet?.pending_balance || 0).toFixed(2)}
+                      ₹{(wallet?.pending_balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">In escrow or processing</p>
                   </div>
@@ -126,7 +126,7 @@ export default function MerchantPayouts() {
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Last Withdrawal</p>
                     <p className="text-2xl font-bold">
-                      {lastPayout ? `$${lastPayout.net_amount.toFixed(2)}` : "-"}
+                      {lastPayout ? `₹${lastPayout.net_amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {lastPayout 
@@ -149,7 +149,7 @@ export default function MerchantPayouts() {
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Total Paid Out</p>
                     <p className="text-2xl font-bold text-primary">
-                      ${(wallet?.total_paid_out || 0).toFixed(2)}
+                      ₹{(wallet?.total_paid_out || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">Lifetime earnings</p>
                   </div>
@@ -248,7 +248,7 @@ export default function MerchantPayouts() {
                         ? "Add a bank account to withdraw funds"
                         : !defaultBankAccount.is_verified
                         ? "Your bank account is pending verification"
-                        : `Minimum withdrawal is $${MINIMUM_WITHDRAWAL}`
+                        : `Minimum withdrawal is ₹${MINIMUM_WITHDRAWAL}`
                       }
                     </p>
                   </div>
@@ -311,7 +311,7 @@ export default function MerchantPayouts() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold">${payout.net_amount.toFixed(2)}</p>
+                          <p className="font-semibold">₹{payout.net_amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                           <Badge className={`${statusConfig.color} text-white gap-1`}>
                             {statusConfig.icon}
                             {statusConfig.label}

@@ -218,25 +218,56 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. Create order event
+    // 4. Credit merchant wallet with earnings
+    const { data: merchantWallet } = await supabase
+      .from("merchant_wallets")
+      .select("*")
+      .eq("merchant_id", order.merchant_id)
+      .single();
+
+    if (merchantWallet) {
+      const { error: walletUpdateError } = await supabase
+        .from("merchant_wallets")
+        .update({
+          available_balance: merchantWallet.available_balance + order.amount,
+          updated_at: now
+        })
+        .eq("id", merchantWallet.id);
+
+      if (walletUpdateError) {
+        console.error("Failed to update merchant wallet:", walletUpdateError);
+      } else {
+        console.log(`Credited ₹${order.amount} to merchant wallet`);
+      }
+    } else {
+      console.log("No merchant wallet found, creating one");
+      // Create wallet if doesn't exist
+      await supabase.from("merchant_wallets").insert({
+        merchant_id: order.merchant_id,
+        available_balance: order.amount,
+        currency: "INR"
+      });
+    }
+
+    // 5. Create order event
     await supabase.from("order_events").insert({
       order_id: orderId,
       event_type: "escrow_released",
       title: "Escrow Released",
-      description: `Payment of $${order.amount} has been released to the merchant. Reason: ${reason.replace(/_/g, " ")}`,
+      description: `Payment of ₹${order.amount} has been released to the merchant. Reason: ${reason.replace(/_/g, " ")}`,
       metadata: { reason, disputeId, amount: order.amount }
     });
 
-    // 5. Notify merchant
+    // 6. Notify merchant
     await supabase.from("notifications").insert({
       user_id: order.merchant_id,
       title: "Payment Released",
-      message: `Payment of $${order.amount} for order #${orderId.slice(0, 8)} has been released to you.`,
+      message: `Payment of ₹${order.amount} for order #${orderId.slice(0, 8)} has been released to your wallet.`,
       type: "payment",
       order_id: orderId,
     });
 
-    // 6. Notify customer
+    // 7. Notify customer
     await supabase.from("notifications").insert({
       user_id: order.customer_id,
       title: "Order Completed",

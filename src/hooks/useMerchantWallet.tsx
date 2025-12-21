@@ -65,8 +65,8 @@ export interface CreatePayoutData {
   notes?: string;
 }
 
-const MINIMUM_WITHDRAWAL = 10;
-const PAYOUT_FEE_PERCENT = 0;
+const MINIMUM_WITHDRAWAL = 100; // ₹100 minimum
+const PAYOUT_FEE_PERCENT = 2; // 2% fee on all payouts
 
 export function useMerchantWallet() {
   const { user } = useMerchantAuth();
@@ -323,7 +323,7 @@ export function useMerchantWallet() {
       if (!wallet) throw new Error("Wallet not found");
 
       if (data.amount < MINIMUM_WITHDRAWAL) {
-        throw new Error(`Minimum withdrawal is $${MINIMUM_WITHDRAWAL}`);
+        throw new Error(`Minimum withdrawal is ₹${MINIMUM_WITHDRAWAL}`);
       }
 
       if (data.amount > wallet.available_balance) {
