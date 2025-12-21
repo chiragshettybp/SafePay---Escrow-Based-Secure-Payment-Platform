@@ -496,6 +496,119 @@ export type Database = {
           },
         ]
       }
+      merchant_kyc: {
+        Row: {
+          additional_notes: string | null
+          business_type: string | null
+          created_at: string
+          gst_number: string | null
+          id: string
+          legal_business_name: string | null
+          merchant_id: string
+          owner_dob: string | null
+          owner_name: string | null
+          owner_phone: string | null
+          pan_number: string | null
+          registered_address: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          additional_notes?: string | null
+          business_type?: string | null
+          created_at?: string
+          gst_number?: string | null
+          id?: string
+          legal_business_name?: string | null
+          merchant_id: string
+          owner_dob?: string | null
+          owner_name?: string | null
+          owner_phone?: string | null
+          pan_number?: string | null
+          registered_address?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          additional_notes?: string | null
+          business_type?: string | null
+          created_at?: string
+          gst_number?: string | null
+          id?: string
+          legal_business_name?: string | null
+          merchant_id?: string
+          owner_dob?: string | null
+          owner_name?: string | null
+          owner_phone?: string | null
+          pan_number?: string | null
+          registered_address?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      merchant_kyc_documents: {
+        Row: {
+          created_at: string
+          document_type: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          kyc_id: string | null
+          merchant_id: string
+          rejection_reason: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          document_type: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          kyc_id?: string | null
+          merchant_id: string
+          rejection_reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          document_type?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          kyc_id?: string | null
+          merchant_id?: string
+          rejection_reason?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_kyc_documents_kyc_id_fkey"
+            columns: ["kyc_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_kyc"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       merchant_notification_prefs: {
         Row: {
           created_at: string
@@ -765,6 +878,7 @@ export type Database = {
           email: string
           gst_number: string | null
           id: string
+          logo_url: string | null
           phone: string | null
           status: string
           updated_at: string
@@ -778,6 +892,7 @@ export type Database = {
           email: string
           gst_number?: string | null
           id?: string
+          logo_url?: string | null
           phone?: string | null
           status?: string
           updated_at?: string
@@ -791,6 +906,7 @@ export type Database = {
           email?: string
           gst_number?: string | null
           id?: string
+          logo_url?: string | null
           phone?: string | null
           status?: string
           updated_at?: string
