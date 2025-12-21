@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { merchantSupabase } from "@/integrations/supabase/merchantClient";
+import { Seo } from "@/components/seo/Seo";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -115,6 +116,11 @@ export default function MerchantLogin() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Seo
+        title="Merchant Login | Safepay"
+        description="Sign in to the Safepay merchant portal to manage escrow orders, shipments, disputes, and payouts."
+        canonicalPath="/merchant/login"
+      />
       <div className="w-full max-w-md">
         <Card className="border-border/50 shadow-lg">
           <CardHeader className="text-center space-y-4 pb-6">
@@ -122,7 +128,7 @@ export default function MerchantLogin() {
               <Store className="w-8 h-8 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-2xl font-bold">Merchant Login</CardTitle>
+              <h1 className="text-2xl font-bold text-foreground">Merchant Login</h1>
               <CardDescription className="mt-2">
                 Sign in to manage your escrow orders and payouts
               </CardDescription>

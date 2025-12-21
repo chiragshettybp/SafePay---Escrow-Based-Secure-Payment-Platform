@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { merchantSupabase } from "@/integrations/supabase/merchantClient";
+import { Seo } from "@/components/seo/Seo";
 
 const signupSchema = z.object({
   businessName: z.string().min(2, "Business name must be at least 2 characters"),
@@ -85,30 +86,23 @@ export default function MerchantSignup() {
     setIsLoading(true);
 
     try {
-      // Check if email already exists in merchants table
-      const { data: existingMerchant } = await merchantSupabase
-        .from("merchants")
-        .select("id")
-        .eq("email", data.email)
-        .maybeSingle();
+      const emailRedirectTo = `${window.location.origin}/merchant/settings`;
 
-      if (existingMerchant) {
-        toast({
-          title: "Email Already Registered",
-          description: "This email is already registered as a merchant. Please login instead.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Sign up without email verification
       const { data: authData, error: authError } = await merchantSupabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
+          emailRedirectTo,
           data: {
             is_merchant: true,
+            merchant_profile_created: false,
+            merchant_profile: {
+              business_name: data.businessName,
+              phone: data.phone || null,
+              category: data.category || null,
+              gst_number: data.gstNumber || null,
+              address: data.address || null,
+            },
           },
         },
       });
@@ -119,7 +113,6 @@ export default function MerchantSignup() {
           description: authError.message,
           variant: "destructive",
         });
-        setIsLoading(false);
         return;
       }
 
@@ -129,40 +122,34 @@ export default function MerchantSignup() {
           description: "Unable to create account. Please try again.",
           variant: "destructive",
         });
-        setIsLoading(false);
         return;
       }
 
-      // Create merchant profile directly
-      const { error: merchantError } = await merchantSupabase.from("merchants").insert({
-        user_id: authData.user.id,
-        email: data.email,
-        business_name: data.businessName,
-        phone: data.phone || null,
-        category: data.category || null,
-        gst_number: data.gstNumber || null,
-        address: data.address || null,
-        status: "pending_verification",
-      });
-
-      if (merchantError) {
-        console.error("Merchant profile creation error:", merchantError);
-        toast({
-          title: "Profile Creation Failed",
-          description: "Account created but profile setup failed. Please contact support.",
-          variant: "destructive",
+      // Auto-login (only works when email confirmation is disabled or not required).
+      if (!authData.session) {
+        const { error: signInError } = await merchantSupabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
         });
-        setIsLoading(false);
-        return;
+
+        if (signInError) {
+          toast({
+            title: "Account Created",
+            description:
+              "Your account was created. Please check your email to confirm (if required), then sign in.",
+          });
+          navigate("/merchant/login");
+          return;
+        }
       }
 
       toast({
         title: "Account Created!",
-        description: "Welcome! Your merchant account is ready.",
+        description: "Welcome! You're signed in.",
       });
 
       navigate("/merchant/dashboard");
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "An unexpected error occurred. Please try again.",
@@ -175,6 +162,11 @@ export default function MerchantSignup() {
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
+      <Seo
+        title="Merchant Signup | Safepay"
+        description="Create a merchant account to manage escrow orders, shipments, disputes, and payouts."
+        canonicalPath="/merchant/signup"
+      />
       <div className="w-full max-w-lg mx-auto">
         <Card className="border-border/50 shadow-lg">
           <CardHeader className="text-center space-y-4 pb-4">
@@ -182,7 +174,7 @@ export default function MerchantSignup() {
               <Store className="w-7 h-7 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-xl font-bold">Create Merchant Account</CardTitle>
+              <h1 className="text-xl font-bold text-foreground">Create Merchant Account</h1>
               <CardDescription className="mt-1 text-sm">
                 Register to receive payments via escrow
               </CardDescription>

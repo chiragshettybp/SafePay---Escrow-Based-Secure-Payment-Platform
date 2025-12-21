@@ -214,8 +214,7 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (data: MerchantSignupData): Promise<{ error: Error | null }> => {
     try {
-      // Use the callback route for email verification
-      const redirectUrl = `${window.location.origin}/merchant/auth/callback`;
+      const redirectUrl = `${window.location.origin}/merchant/settings`;
 
       const { data: authData, error: authError } = await merchantSupabase.auth.signUp({
         email: data.email,
@@ -263,12 +262,12 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
   const resendVerificationEmail = async (email?: string): Promise<{ error: Error | null }> => {
     try {
       const targetEmail = email || user?.email;
-      
+
       if (!targetEmail) {
         return { error: new Error("No email address found") };
       }
 
-      const redirectUrl = `${window.location.origin}/merchant/auth/callback`;
+      const redirectUrl = `${window.location.origin}/merchant/settings`;
 
       const { error } = await merchantSupabase.auth.resend({
         type: "signup",
