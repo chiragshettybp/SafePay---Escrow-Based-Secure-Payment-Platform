@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 interface MerchantSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
+  onNavClick?: () => void;
 }
 
 const navItems = [
@@ -30,9 +31,13 @@ const navItems = [
   { icon: Settings, label: "Settings", href: "/merchant/settings" },
 ];
 
-export function MerchantSidebar({ isCollapsed, onToggle }: MerchantSidebarProps) {
+export function MerchantSidebar({ isCollapsed, onToggle, onNavClick }: MerchantSidebarProps) {
   const location = useLocation();
   const { merchant, logout } = useMerchantAuth();
+
+  const handleNavClick = () => {
+    onNavClick?.();
+  };
 
   const getInitials = (name: string) => {
     return name
@@ -80,6 +85,7 @@ export function MerchantSidebar({ isCollapsed, onToggle }: MerchantSidebarProps)
             <Link
               key={item.href}
               to={item.href}
+              onClick={handleNavClick}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
                 isActive
