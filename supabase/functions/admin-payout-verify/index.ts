@@ -83,156 +83,277 @@ Deno.serve(async (req) => {
 
     console.log(`Processing payout ${payout_id} - Decision: ${decision}`);
 
-    // Get current payout
-    const { data: payout, error: payoutError } = await supabase
+    // First, try to find in merchant_payouts
+    const { data: merchantPayout } = await supabase
       .from('merchant_payouts')
       .select('*')
       .eq('id', payout_id)
-      .single();
+      .maybeSingle();
 
-    if (payoutError || !payout) {
-      console.error('Payout not found:', payoutError);
+    // If not found, try wallet_transactions (customer withdrawals)
+    const { data: customerWithdrawal } = !merchantPayout ? await supabase
+      .from('wallet_transactions')
+      .select('*')
+      .eq('id', payout_id)
+      .eq('type', 'withdrawal')
+      .maybeSingle() : { data: null };
+
+    if (!merchantPayout && !customerWithdrawal) {
+      console.error('Payout not found in either table');
       return new Response(
         JSON.stringify({ error: 'Payout not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate payout status
-    if (!['processing', 'pending'].includes(payout.status)) {
-      return new Response(
-        JSON.stringify({ error: `Cannot process payout with status: ${payout.status}` }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get merchant wallet
-    const { data: wallet, error: walletError } = await supabase
-      .from('merchant_wallets')
-      .select('*')
-      .eq('merchant_id', payout.merchant_id)
-      .single();
-
-    if (walletError || !wallet) {
-      console.error('Wallet not found:', walletError);
-      return new Response(
-        JSON.stringify({ error: 'Merchant wallet not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const now = new Date().toISOString();
 
-    if (decision === 'approve') {
-      // Validate wallet balance
-      if (wallet.available_balance < payout.amount) {
+    // Handle merchant payout
+    if (merchantPayout) {
+      console.log('Processing merchant payout');
+      
+      // Validate payout status
+      if (!['processing', 'pending'].includes(merchantPayout.status)) {
         return new Response(
-          JSON.stringify({ error: 'Insufficient wallet balance for payout' }),
+          JSON.stringify({ error: `Cannot process payout with status: ${merchantPayout.status}` }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Deduct from wallet balance
-      const newAvailableBalance = wallet.available_balance - payout.amount;
-      const newTotalPaidOut = wallet.total_paid_out + payout.net_amount;
-
-      const { error: walletUpdateError } = await supabase
+      // Get merchant wallet
+      const { data: wallet, error: walletError } = await supabase
         .from('merchant_wallets')
-        .update({
-          available_balance: newAvailableBalance,
-          total_paid_out: newTotalPaidOut,
-          updated_at: now
-        })
-        .eq('id', wallet.id);
+        .select('*')
+        .eq('merchant_id', merchantPayout.merchant_id)
+        .single();
 
-      if (walletUpdateError) {
-        console.error('Wallet update error:', walletUpdateError);
+      if (walletError || !wallet) {
+        console.error('Wallet not found:', walletError);
         return new Response(
-          JSON.stringify({ error: 'Failed to update wallet balance' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'Merchant wallet not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Update payout status to approved/paid
-      const { error: payoutUpdateError } = await supabase
-        .from('merchant_payouts')
-        .update({
-          status: 'paid',
-          processed_at: now,
-          notes: admin_notes || payout.notes,
-          updated_at: now
-        })
-        .eq('id', payout_id);
+      if (decision === 'approve') {
+        // Validate wallet balance
+        if (wallet.available_balance < merchantPayout.amount) {
+          return new Response(
+            JSON.stringify({ error: 'Insufficient wallet balance for payout' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
-      if (payoutUpdateError) {
-        console.error('Payout update error:', payoutUpdateError);
-        // Rollback wallet update
-        await supabase
+        // Deduct from wallet balance
+        const newAvailableBalance = wallet.available_balance - merchantPayout.amount;
+        const newTotalPaidOut = wallet.total_paid_out + merchantPayout.net_amount;
+
+        const { error: walletUpdateError } = await supabase
           .from('merchant_wallets')
           .update({
-            available_balance: wallet.available_balance,
-            total_paid_out: wallet.total_paid_out,
+            available_balance: newAvailableBalance,
+            total_paid_out: newTotalPaidOut,
             updated_at: now
           })
           .eq('id', wallet.id);
 
+        if (walletUpdateError) {
+          console.error('Wallet update error:', walletUpdateError);
+          return new Response(
+            JSON.stringify({ error: 'Failed to update wallet balance' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Update payout status to approved/paid
+        const { error: payoutUpdateError } = await supabase
+          .from('merchant_payouts')
+          .update({
+            status: 'paid',
+            processed_at: now,
+            notes: admin_notes || merchantPayout.notes,
+            updated_at: now
+          })
+          .eq('id', payout_id);
+
+        if (payoutUpdateError) {
+          console.error('Payout update error:', payoutUpdateError);
+          // Rollback wallet update
+          await supabase
+            .from('merchant_wallets')
+            .update({
+              available_balance: wallet.available_balance,
+              total_paid_out: wallet.total_paid_out,
+              updated_at: now
+            })
+            .eq('id', wallet.id);
+
+          return new Response(
+            JSON.stringify({ error: 'Failed to update payout status' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Create notification for merchant
+        await supabase
+          .from('merchant_notifications')
+          .insert({
+            merchant_id: merchantPayout.merchant_id,
+            type: 'payout',
+            title: 'Payout Approved',
+            body: `Your payout request of ₹${merchantPayout.net_amount.toLocaleString()} has been approved and is being processed.`,
+            priority: 'high'
+          });
+
+        console.log(`Merchant payout ${payout_id} approved successfully`);
+      } else {
+        // Decline payout
+        const { error: payoutUpdateError } = await supabase
+          .from('merchant_payouts')
+          .update({
+            status: 'failed',
+            failure_reason: reason,
+            notes: admin_notes || merchantPayout.notes,
+            updated_at: now
+          })
+          .eq('id', payout_id);
+
+        if (payoutUpdateError) {
+          console.error('Payout update error:', payoutUpdateError);
+          return new Response(
+            JSON.stringify({ error: 'Failed to update payout status' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Create notification for merchant
+        await supabase
+          .from('merchant_notifications')
+          .insert({
+            merchant_id: merchantPayout.merchant_id,
+            type: 'payout',
+            title: 'Payout Declined',
+            body: `Your payout request of ₹${merchantPayout.net_amount.toLocaleString()} has been declined. Reason: ${reason}`,
+            priority: 'high'
+          });
+
+        console.log(`Merchant payout ${payout_id} declined successfully`);
+      }
+    } 
+    // Handle customer withdrawal
+    else if (customerWithdrawal) {
+      console.log('Processing customer withdrawal');
+      
+      // Validate withdrawal status
+      if (!['processing', 'pending'].includes(customerWithdrawal.status)) {
         return new Response(
-          JSON.stringify({ error: 'Failed to update payout status' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: `Cannot process withdrawal with status: ${customerWithdrawal.status}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Create notification for merchant
-      await supabase
-        .from('merchant_notifications')
-        .insert({
-          merchant_id: payout.merchant_id,
-          type: 'payout',
-          title: 'Payout Approved',
-          body: `Your payout request of ₹${payout.net_amount.toLocaleString()} has been approved and is being processed.`,
-          priority: 'high'
-        });
+      if (decision === 'approve') {
+        // Update withdrawal status to success
+        const { error: withdrawalUpdateError } = await supabase
+          .from('wallet_transactions')
+          .update({
+            status: 'success',
+            updated_at: now
+          })
+          .eq('id', payout_id);
 
-      console.log(`Payout ${payout_id} approved successfully`);
-    } else {
-      // Decline payout
-      const { error: payoutUpdateError } = await supabase
-        .from('merchant_payouts')
-        .update({
-          status: 'failed',
-          failure_reason: reason,
-          notes: admin_notes || payout.notes,
-          updated_at: now
-        })
-        .eq('id', payout_id);
+        if (withdrawalUpdateError) {
+          console.error('Withdrawal update error:', withdrawalUpdateError);
+          return new Response(
+            JSON.stringify({ error: 'Failed to update withdrawal status' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
-      if (payoutUpdateError) {
-        console.error('Payout update error:', payoutUpdateError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to update payout status' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // Create notification for customer
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: customerWithdrawal.customer_id,
+            type: 'wallet',
+            title: 'Withdrawal Approved',
+            message: `Your withdrawal request of ₹${customerWithdrawal.amount.toLocaleString()} has been approved and is being processed.`
+          });
+
+        console.log(`Customer withdrawal ${payout_id} approved successfully`);
+      } else {
+        // Decline withdrawal - refund to wallet
+        const { data: customerWallet } = await supabase
+          .from('wallets')
+          .select('*')
+          .eq('customer_id', customerWithdrawal.customer_id)
+          .single();
+
+        if (customerWallet) {
+          // Refund the amount back to wallet
+          const { error: walletUpdateError } = await supabase
+            .from('wallets')
+            .update({
+              balance: customerWallet.balance + customerWithdrawal.amount,
+              updated_at: now
+            })
+            .eq('id', customerWallet.id);
+
+          if (walletUpdateError) {
+            console.error('Wallet refund error:', walletUpdateError);
+          }
+        }
+
+        // Update withdrawal status to failed
+        const { error: withdrawalUpdateError } = await supabase
+          .from('wallet_transactions')
+          .update({
+            status: 'failed',
+            updated_at: now
+          })
+          .eq('id', payout_id);
+
+        if (withdrawalUpdateError) {
+          console.error('Withdrawal update error:', withdrawalUpdateError);
+          return new Response(
+            JSON.stringify({ error: 'Failed to update withdrawal status' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Create notification for customer
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: customerWithdrawal.customer_id,
+            type: 'wallet',
+            title: 'Withdrawal Declined',
+            message: `Your withdrawal request of ₹${customerWithdrawal.amount.toLocaleString()} has been declined. Reason: ${reason}. The amount has been refunded to your wallet.`
+          });
+
+        console.log(`Customer withdrawal ${payout_id} declined successfully`);
       }
-
-      // Create notification for merchant
-      await supabase
-        .from('merchant_notifications')
-        .insert({
-          merchant_id: payout.merchant_id,
-          type: 'payout',
-          title: 'Payout Declined',
-          body: `Your payout request of ₹${payout.net_amount.toLocaleString()} has been declined. Reason: ${reason}`,
-          priority: 'high'
-        });
-
-      console.log(`Payout ${payout_id} declined successfully`);
     }
+
+    // Log admin action
+    await supabase
+      .from('admin_financial_actions_log')
+      .insert({
+        admin_id: user.id,
+        action_type: decision === 'approve' ? 'payout_approved' : 'payout_declined',
+        target_type: merchantPayout ? 'merchant_payout' : 'customer_withdrawal',
+        target_id: payout_id,
+        amount: merchantPayout?.amount || customerWithdrawal?.amount,
+        reason: decision === 'decline' ? reason : null,
+        metadata: { admin_notes }
+      });
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: decision === 'approve' ? 'Payout approved and processed' : 'Payout declined',
-        payout_id
+        payout_id,
+        payout_type: merchantPayout ? 'merchant' : 'customer'
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
