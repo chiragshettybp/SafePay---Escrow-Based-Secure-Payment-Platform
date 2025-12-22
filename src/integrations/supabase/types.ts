@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_financial_actions_log: {
+        Row: {
+          action_type: string
+          admin_id: string
+          amount: number | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          reason: string | null
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          amount?: number | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          reason?: string | null
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          amount?: number | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          reason?: string | null
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: []
+      }
       admin_login_attempts: {
         Row: {
           created_at: string
@@ -405,6 +444,99 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "disputes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      escrow_accounts: {
+        Row: {
+          available_balance: number
+          created_at: string
+          id: string
+          is_frozen: boolean
+          locked_balance: number
+          merchant_id: string
+          notes: string | null
+          risk_flag: string | null
+          total_balance: number
+          updated_at: string
+        }
+        Insert: {
+          available_balance?: number
+          created_at?: string
+          id?: string
+          is_frozen?: boolean
+          locked_balance?: number
+          merchant_id: string
+          notes?: string | null
+          risk_flag?: string | null
+          total_balance?: number
+          updated_at?: string
+        }
+        Update: {
+          available_balance?: number
+          created_at?: string
+          id?: string
+          is_frozen?: boolean
+          locked_balance?: number
+          merchant_id?: string
+          notes?: string | null
+          risk_flag?: string | null
+          total_balance?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      escrow_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at: string
+          created_by: string | null
+          escrow_account_id: string
+          id: string
+          order_id: string | null
+          reason: string | null
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at?: string
+          created_by?: string | null
+          escrow_account_id: string
+          id?: string
+          order_id?: string | null
+          reason?: string | null
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          balance_before?: number
+          created_at?: string
+          created_by?: string | null
+          escrow_account_id?: string
+          id?: string
+          order_id?: string | null
+          reason?: string | null
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escrow_transactions_escrow_account_id_fkey"
+            columns: ["escrow_account_id"]
+            isOneToOne: false
+            referencedRelation: "escrow_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escrow_transactions_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
@@ -2020,6 +2152,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      withdrawal_transactions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          gateway_response: Json | null
+          id: string
+          message: string | null
+          payout_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          gateway_response?: Json | null
+          id?: string
+          message?: string | null
+          payout_id: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          gateway_response?: Json | null
+          id?: string
+          message?: string | null
+          payout_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdrawal_transactions_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_payouts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
