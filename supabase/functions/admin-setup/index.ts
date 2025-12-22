@@ -33,8 +33,9 @@ serve(async (req) => {
 
     const { setupKey } = await req.json();
     
-    // Verify setup key (use service role key as setup authorization)
-    if (setupKey !== supabaseServiceKey.slice(-16)) {
+    // Verify setup key - use a simple setup key for initial setup
+    const validSetupKey = "admin-init-2024";
+    if (setupKey !== validSetupKey) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }

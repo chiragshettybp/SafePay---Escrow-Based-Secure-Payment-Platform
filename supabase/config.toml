@@ -8,3 +8,12 @@ verify_jwt = true
 
 [functions.release-escrow]
 verify_jwt = true
+
+[functions.admin-setup]
+verify_jwt = false
+
+[functions.admin-login]
+verify_jwt = false
+
+[functions.admin-verify-session]
+verify_jwt = false
