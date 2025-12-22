@@ -57,6 +57,14 @@ import MerchantNotifications from "./pages/MerchantNotifications";
 import MerchantNotificationDetail from "./pages/MerchantNotificationDetail";
 import MerchantNotificationPreferences from "./pages/MerchantNotificationPreferences";
 import MerchantNotificationsArchive from "./pages/MerchantNotificationsArchive";
+import MerchantShipments from "./pages/MerchantShipments";
+import MerchantShipmentDetails from "./pages/MerchantShipmentDetails";
+import MerchantShipmentCreate from "./pages/MerchantShipmentCreate";
+import MerchantShipmentEdit from "./pages/MerchantShipmentEdit";
+import MerchantShipmentStatus from "./pages/MerchantShipmentStatus";
+import MerchantShipmentProof from "./pages/MerchantShipmentProof";
+import MerchantShipmentTimeline from "./pages/MerchantShipmentTimeline";
+import MerchantShipmentsBulk from "./pages/MerchantShipmentsBulk";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -123,6 +131,15 @@ const App = () => (
               <Route path="notifications/:notificationId" element={<MerchantNotificationDetail />} />
               <Route path="notifications/preferences" element={<MerchantNotificationPreferences />} />
               <Route path="notifications/archive" element={<MerchantNotificationsArchive />} />
+              {/* Shipments Routes */}
+              <Route path="shipments" element={<MerchantShipments />} />
+              <Route path="shipments/bulk" element={<MerchantShipmentsBulk />} />
+              <Route path="shipments/create/:orderId" element={<MerchantShipmentCreate />} />
+              <Route path="shipments/:shipmentId" element={<MerchantShipmentDetails />} />
+              <Route path="shipments/:shipmentId/edit" element={<MerchantShipmentEdit />} />
+              <Route path="shipments/:shipmentId/status" element={<MerchantShipmentStatus />} />
+              <Route path="shipments/:shipmentId/proof" element={<MerchantShipmentProof />} />
+              <Route path="shipments/:shipmentId/timeline" element={<MerchantShipmentTimeline />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

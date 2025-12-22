@@ -141,7 +141,8 @@ export function MerchantSidebar({ isCollapsed, onToggle, onNavClick, isMobile }:
       {/* Navigation */}
       <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.href;
+          const isActive = location.pathname === item.href || 
+            (item.href !== "/merchant/dashboard" && location.pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
