@@ -162,12 +162,12 @@ export default function AdminPayoutVerify() {
             </CardHeader>
             <CardContent className="space-y-2">
               <div>
-                <p className="text-sm text-muted-foreground">Business Name</p>
-                <p className="font-medium">{payout.merchant?.business_name || "Unknown"}</p>
+                <p className="text-sm text-muted-foreground">{payout.user_type === 'merchant' ? 'Business Name' : 'Customer Name'}</p>
+                <p className="font-medium">{payout.user_name || "Unknown"}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Merchant ID</p>
-                <p className="font-mono text-sm">{payout.merchant_id.slice(0, 12)}...</p>
+                <p className="text-sm text-muted-foreground">{payout.user_type === 'merchant' ? 'Merchant ID' : 'Customer ID'}</p>
+                <p className="font-mono text-sm">{payout.user_id.slice(0, 12)}...</p>
               </div>
             </CardContent>
           </Card>

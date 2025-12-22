@@ -187,8 +187,8 @@ export default function AdminPayouts() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{payout.merchant?.business_name || "Unknown"}</div>
-                          <div className="text-sm text-muted-foreground">{payout.merchant_id.slice(0, 8)}...</div>
+                          <div className="font-medium">{payout.user_name || "Unknown"}</div>
+                          <div className="text-sm text-muted-foreground">{payout.user_id.slice(0, 8)}... ({payout.user_type})</div>
                         </div>
                       </TableCell>
                       <TableCell className="font-medium">{formatCurrency(payout.amount)}</TableCell>
