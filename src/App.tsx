@@ -75,6 +75,13 @@ import MerchantShipmentStatus from "./pages/MerchantShipmentStatus";
 import MerchantShipmentProof from "./pages/MerchantShipmentProof";
 import MerchantShipmentTimeline from "./pages/MerchantShipmentTimeline";
 import MerchantShipmentsBulk from "./pages/MerchantShipmentsBulk";
+import MerchantSupport from "./pages/MerchantSupport";
+import MerchantSupportCreate from "./pages/MerchantSupportCreate";
+import MerchantSupportTickets from "./pages/MerchantSupportTickets";
+import MerchantSupportTicketDetails from "./pages/MerchantSupportTicketDetails";
+import MerchantSupportUpload from "./pages/MerchantSupportUpload";
+import MerchantSupportResult from "./pages/MerchantSupportResult";
+import MerchantSupportFaq from "./pages/MerchantSupportFaq";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -162,6 +169,14 @@ const App = () => (
               <Route path="shipments/:shipmentId/status" element={<MerchantShipmentStatus />} />
               <Route path="shipments/:shipmentId/proof" element={<MerchantShipmentProof />} />
               <Route path="shipments/:shipmentId/timeline" element={<MerchantShipmentTimeline />} />
+              {/* Support Routes */}
+              <Route path="support" element={<MerchantSupport />} />
+              <Route path="support/create" element={<MerchantSupportCreate />} />
+              <Route path="support/tickets" element={<MerchantSupportTickets />} />
+              <Route path="support/ticket/:ticketId" element={<MerchantSupportTicketDetails />} />
+              <Route path="support/upload/:ticketId" element={<MerchantSupportUpload />} />
+              <Route path="support/result/:ticketId" element={<MerchantSupportResult />} />
+              <Route path="support/faq" element={<MerchantSupportFaq />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

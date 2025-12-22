@@ -302,6 +302,7 @@ export type Database = {
       faqs: {
         Row: {
           answer: string
+          audience: string
           category: string
           created_at: string
           id: string
@@ -312,6 +313,7 @@ export type Database = {
         }
         Insert: {
           answer: string
+          audience?: string
           category: string
           created_at?: string
           id?: string
@@ -322,6 +324,7 @@ export type Database = {
         }
         Update: {
           answer?: string
+          audience?: string
           category?: string
           created_at?: string
           id?: string
@@ -1356,6 +1359,7 @@ export type Database = {
           id: string
           priority: string
           related_order_id: string | null
+          related_shipment_id: string | null
           resolved_at: string | null
           status: string
           subject: string
@@ -1371,6 +1375,7 @@ export type Database = {
           id?: string
           priority?: string
           related_order_id?: string | null
+          related_shipment_id?: string | null
           resolved_at?: string | null
           status?: string
           subject: string
@@ -1386,6 +1391,7 @@ export type Database = {
           id?: string
           priority?: string
           related_order_id?: string | null
+          related_shipment_id?: string | null
           resolved_at?: string | null
           status?: string
           subject?: string
