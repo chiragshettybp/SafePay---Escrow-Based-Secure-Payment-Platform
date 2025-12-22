@@ -83,6 +83,133 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_notification_logs: {
+        Row: {
+          action_type: string
+          admin_id: string
+          created_at: string
+          description: string | null
+          id: string
+          new_value: Json | null
+          notification_id: string
+          previous_value: Json | null
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          new_value?: Json | null
+          notification_id: string
+          previous_value?: Json | null
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          new_value?: Json | null
+          notification_id?: string
+          previous_value?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_notification_logs_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "admin_notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_notification_recipients: {
+        Row: {
+          created_at: string
+          delivered_at: string | null
+          delivery_status: string
+          id: string
+          notification_id: string
+          read_at: string | null
+          user_id: string
+          user_type: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_at?: string | null
+          delivery_status?: string
+          id?: string
+          notification_id: string
+          read_at?: string | null
+          user_id: string
+          user_type?: string
+        }
+        Update: {
+          created_at?: string
+          delivered_at?: string | null
+          delivery_status?: string
+          id?: string
+          notification_id?: string
+          read_at?: string | null
+          user_id?: string
+          user_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_notification_recipients_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "admin_notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_notifications: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          message: string
+          scheduled_at: string | null
+          sent_at: string | null
+          specific_user_ids: string[] | null
+          status: string
+          target_audience: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          message: string
+          scheduled_at?: string | null
+          sent_at?: string | null
+          specific_user_ids?: string[] | null
+          status?: string
+          target_audience?: string
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          message?: string
+          scheduled_at?: string | null
+          sent_at?: string | null
+          specific_user_ids?: string[] | null
+          status?: string
+          target_audience?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       admin_password_resets: {
         Row: {
           admin_id: string
