@@ -1236,6 +1236,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_status: string
           avatar_url: string | null
           created_at: string
           full_name: string | null
@@ -1245,6 +1246,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_status?: string
           avatar_url?: string | null
           created_at?: string
           full_name?: string | null
@@ -1254,6 +1256,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_status?: string
           avatar_url?: string | null
           created_at?: string
           full_name?: string | null
@@ -1604,6 +1607,48 @@ export type Database = {
           },
         ]
       }
+      user_bans: {
+        Row: {
+          action_type: string
+          admin_id: string
+          created_at: string
+          duration_days: number | null
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          notes: string | null
+          reason: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          created_at?: string
+          duration_days?: number | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          reason: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          created_at?: string
+          duration_days?: number | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          reason?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_notification_prefs: {
         Row: {
           created_at: string
@@ -1753,6 +1798,33 @@ export type Database = {
           two_factor_enabled?: boolean
           two_factor_method?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_warnings: {
+        Row: {
+          admin_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          reason: string
+          user_id: string
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          reason: string
+          user_id: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          reason?: string
           user_id?: string
         }
         Relationships: []

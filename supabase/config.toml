@@ -38,3 +38,6 @@ verify_jwt = true
 
 [functions.admin-merchant-ban]
 verify_jwt = true
+
+[functions.admin-user-action]
+verify_jwt = true
