@@ -186,4 +186,75 @@
   .touch-highlight {
     @apply active:scale-[0.98] transition-transform;
   }
+
+  /* Admin-specific mobile utilities */
+  .admin-page-header {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6;
+  }
+
+  .admin-page-title {
+    @apply text-xl sm:text-2xl font-bold tracking-tight;
+  }
+
+  .admin-page-subtitle {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+
+  .admin-card-compact {
+    @apply p-3 sm:p-4;
+  }
+
+  .admin-stat-value {
+    @apply text-lg sm:text-2xl font-bold font-mono;
+  }
+
+  .admin-stat-label {
+    @apply text-xs sm:text-sm text-muted-foreground;
+  }
+
+  .admin-info-grid {
+    @apply grid grid-cols-2 gap-3 sm:gap-4;
+  }
+
+  .admin-info-item {
+    @apply space-y-0.5 sm:space-y-1;
+  }
+
+  .admin-info-label {
+    @apply text-xs sm:text-sm text-muted-foreground;
+  }
+
+  .admin-info-value {
+    @apply text-sm sm:text-base font-medium truncate;
+  }
+
+  .admin-table-scroll {
+    @apply overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0;
+  }
+
+  .admin-filters {
+    @apply flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center;
+  }
+
+  .admin-filter-item {
+    @apply w-full sm:w-auto sm:min-w-[160px];
+  }
+
+  .admin-actions-mobile {
+    @apply flex flex-col gap-2 sm:flex-row sm:gap-3;
+  }
+
+  .admin-back-btn {
+    @apply mb-4 sm:mb-6 -ml-2;
+  }
+
+  /* Mobile list items */
+  .admin-list-item {
+    @apply p-4 border-b border-border last:border-b-0 active:bg-muted/50 transition-colors;
+  }
+
+  /* Responsive text truncation */
+  .truncate-mobile {
+    @apply max-w-[150px] sm:max-w-[200px] md:max-w-none truncate;
+  }
 }
