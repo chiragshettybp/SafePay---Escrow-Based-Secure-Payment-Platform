@@ -29,3 +29,6 @@ verify_jwt = true
 
 [functions.admin-force-refund]
 verify_jwt = true
+
+[functions.admin-dispute-decision]
+verify_jwt = true
