@@ -11,6 +11,7 @@ export interface DashboardMetrics {
   totalRevenue: number;
   escrowBalance: number;
   pendingWithdrawals: number;
+  pendingPayoutsAmount: number;
   openDisputes: number;
   activeShipments: number;
   openSupportTickets: number;
@@ -53,6 +54,7 @@ export function useAdminDashboard() {
     totalRevenue: 0,
     escrowBalance: 0,
     pendingWithdrawals: 0,
+    pendingPayoutsAmount: 0,
     openDisputes: 0,
     activeShipments: 0,
     openSupportTickets: 0,
@@ -97,15 +99,19 @@ export function useAdminDashboard() {
         supabase.from("disputes").select("id", { count: "exact", head: true }).in("status", ["open", "under_review"]),
         supabase.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress"]),
         supabase.from("merchant_kyc").select("id", { count: "exact", head: true }).eq("status", "pending"),
-        supabase.from("merchant_payouts").select("id", { count: "exact", head: true }).eq("status", "processing"),
+        supabase.from("merchant_payouts").select("id", { count: "exact", head: true }).in("status", ["processing", "requested", "under_review"]),
         supabase.from("tracking").select("id", { count: "exact", head: true }).in("status", ["in_transit", "out_for_delivery"]),
         supabase.from("orders").select("amount").in("status", ["completed", "delivered"]),
         supabase.from("orders").select("amount").eq("status", "escrow_locked"),
+        supabase.from("merchant_payouts").select("amount").in("status", ["processing", "requested", "under_review"]),
       ]);
 
-      // Calculate revenue
+      // Calculate revenue and payout amounts
       const totalRevenue = revenueResult.data?.reduce((sum, order) => sum + (Number(order.amount) || 0), 0) || 0;
       const escrowBalance = escrowResult.data?.reduce((sum, order) => sum + (Number(order.amount) || 0), 0) || 0;
+      // pendingPayoutsAmountResult is the 13th item (index 12)
+      const pendingPayoutsAmountResult = await supabase.from("merchant_payouts").select("amount").in("status", ["processing", "requested", "under_review"]);
+      const pendingPayoutsAmount = pendingPayoutsAmountResult.data?.reduce((sum, payout) => sum + (Number(payout.amount) || 0), 0) || 0;
 
       setMetrics({
         totalCustomers: customersResult.count || 0,
@@ -116,6 +122,7 @@ export function useAdminDashboard() {
         totalRevenue,
         escrowBalance,
         pendingWithdrawals: withdrawalsResult.count || 0,
+        pendingPayoutsAmount,
         openDisputes: disputesResult.count || 0,
         activeShipments: shipmentsResult.count || 0,
         openSupportTickets: supportTicketsResult.count || 0,
@@ -312,11 +319,11 @@ export function useAdminDashboard() {
 
     if (metrics.pendingWithdrawals > 0) {
       newAlerts.push({
-        id: "pending-withdrawals",
+        id: "pending-payouts",
         type: "warning",
-        title: `${metrics.pendingWithdrawals} Pending Withdrawals`,
-        description: "Processing merchant payouts",
-        link: "/admin/withdrawals?filter=pending",
+        title: `${metrics.pendingWithdrawals} Pending Payouts`,
+        description: `₹${metrics.pendingPayoutsAmount?.toLocaleString("en-IN") || 0} awaiting approval`,
+        link: "/admin/payouts?status=processing",
         createdAt: new Date().toISOString(),
       });
     }
@@ -388,10 +395,22 @@ export function useAdminDashboard() {
       )
       .subscribe();
 
+    const payoutsChannel = supabase
+      .channel("admin-payouts-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "merchant_payouts" },
+        () => {
+          fetchMetrics();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(disputesChannel);
       supabase.removeChannel(merchantsChannel);
+      supabase.removeChannel(payoutsChannel);
     };
   }, []);
 

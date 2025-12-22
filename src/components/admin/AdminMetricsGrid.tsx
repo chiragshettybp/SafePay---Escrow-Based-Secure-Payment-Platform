@@ -126,10 +126,11 @@ export function AdminMetricsGrid({ metrics, isLoading }: AdminMetricsGridProps) 
         isLoading={isLoading}
       />
       <MetricCard
-        title="Pending Withdrawals"
+        title="Pending Payouts"
         value={metrics.pendingWithdrawals}
+        subtitle={`₹${metrics.pendingPayoutsAmount?.toLocaleString("en-IN") || 0} total`}
         icon={Clock}
-        href="/admin/withdrawals"
+        href="/admin/payouts"
         isLoading={isLoading}
       />
       <MetricCard
