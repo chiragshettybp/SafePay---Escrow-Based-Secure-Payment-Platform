@@ -194,34 +194,46 @@ export default function AdminPayoutDetails() {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Business Name</p>
-                  <p className="font-medium">{payout.merchant?.business_name || "Unknown"}</p>
+                  <p className="text-sm text-muted-foreground">{payout.user_type === 'merchant' ? 'Business Name' : 'Customer Name'}</p>
+                  <p className="font-medium">{payout.user_name || "Unknown"}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Merchant ID</p>
-                  <p className="font-mono text-sm">{payout.merchant_id.slice(0, 12)}...</p>
+                  <p className="text-sm text-muted-foreground">{payout.user_type === 'merchant' ? 'Merchant ID' : 'Customer ID'}</p>
+                  <p className="font-mono text-sm">{payout.user_id.slice(0, 12)}...</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">{payout.merchant?.email || "N/A"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Account Status</p>
-                  <Badge variant={payout.merchant?.status === "active" ? "default" : "secondary"}>
-                    {payout.merchant?.status || "Unknown"}
+                  <p className="text-sm text-muted-foreground">Type</p>
+                  <Badge variant={payout.user_type === 'merchant' ? 'default' : 'secondary'}>
+                    {payout.user_type === 'merchant' ? 'Merchant' : 'Customer'}
                   </Badge>
                 </div>
+                {payout.user_type === 'merchant' && payout.merchant && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Email</p>
+                    <p className="font-medium">{payout.merchant?.email || "N/A"}</p>
+                  </div>
+                )}
+                {payout.user_type === 'merchant' && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Account Status</p>
+                    <Badge variant={payout.merchant?.status === "active" ? "default" : "secondary"}>
+                      {payout.merchant?.status || "Unknown"}
+                    </Badge>
+                  </div>
+                )}
               </div>
-              <div className="mt-4">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => navigate(`/admin/merchants/${payout.merchant?.user_id || payout.merchant_id}`)}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View Merchant Profile
-                </Button>
-              </div>
+              {payout.user_type === 'merchant' && (
+                <div className="mt-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => navigate(`/admin/merchants/${payout.merchant?.user_id || payout.user_id}`)}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    View Merchant Profile
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 

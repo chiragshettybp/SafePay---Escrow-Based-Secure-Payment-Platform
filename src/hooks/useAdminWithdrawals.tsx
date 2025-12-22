@@ -5,7 +5,8 @@ import { toast } from "sonner";
 
 export interface WithdrawalRequest {
   id: string;
-  merchant_id: string;
+  user_id: string;
+  user_type: "merchant" | "customer";
   bank_account_id: string;
   amount: number;
   fee: number;
@@ -17,10 +18,16 @@ export interface WithdrawalRequest {
   processed_at: string | null;
   created_at: string;
   updated_at: string;
+  user_name?: string;
+  user_email?: string;
   merchant?: {
     business_name: string;
     email: string;
     status: string;
+  };
+  customer?: {
+    full_name: string | null;
+    email: string;
   };
   bank_account?: {
     bank_name: string;
@@ -29,6 +36,7 @@ export interface WithdrawalRequest {
     ifsc_code: string;
   };
   escrow_balance?: number;
+  wallet_balance?: number;
 }
 
 export interface WithdrawalTransaction {
@@ -44,6 +52,7 @@ export interface WithdrawalTransaction {
 export interface WithdrawalFilters {
   search?: string;
   status?: string;
+  userType?: "all" | "merchant" | "customer";
   minAmount?: number;
   maxAmount?: number;
   startDate?: string;
@@ -59,6 +68,8 @@ export interface WithdrawalMetrics {
   totalRejected: number;
   pendingCount: number;
   processingCount: number;
+  merchantTotal: number;
+  customerTotal: number;
 }
 
 export function useAdminWithdrawals(filters: WithdrawalFilters = {}) {
@@ -67,33 +78,38 @@ export function useAdminWithdrawals(filters: WithdrawalFilters = {}) {
   const { data: withdrawals, isLoading, refetch } = useQuery({
     queryKey: ["admin-withdrawals", filters],
     queryFn: async () => {
-      let query = supabase
-        .from("merchant_payouts")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const allWithdrawals: WithdrawalRequest[] = [];
 
-      if (filters.status) {
-        query = query.eq("status", filters.status);
-      }
-      if (filters.minAmount !== undefined) {
-        query = query.gte("amount", filters.minAmount);
-      }
-      if (filters.maxAmount !== undefined) {
-        query = query.lte("amount", filters.maxAmount);
-      }
-      if (filters.startDate) {
-        query = query.gte("created_at", filters.startDate);
-      }
-      if (filters.endDate) {
-        query = query.lte("created_at", filters.endDate);
-      }
+      // Fetch merchant payouts
+      if (!filters.userType || filters.userType === "all" || filters.userType === "merchant") {
+        let merchantQuery = supabase
+          .from("merchant_payouts")
+          .select("*")
+          .order("created_at", { ascending: false });
 
-      const { data: payouts, error } = await query;
-      if (error) throw error;
+        if (filters.status) {
+          merchantQuery = merchantQuery.eq("status", filters.status);
+        }
+        if (filters.minAmount !== undefined) {
+          merchantQuery = merchantQuery.gte("amount", filters.minAmount);
+        }
+        if (filters.maxAmount !== undefined) {
+          merchantQuery = merchantQuery.lte("amount", filters.maxAmount);
+        }
+        if (filters.startDate) {
+          merchantQuery = merchantQuery.gte("created_at", filters.startDate);
+        }
+        if (filters.endDate) {
+          merchantQuery = merchantQuery.lte("created_at", filters.endDate);
+        }
 
-      // Enrich with merchant and bank data
-      const enrichedPayouts = await Promise.all(
-        (payouts || []).map(async (payout) => {
+        const { data: merchantPayouts, error: merchantError } = await merchantQuery;
+        if (merchantError) {
+          console.error("Error fetching merchant payouts:", merchantError);
+        }
+
+        // Enrich merchant payouts
+        for (const payout of merchantPayouts || []) {
           const { data: merchant } = await supabase
             .from("merchants")
             .select("business_name, email, status")
@@ -112,40 +128,157 @@ export function useAdminWithdrawals(filters: WithdrawalFilters = {}) {
             .eq("merchant_id", payout.merchant_id)
             .single();
 
-          return {
-            ...payout,
+          allWithdrawals.push({
+            id: payout.id,
+            user_id: payout.merchant_id,
+            user_type: "merchant",
+            bank_account_id: payout.bank_account_id,
+            amount: payout.amount,
+            fee: payout.fee || 0,
+            net_amount: payout.net_amount,
+            status: payout.status,
+            transaction_id: payout.transaction_id,
+            failure_reason: payout.failure_reason,
+            notes: payout.notes,
+            processed_at: payout.processed_at,
+            created_at: payout.created_at,
+            updated_at: payout.updated_at,
+            user_name: merchant?.business_name || "Unknown Merchant",
+            user_email: merchant?.email,
             merchant: merchant || undefined,
             bank_account: bankAccount || undefined,
             escrow_balance: escrowAccount?.available_balance || 0,
-          };
-        })
+          });
+        }
+      }
+
+      // Fetch customer withdrawals from wallet_transactions
+      if (!filters.userType || filters.userType === "all" || filters.userType === "customer") {
+        let customerQuery = supabase
+          .from("wallet_transactions")
+          .select("*")
+          .eq("type", "withdrawal")
+          .order("created_at", { ascending: false });
+
+        if (filters.status) {
+          customerQuery = customerQuery.eq("status", filters.status);
+        }
+        if (filters.minAmount !== undefined) {
+          customerQuery = customerQuery.gte("amount", filters.minAmount);
+        }
+        if (filters.maxAmount !== undefined) {
+          customerQuery = customerQuery.lte("amount", filters.maxAmount);
+        }
+        if (filters.startDate) {
+          customerQuery = customerQuery.gte("created_at", filters.startDate);
+        }
+        if (filters.endDate) {
+          customerQuery = customerQuery.lte("created_at", filters.endDate);
+        }
+
+        const { data: customerWithdrawals, error: customerError } = await customerQuery;
+        if (customerError) {
+          console.error("Error fetching customer withdrawals:", customerError);
+        }
+
+        // Enrich customer withdrawals
+        for (const withdrawal of customerWithdrawals || []) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("user_id", withdrawal.customer_id)
+            .single();
+
+          // Get email from auth (we'll use a fallback)
+          let email = "Unknown";
+          
+          const { data: bankAccount } = withdrawal.reference_id ? await supabase
+            .from("bank_accounts")
+            .select("bank_name, account_number, account_holder_name, ifsc_code")
+            .eq("id", withdrawal.reference_id)
+            .single() : { data: null };
+
+          const { data: wallet } = await supabase
+            .from("wallets")
+            .select("balance")
+            .eq("customer_id", withdrawal.customer_id)
+            .single();
+
+          allWithdrawals.push({
+            id: withdrawal.id,
+            user_id: withdrawal.customer_id,
+            user_type: "customer",
+            bank_account_id: withdrawal.reference_id || "",
+            amount: withdrawal.amount,
+            fee: 0,
+            net_amount: withdrawal.amount,
+            status: withdrawal.status,
+            transaction_id: null,
+            failure_reason: null,
+            notes: withdrawal.description,
+            processed_at: withdrawal.status === "success" ? withdrawal.updated_at : null,
+            created_at: withdrawal.created_at,
+            updated_at: withdrawal.updated_at,
+            user_name: profile?.full_name || "Customer",
+            user_email: email,
+            customer: {
+              full_name: profile?.full_name || null,
+              email: email,
+            },
+            bank_account: bankAccount || undefined,
+            wallet_balance: wallet?.balance || 0,
+          });
+        }
+      }
+
+      // Sort by created_at descending
+      allWithdrawals.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
       // Apply search filter client-side
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
-        return enrichedPayouts.filter(
+        return allWithdrawals.filter(
           (w) =>
-            w.merchant?.business_name?.toLowerCase().includes(searchLower) ||
-            w.id.toLowerCase().includes(searchLower)
+            w.user_name?.toLowerCase().includes(searchLower) ||
+            w.id.toLowerCase().includes(searchLower) ||
+            w.user_email?.toLowerCase().includes(searchLower)
         );
       }
 
-      return enrichedPayouts;
+      return allWithdrawals;
     },
   });
 
   const { data: metrics } = useQuery({
     queryKey: ["admin-withdrawal-metrics"],
     queryFn: async () => {
-      const { data: payouts } = await supabase
+      // Fetch merchant payouts metrics
+      const { data: merchantPayouts } = await supabase
         .from("merchant_payouts")
         .select("amount, status");
 
-      const grouped = (payouts || []).reduce(
+      // Fetch customer withdrawals metrics
+      const { data: customerWithdrawals } = await supabase
+        .from("wallet_transactions")
+        .select("amount, status")
+        .eq("type", "withdrawal");
+
+      const allRecords = [
+        ...(merchantPayouts || []).map(p => ({ ...p, source: "merchant" })),
+        ...(customerWithdrawals || []).map(w => ({ ...w, source: "customer" })),
+      ];
+
+      const grouped = allRecords.reduce(
         (acc, p) => {
           acc[p.status] = (acc[p.status] || 0) + Number(p.amount);
           acc[`${p.status}_count`] = (acc[`${p.status}_count`] || 0) + 1;
+          if (p.source === "merchant") {
+            acc["merchant_total"] = (acc["merchant_total"] || 0) + Number(p.amount);
+          } else {
+            acc["customer_total"] = (acc["customer_total"] || 0) + Number(p.amount);
+          }
           return acc;
         },
         {} as Record<string, number>
@@ -155,11 +288,13 @@ export function useAdminWithdrawals(filters: WithdrawalFilters = {}) {
         totalPending: grouped["pending"] || 0,
         totalApproved: grouped["approved"] || 0,
         totalProcessing: grouped["processing"] || 0,
-        totalPaid: grouped["paid"] || grouped["completed"] || 0,
+        totalPaid: (grouped["paid"] || 0) + (grouped["success"] || 0),
         totalFailed: grouped["failed"] || 0,
         totalRejected: grouped["rejected"] || 0,
         pendingCount: grouped["pending_count"] || 0,
         processingCount: grouped["processing_count"] || 0,
+        merchantTotal: grouped["merchant_total"] || 0,
+        customerTotal: grouped["customer_total"] || 0,
       } as WithdrawalMetrics;
     },
   });
@@ -171,6 +306,14 @@ export function useAdminWithdrawals(filters: WithdrawalFilters = {}) {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "merchant_payouts" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
+          queryClient.invalidateQueries({ queryKey: ["admin-withdrawal-metrics"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "wallet_transactions" },
         () => {
           queryClient.invalidateQueries({ queryKey: ["admin-withdrawals"] });
           queryClient.invalidateQueries({ queryKey: ["admin-withdrawal-metrics"] });
