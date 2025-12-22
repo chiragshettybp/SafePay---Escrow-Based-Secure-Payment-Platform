@@ -1603,6 +1603,47 @@ export type Database = {
           },
         ]
       }
+      support_actions_log: {
+        Row: {
+          action_type: string
+          admin_id: string
+          created_at: string
+          description: string | null
+          id: string
+          new_value: Json | null
+          previous_value: Json | null
+          ticket_id: string
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          new_value?: Json | null
+          previous_value?: Json | null
+          ticket_id: string
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          new_value?: Json | null
+          previous_value?: Json | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_actions_log_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_attachments: {
         Row: {
           created_at: string
@@ -1685,6 +1726,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "support_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_status_history: {
+        Row: {
+          changed_by: string
+          changed_by_type: string
+          created_at: string
+          id: string
+          new_priority: string | null
+          new_status: string
+          previous_priority: string | null
+          previous_status: string | null
+          reason: string | null
+          ticket_id: string
+        }
+        Insert: {
+          changed_by: string
+          changed_by_type?: string
+          created_at?: string
+          id?: string
+          new_priority?: string | null
+          new_status: string
+          previous_priority?: string | null
+          previous_status?: string | null
+          reason?: string | null
+          ticket_id: string
+        }
+        Update: {
+          changed_by?: string
+          changed_by_type?: string
+          created_at?: string
+          id?: string
+          new_priority?: string | null
+          new_status?: string
+          previous_priority?: string | null
+          previous_status?: string | null
+          reason?: string | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_status_history_ticket_id_fkey"
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "support_tickets"
