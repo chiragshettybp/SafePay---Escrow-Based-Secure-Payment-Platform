@@ -131,6 +131,9 @@ import AdminNotificationDetails from "./pages/AdminNotificationDetails";
 import AdminNotificationRecipients from "./pages/AdminNotificationRecipients";
 import AdminNotificationHistory from "./pages/AdminNotificationHistory";
 import AdminNotificationActions from "./pages/AdminNotificationActions";
+import AdminMerchantKyc from "./pages/AdminMerchantKyc";
+import AdminMerchantBankVerify from "./pages/AdminMerchantBankVerify";
+import AdminMerchantVerificationHistory from "./pages/AdminMerchantVerificationHistory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -244,6 +247,9 @@ const App = () => (
               <Route path="/admin/merchants/:merchant_id" element={<AdminProtectedRoute><AdminMerchantDetails /></AdminProtectedRoute>} />
               <Route path="/admin/merchants/:merchant_id/verification" element={<AdminProtectedRoute><AdminMerchantVerification /></AdminProtectedRoute>} />
               <Route path="/admin/merchants/:merchant_id/ban" element={<AdminProtectedRoute><AdminMerchantBan /></AdminProtectedRoute>} />
+              <Route path="/admin/merchants/:merchant_id/kyc" element={<AdminProtectedRoute><AdminMerchantKyc /></AdminProtectedRoute>} />
+              <Route path="/admin/merchants/:merchant_id/bankdetails-verify" element={<AdminProtectedRoute><AdminMerchantBankVerify /></AdminProtectedRoute>} />
+              <Route path="/admin/merchants/:merchant_id/verification-history" element={<AdminProtectedRoute><AdminMerchantVerificationHistory /></AdminProtectedRoute>} />
               <Route path="/admin/users" element={<AdminProtectedRoute><AdminUsers /></AdminProtectedRoute>} />
               <Route path="/admin/users/:user_id" element={<AdminProtectedRoute><AdminUserDetails /></AdminProtectedRoute>} />
               <Route path="/admin/users/:user_id/ban" element={<AdminProtectedRoute><AdminUserBan /></AdminProtectedRoute>} />
