@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface AdminUser {
   id: string;
@@ -27,7 +27,11 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const location = useLocation();
+
+  // Check if current route is an admin route
+  const isAdminRoute = location.pathname.startsWith('/admin');
 
   const verifySession = useCallback(async (): Promise<boolean> => {
     try {
@@ -70,6 +74,14 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Only verify admin session when on admin routes
+    if (!isAdminRoute) {
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -88,11 +100,11 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // Initial session check
+    // Initial session check for admin routes
     verifySession().finally(() => setIsLoading(false));
 
     return () => subscription.unsubscribe();
-  }, [verifySession]);
+  }, [verifySession, isAdminRoute]);
 
   const login = async (email: string, password: string, pin: string): Promise<{ error: string | null }> => {
     try {
