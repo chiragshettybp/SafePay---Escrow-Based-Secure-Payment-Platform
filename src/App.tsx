@@ -104,6 +104,10 @@ import AdminUserBan from "./pages/AdminUserBan";
 import AdminUserKyc from "./pages/AdminUserKyc";
 import AdminUserBankVerify from "./pages/AdminUserBankVerify";
 import AdminUserVerificationHistory from "./pages/AdminUserVerificationHistory";
+import AdminUserProfile from "./pages/AdminUserProfile";
+import AdminUserControls from "./pages/AdminUserControls";
+import AdminUserWallet from "./pages/AdminUserWallet";
+import AdminUserTransactions from "./pages/AdminUserTransactions";
 import AdminPayouts from "./pages/AdminPayouts";
 import AdminPayoutDetails from "./pages/AdminPayoutDetails";
 import AdminPayoutVerify from "./pages/AdminPayoutVerify";
@@ -293,7 +297,11 @@ const App = () => (
               <Route path="/admin/notifications/:notificationId/recipients" element={<AdminProtectedRoute><AdminNotificationRecipients /></AdminProtectedRoute>} />
               <Route path="/admin/notifications/:notificationId/history" element={<AdminProtectedRoute><AdminNotificationHistory /></AdminProtectedRoute>} />
               <Route path="/admin/notifications/:notificationId/actions" element={<AdminProtectedRoute><AdminNotificationActions /></AdminProtectedRoute>} />
-              {/* Admin User Verification Routes */}
+              {/* Admin User Verification & Profile Routes */}
+              <Route path="/admin/users/:user_id/profile" element={<AdminProtectedRoute><AdminUserProfile /></AdminProtectedRoute>} />
+              <Route path="/admin/users/:user_id/controls" element={<AdminProtectedRoute><AdminUserControls /></AdminProtectedRoute>} />
+              <Route path="/admin/users/:user_id/wallet" element={<AdminProtectedRoute><AdminUserWallet /></AdminProtectedRoute>} />
+              <Route path="/admin/users/:user_id/transactions" element={<AdminProtectedRoute><AdminUserTransactions /></AdminProtectedRoute>} />
               <Route path="/admin/users/:user_id/kyc" element={<AdminProtectedRoute><AdminUserKyc /></AdminProtectedRoute>} />
               <Route path="/admin/users/:user_id/bankdetails-verify" element={<AdminProtectedRoute><AdminUserBankVerify /></AdminProtectedRoute>} />
               <Route path="/admin/users/:user_id/verification-history" element={<AdminProtectedRoute><AdminUserVerificationHistory /></AdminProtectedRoute>} />
