@@ -58,7 +58,7 @@ export function AdminSidebar({ isCollapsed = false, onToggle, alerts }: AdminSid
     {
       title: "Users",
       items: [
-        { title: "Customers", href: "/admin/customers", icon: Users },
+        { title: "Customers", href: "/admin/users", icon: Users },
         { title: "Merchants", href: "/admin/merchants", icon: Store, badge: alerts?.pendingKyc },
       ],
     },
