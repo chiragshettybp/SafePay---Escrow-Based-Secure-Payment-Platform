@@ -134,16 +134,19 @@ export default function AdminMerchantDetails() {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-3">
-          {merchant.kyc?.status === "pending" && (
-            <Button
-              onClick={() =>
-                navigate(`/admin/merchants/${merchant_id}/verification`)
-              }
-            >
-              <FileCheck className="h-4 w-4 mr-2" />
-              Review Verification
-            </Button>
-          )}
+          <Button
+            onClick={() => navigate(`/admin/merchants/${merchant_id}/kyc`)}
+          >
+            <FileCheck className="h-4 w-4 mr-2" />
+            KYC Verification
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/admin/merchants/${merchant_id}/bankdetails-verify`)}
+          >
+            <IndianRupee className="h-4 w-4 mr-2" />
+            Bank Verification
+          </Button>
           <Button
             variant="outline"
             onClick={() => navigate(`/admin/merchants/${merchant_id}/ban`)}

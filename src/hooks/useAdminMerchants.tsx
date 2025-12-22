@@ -302,6 +302,7 @@ export function useAdminMerchants(filters?: MerchantFilters) {
       queryClient.invalidateQueries({ queryKey: ["admin-merchants"] });
       queryClient.invalidateQueries({ queryKey: ["admin-merchant-details"] });
       queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["merchant-verification-history"] });
       toast({
         title: "Verification Updated",
         description: "Merchant verification status has been updated.",
@@ -310,6 +311,176 @@ export function useAdminMerchants(filters?: MerchantFilters) {
     onError: (error: Error) => {
       toast({
         title: "Verification Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Request KYC re-upload
+  const requestKycReupload = useMutation({
+    mutationFn: async ({
+      merchantId,
+      reason,
+    }: {
+      merchantId: string;
+      reason: string;
+    }) => {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) throw new Error("Not authenticated");
+
+      // Update KYC status and add reason
+      const { error } = await supabase
+        .from("merchant_kyc")
+        .update({
+          status: "pending",
+          rejection_reason: reason,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: session.session.user.id,
+        })
+        .eq("merchant_id", merchantId);
+
+      if (error) throw error;
+
+      // Log the action
+      await supabase.from("admin_financial_actions_log").insert({
+        admin_id: session.session.user.id,
+        action_type: "kyc_reupload_requested",
+        target_type: "merchant",
+        target_id: merchantId,
+        reason,
+      });
+
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-merchant-details"] });
+      queryClient.invalidateQueries({ queryKey: ["merchant-verification-history"] });
+      toast({
+        title: "Re-upload Requested",
+        description: "Merchant has been notified to re-upload KYC documents.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Request Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Verify bank account
+  const verifyBankAccount = useMutation({
+    mutationFn: async ({
+      merchantId,
+      bankAccountId,
+      decision,
+      reason,
+    }: {
+      merchantId: string;
+      bankAccountId: string;
+      decision: "verified" | "rejected";
+      reason?: string;
+    }) => {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) throw new Error("Not authenticated");
+
+      const isVerified = decision === "verified";
+
+      const { error } = await supabase
+        .from("merchant_bank_accounts")
+        .update({
+          is_verified: isVerified,
+          verification_status: decision,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", bankAccountId)
+        .eq("merchant_id", merchantId);
+
+      if (error) throw error;
+
+      // Log the action
+      await supabase.from("admin_financial_actions_log").insert({
+        admin_id: session.session.user.id,
+        action_type: `bank_${decision}`,
+        target_type: "bank_account",
+        target_id: bankAccountId,
+        reason,
+        metadata: { merchant_id: merchantId },
+      });
+
+      return { success: true };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-merchant-details"] });
+      queryClient.invalidateQueries({ queryKey: ["merchant-verification-history"] });
+      toast({
+        title: variables.decision === "verified" ? "Bank Verified" : "Bank Rejected",
+        description: `Bank account has been ${variables.decision}.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Verification Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Request bank proof re-upload
+  const requestBankReupload = useMutation({
+    mutationFn: async ({
+      merchantId,
+      bankAccountId,
+      reason,
+    }: {
+      merchantId: string;
+      bankAccountId: string;
+      reason: string;
+    }) => {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("merchant_bank_accounts")
+        .update({
+          verification_status: "pending",
+          is_verified: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", bankAccountId)
+        .eq("merchant_id", merchantId);
+
+      if (error) throw error;
+
+      // Log the action
+      await supabase.from("admin_financial_actions_log").insert({
+        admin_id: session.session.user.id,
+        action_type: "bank_reupload_requested",
+        target_type: "bank_account",
+        target_id: bankAccountId,
+        reason,
+        metadata: { merchant_id: merchantId },
+      });
+
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-merchant-details"] });
+      queryClient.invalidateQueries({ queryKey: ["merchant-verification-history"] });
+      toast({
+        title: "Re-upload Requested",
+        description: "Merchant has been notified to re-upload bank proof.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Request Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -377,6 +548,52 @@ export function useAdminMerchants(filters?: MerchantFilters) {
     },
   });
 
+  // Fetch verification history
+  const useVerificationHistory = (merchantId: string) => {
+    return useQuery({
+      queryKey: ["merchant-verification-history", merchantId],
+      queryFn: async () => {
+        // Fetch from admin_financial_actions_log for this merchant
+        const { data, error } = await supabase
+          .from("admin_financial_actions_log")
+          .select("*")
+          .or(`target_id.eq.${merchantId},metadata->>merchant_id.eq.${merchantId}`)
+          .in("action_type", [
+            "kyc_approved",
+            "kyc_rejected",
+            "kyc_reupload_requested",
+            "bank_verified",
+            "bank_rejected",
+            "bank_reupload_requested",
+            "kyc_submitted",
+            "bank_submitted",
+          ])
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        // Enrich with admin email
+        const enrichedData = await Promise.all(
+          (data || []).map(async (entry) => {
+            const { data: adminData } = await supabase
+              .from("admin_users")
+              .select("email")
+              .eq("user_id", entry.admin_id)
+              .single();
+
+            return {
+              ...entry,
+              admin_email: adminData?.email || "Unknown",
+            };
+          })
+        );
+
+        return enrichedData;
+      },
+      enabled: !!merchantId,
+    });
+  };
+
   // Real-time subscription
   useEffect(() => {
     const channel = supabase
@@ -397,6 +614,13 @@ export function useAdminMerchants(filters?: MerchantFilters) {
           queryClient.invalidateQueries({ queryKey: ["admin-merchant-details"] });
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "merchant_bank_accounts" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["admin-merchant-details"] });
+        }
+      )
       .subscribe();
 
     return () => {
@@ -410,6 +634,10 @@ export function useAdminMerchants(filters?: MerchantFilters) {
     error,
     useMerchantDetails,
     verifyMerchant,
+    requestKycReupload,
+    verifyBankAccount,
+    requestBankReupload,
     banMerchant,
+    useVerificationHistory,
   };
 }
