@@ -1,12 +1,14 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminStatCard } from "@/components/admin/AdminStatCard";
+import { AdminInfoCard } from "@/components/admin/AdminInfoCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
-  ArrowLeft, 
   IndianRupee, 
   Building2, 
   CreditCard, 
@@ -15,9 +17,9 @@ import {
   XCircle, 
   AlertCircle,
   Wallet,
-  User,
   FileText,
-  ExternalLink
+  ExternalLink,
+  User
 } from "lucide-react";
 import { useAdminPayoutDetails } from "@/hooks/useAdminPayouts";
 import { format } from "date-fns";
@@ -37,39 +39,19 @@ export default function AdminPayoutDetails() {
   const { payoutId } = useParams<{ payoutId: string }>();
   const { payout, loading } = useAdminPayoutDetails(payoutId);
 
-
   const canReview = payout && ["processing", "pending"].includes(payout.status);
   const status = payout ? (statusConfig[payout.status] || statusConfig.pending) : statusConfig.pending;
 
   if (loading) {
     return (
       <AdminLayout>
-        <Button variant="ghost" className="mb-6" onClick={() => navigate("/admin/payouts")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Payouts
-        </Button>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-48" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardContent>
-            </Card>
-          </div>
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-32" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-            </Card>
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-48" />
+          <div className="mobile-grid-4">
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
+            <Skeleton className="h-20" />
           </div>
         </div>
       </AdminLayout>
@@ -79,314 +61,320 @@ export default function AdminPayoutDetails() {
   if (!payout) {
     return (
       <AdminLayout>
-        <Button variant="ghost" className="mb-6" onClick={() => navigate("/admin/payouts")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Payouts
-        </Button>
+        <AdminPageHeader
+          title="Payout Not Found"
+          backUrl="/admin/payouts"
+          backLabel="Back to Payouts"
+        />
         <Card>
           <CardContent className="py-12 text-center">
             <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-lg font-medium">Payout not found</p>
-            <p className="text-muted-foreground">The payout you're looking for doesn't exist or has been removed.</p>
+            <p className="text-muted-foreground text-sm mt-1">
+              The payout you're looking for doesn't exist or has been removed.
+            </p>
           </CardContent>
         </Card>
       </AdminLayout>
     );
   }
 
+  const isCustomer = payout.user_type === 'customer';
+
   return (
     <AdminLayout>
-      <Button variant="ghost" className="mb-6" onClick={() => navigate("/admin/payouts")}>
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Payouts
-      </Button>
+      <div className="space-y-4 sm:space-y-6">
+        <AdminPageHeader
+          title="Payout Details"
+          subtitle={`ID: ${payout.id.slice(0, 12)}...`}
+          backUrl="/admin/payouts"
+          backLabel="Payouts"
+          badge={
+            <Badge variant={status.variant} className="gap-1">
+              {status.icon}
+              {status.label}
+            </Badge>
+          }
+        />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Main Info */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Payout Summary */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                <CardTitle className="flex items-center gap-2">
-                    <IndianRupee className="h-5 w-5" />
-                    Payout Summary
-                  </CardTitle>
-                  <CardDescription>Request details and status</CardDescription>
-                </div>
-                <Badge variant={status.variant} className="gap-1 text-sm">
-                  {status.icon}
-                  {status.label}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Payout ID</p>
-                  <p className="font-mono text-sm">{payout.id.slice(0, 12)}...</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Requested Amount</p>
-                  <p className="font-bold text-lg">{formatCurrency(payout.amount)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Fee</p>
-                  <p className="font-medium">{formatCurrency(payout.fee)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Net Amount</p>
-                  <p className="font-bold text-lg text-primary">{formatCurrency(payout.net_amount)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Requested On</p>
-                  <p className="font-medium">{format(new Date(payout.created_at), "dd MMM yyyy, HH:mm")}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Last Updated</p>
-                  <p className="font-medium">{format(new Date(payout.updated_at), "dd MMM yyyy, HH:mm")}</p>
-                </div>
-                {payout.processed_at && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Processed On</p>
-                    <p className="font-medium">{format(new Date(payout.processed_at), "dd MMM yyyy, HH:mm")}</p>
-                  </div>
-                )}
-                {payout.transaction_id && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Transaction ID</p>
-                    <p className="font-mono text-sm">{payout.transaction_id}</p>
-                  </div>
-                )}
-              </div>
-
-              {payout.failure_reason && (
-                <>
-                  <Separator className="my-4" />
-                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-                    <p className="text-sm font-medium text-destructive mb-1">Decline Reason</p>
-                    <p className="text-sm">{payout.failure_reason}</p>
-                  </div>
-                </>
-              )}
-
-              {payout.notes && (
-                <>
-                  <Separator className="my-4" />
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Admin Notes</p>
-                    <p className="text-sm">{payout.notes}</p>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Merchant Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Merchant Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">{payout.user_type === 'merchant' ? 'Business Name' : 'Customer Name'}</p>
-                  <p className="font-medium">{payout.user_name || "Unknown"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{payout.user_type === 'merchant' ? 'Merchant ID' : 'Customer ID'}</p>
-                  <p className="font-mono text-sm">{payout.user_id.slice(0, 12)}...</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Type</p>
-                  <Badge variant={payout.user_type === 'merchant' ? 'default' : 'secondary'}>
-                    {payout.user_type === 'merchant' ? 'Merchant' : 'Customer'}
-                  </Badge>
-                </div>
-                {payout.user_type === 'merchant' && payout.merchant && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-medium">{payout.merchant?.email || "N/A"}</p>
-                  </div>
-                )}
-                {payout.user_type === 'merchant' && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Account Status</p>
-                    <Badge variant={payout.merchant?.status === "active" ? "default" : "secondary"}>
-                      {payout.merchant?.status || "Unknown"}
-                    </Badge>
-                  </div>
-                )}
-              </div>
-              {payout.user_type === 'merchant' && (
-                <div className="mt-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => navigate(`/admin/merchants/${payout.merchant?.user_id || payout.user_id}`)}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    View Merchant Profile
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Bank Account Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Bank Account Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {payout.bank_account ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Bank Name</p>
-                    <p className="font-medium">{payout.bank_account.bank_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Account Holder</p>
-                    <p className="font-medium">{payout.bank_account.account_holder_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Account Number</p>
-                    <p className="font-mono">****{payout.bank_account.account_number.slice(-4)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">IFSC Code</p>
-                    <p className="font-mono">{payout.bank_account.ifsc_code}</p>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-muted-foreground">Bank account details not available</p>
-              )}
-            </CardContent>
-          </Card>
+        {/* Summary Stats */}
+        <div className="mobile-grid-4">
+          <AdminStatCard
+            title="Requested"
+            value={formatCurrency(payout.amount)}
+            icon={<IndianRupee className="h-4 w-4" />}
+          />
+          <AdminStatCard
+            title="Fee"
+            value={formatCurrency(payout.fee)}
+          />
+          <AdminStatCard
+            title="Net Amount"
+            value={formatCurrency(payout.net_amount)}
+            variant="success"
+          />
+          <AdminStatCard
+            title="Type"
+            value={isCustomer ? "Customer" : "Merchant"}
+            icon={isCustomer ? <User className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+          />
         </div>
 
-        {/* Right Column - Wallet & Actions */}
-        <div className="space-y-6">
-          {/* Wallet Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wallet className="h-5 w-5" />
-                Wallet Balance
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {payout.wallet ? (
-                <>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Available Balance</p>
-                    <p className="text-2xl font-bold">{formatCurrency(payout.wallet.available_balance)}</p>
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          {/* Left Column - Details */}
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+            {/* Request Details */}
+            <Card className="admin-card-compact">
+              <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
+                <CardTitle className="text-sm sm:text-base">Request Details</CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+                <div className="admin-info-grid">
+                  <div className="admin-info-item">
+                    <p className="admin-info-label">Requested On</p>
+                    <p className="admin-info-value">{format(new Date(payout.created_at), "dd MMM yyyy, HH:mm")}</p>
                   </div>
-                  <Separator />
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Pending</p>
-                      <p className="font-medium">{formatCurrency(payout.wallet.pending_balance)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Paid Out</p>
-                      <p className="font-medium">{formatCurrency(payout.wallet.total_paid_out)}</p>
-                    </div>
+                  <div className="admin-info-item">
+                    <p className="admin-info-label">Last Updated</p>
+                    <p className="admin-info-value">{format(new Date(payout.updated_at), "dd MMM yyyy, HH:mm")}</p>
                   </div>
-                  {canReview && payout.wallet.available_balance < payout.amount && (
-                    <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-                      <p className="text-sm text-destructive font-medium">
-                        Insufficient balance for payout
-                      </p>
+                  {payout.processed_at && (
+                    <div className="admin-info-item">
+                      <p className="admin-info-label">Processed On</p>
+                      <p className="admin-info-value">{format(new Date(payout.processed_at), "dd MMM yyyy, HH:mm")}</p>
                     </div>
                   )}
-                </>
-              ) : (
-                <p className="text-muted-foreground">Wallet information not available</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {canReview ? (
-                <Button 
-                  className="w-full"
-                  onClick={() => navigate(`/admin/payouts/${payout.id}/verify`)}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Review & Decide
-                </Button>
-              ) : (
-                <div className="text-center py-4">
-                  <div className={`${status.color} mb-2`}>{status.icon}</div>
-                  <p className="text-sm text-muted-foreground">
-                    This payout has been {status.label.toLowerCase()}
-                  </p>
+                  {payout.transaction_id && (
+                    <div className="admin-info-item">
+                      <p className="admin-info-label">Transaction ID</p>
+                      <p className="admin-info-value font-mono text-xs">{payout.transaction_id}</p>
+                    </div>
+                  )}
                 </div>
-              )}
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => navigate("/admin/payouts")}
-              >
-                Back to List
-              </Button>
-            </CardContent>
-          </Card>
 
-          {/* Timeline */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Activity Timeline
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex gap-3">
-                  <div className="w-2 h-2 mt-2 rounded-full bg-primary" />
-                  <div>
-                    <p className="text-sm font-medium">Payout Requested</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(payout.created_at), "dd MMM yyyy, HH:mm")}
+                {payout.failure_reason && (
+                  <>
+                    <Separator className="my-3 sm:my-4" />
+                    <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                      <p className="text-xs sm:text-sm font-medium text-destructive mb-1">Decline Reason</p>
+                      <p className="text-xs sm:text-sm">{payout.failure_reason}</p>
+                    </div>
+                  </>
+                )}
+
+                {payout.notes && (
+                  <>
+                    <Separator className="my-3 sm:my-4" />
+                    <div className="admin-info-item">
+                      <p className="admin-info-label">Admin Notes</p>
+                      <p className="admin-info-value text-sm">{payout.notes}</p>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* User Information */}
+            <Card className="admin-card-compact">
+              <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
+                <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                  {isCustomer ? <User className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+                  {isCustomer ? "Customer Information" : "Merchant Information"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+                <div className="admin-info-grid">
+                  <div className="admin-info-item">
+                    <p className="admin-info-label">{isCustomer ? "Name" : "Business Name"}</p>
+                    <p className="admin-info-value">{payout.user_name || "Unknown"}</p>
+                  </div>
+                  <div className="admin-info-item">
+                    <p className="admin-info-label">ID</p>
+                    <p className="admin-info-value font-mono text-xs">{payout.user_id.slice(0, 12)}...</p>
+                  </div>
+                  {!isCustomer && payout.merchant && (
+                    <>
+                      <div className="admin-info-item">
+                        <p className="admin-info-label">Email</p>
+                        <p className="admin-info-value">{payout.merchant?.email || "N/A"}</p>
+                      </div>
+                      <div className="admin-info-item">
+                        <p className="admin-info-label">Status</p>
+                        <Badge variant={payout.merchant?.status === "active" ? "default" : "secondary"} className="mt-0.5">
+                          {payout.merchant?.status || "Unknown"}
+                        </Badge>
+                      </div>
+                    </>
+                  )}
+                </div>
+                {!isCustomer && (
+                  <div className="mt-3 sm:mt-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="w-full sm:w-auto"
+                      onClick={() => navigate(`/admin/merchants/${payout.merchant?.user_id || payout.user_id}`)}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      View Profile
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Bank Account */}
+            <Card className="admin-card-compact">
+              <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
+                <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  Bank Account
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+                {payout.bank_account ? (
+                  <div className="admin-info-grid">
+                    <div className="admin-info-item">
+                      <p className="admin-info-label">Bank Name</p>
+                      <p className="admin-info-value">{payout.bank_account.bank_name}</p>
+                    </div>
+                    <div className="admin-info-item">
+                      <p className="admin-info-label">Account Holder</p>
+                      <p className="admin-info-value">{payout.bank_account.account_holder_name}</p>
+                    </div>
+                    <div className="admin-info-item">
+                      <p className="admin-info-label">Account Number</p>
+                      <p className="admin-info-value font-mono">****{payout.bank_account.account_number.slice(-4)}</p>
+                    </div>
+                    <div className="admin-info-item">
+                      <p className="admin-info-label">IFSC Code</p>
+                      <p className="admin-info-value font-mono">{payout.bank_account.ifsc_code}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">Bank account details not available</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Column - Actions & Timeline */}
+          <div className="space-y-4 sm:space-y-6">
+            {/* Wallet Balance */}
+            <Card className="admin-card-compact">
+              <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
+                <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                  <Wallet className="h-4 w-4" />
+                  Wallet Balance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0 space-y-3 sm:space-y-4">
+                {payout.wallet ? (
+                  <>
+                    <div>
+                      <p className="admin-info-label">Available Balance</p>
+                      <p className="text-xl sm:text-2xl font-bold">{formatCurrency(payout.wallet.available_balance)}</p>
+                    </div>
+                    <Separator />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="admin-info-item">
+                        <p className="admin-info-label">Pending</p>
+                        <p className="admin-info-value">{formatCurrency(payout.wallet.pending_balance)}</p>
+                      </div>
+                      <div className="admin-info-item">
+                        <p className="admin-info-label">Total Paid</p>
+                        <p className="admin-info-value">{formatCurrency(payout.wallet.total_paid_out)}</p>
+                      </div>
+                    </div>
+                    {canReview && payout.wallet.available_balance < payout.amount && (
+                      <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                        <p className="text-xs sm:text-sm text-destructive font-medium">
+                          Insufficient balance for payout
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-sm">Wallet information not available</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Actions */}
+            <Card className="admin-card-compact">
+              <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
+                <CardTitle className="text-sm sm:text-base">Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0 space-y-2 sm:space-y-3">
+                {canReview ? (
+                  <Button 
+                    className="w-full min-h-[44px]"
+                    onClick={() => navigate(`/admin/payouts/${payout.id}/verify`)}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Review & Decide
+                  </Button>
+                ) : (
+                  <div className="text-center py-3 sm:py-4">
+                    <div className={`${status.color} mb-2 flex justify-center`}>{status.icon}</div>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      This payout has been {status.label.toLowerCase()}
                     </p>
                   </div>
-                </div>
-                {payout.processed_at && (
-                  <div className="flex gap-3">
-                    <div className={`w-2 h-2 mt-2 rounded-full ${
-                      payout.status === "paid" || payout.status === "approved" 
-                        ? "bg-green-500" 
-                        : "bg-red-500"
-                    }`} />
-                    <div>
-                      <p className="text-sm font-medium">
-                        {payout.status === "paid" || payout.status === "approved" 
-                          ? "Payout Approved" 
-                          : "Payout Declined"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(payout.processed_at), "dd MMM yyyy, HH:mm")}
+                )}
+                <Button 
+                  variant="outline" 
+                  className="w-full min-h-[44px]"
+                  onClick={() => navigate("/admin/payouts")}
+                >
+                  Back to List
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Timeline */}
+            <Card className="admin-card-compact">
+              <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
+                <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="flex gap-2 sm:gap-3">
+                    <div className="w-2 h-2 mt-1.5 sm:mt-2 rounded-full bg-primary flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-medium">Payout Requested</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">
+                        {format(new Date(payout.created_at), "dd MMM yyyy, HH:mm")}
                       </p>
                     </div>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  {payout.processed_at && (
+                    <div className="flex gap-2 sm:gap-3">
+                      <div className={`w-2 h-2 mt-1.5 sm:mt-2 rounded-full flex-shrink-0 ${
+                        payout.status === "paid" || payout.status === "approved" 
+                          ? "bg-green-500" 
+                          : "bg-red-500"
+                      }`} />
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-medium">
+                          {payout.status === "paid" || payout.status === "approved" 
+                            ? "Payout Approved" 
+                            : "Payout Declined"}
+                        </p>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">
+                          {format(new Date(payout.processed_at), "dd MMM yyyy, HH:mm")}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </AdminLayout>

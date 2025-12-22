@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -38,6 +38,7 @@ interface NavSection {
 interface AdminSidebarProps {
   isCollapsed?: boolean;
   onToggle?: () => void;
+  onClose?: () => void;
   alerts?: {
     pendingKyc?: number;
     openDisputes?: number;
@@ -46,8 +47,9 @@ interface AdminSidebarProps {
   };
 }
 
-export function AdminSidebar({ isCollapsed = false, onToggle, alerts }: AdminSidebarProps) {
+export function AdminSidebar({ isCollapsed = false, onToggle, onClose, alerts }: AdminSidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const navSections: NavSection[] = [
     {
@@ -97,6 +99,11 @@ export function AdminSidebar({ isCollapsed = false, onToggle, alerts }: AdminSid
     },
   ];
 
+  const handleNavClick = (href: string) => {
+    navigate(href);
+    onClose?.();
+  };
+
   return (
     <aside
       className={cn(
@@ -136,37 +143,38 @@ export function AdminSidebar({ isCollapsed = false, onToggle, alerts }: AdminSid
       </div>
 
       {/* Navigation */}
-      <ScrollArea className="flex-1 py-4">
-        <nav className="space-y-6 px-2">
+      <ScrollArea className="flex-1 py-3 sm:py-4">
+        <nav className="space-y-4 sm:space-y-6 px-2">
           {navSections.map((section) => (
             <div key={section.title}>
               {!isCollapsed && (
-                <h4 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <h4 className="px-3 mb-1.5 sm:mb-2 text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   {section.title}
                 </h4>
               )}
-              <div className="space-y-1">
+              <div className="space-y-0.5 sm:space-y-1">
                 {section.items.map((item) => {
-                  const isActive = location.pathname === item.href;
+                  const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + "/");
                   return (
-                    <Link
+                    <button
                       key={item.href}
-                      to={item.href}
+                      onClick={() => handleNavClick(item.href)}
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                        "w-full flex items-center gap-2.5 sm:gap-3 px-3 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition-colors touch-highlight",
+                        "min-h-[44px] sm:min-h-0",
                         isActive
                           ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted",
                         isCollapsed && "justify-center px-2"
                       )}
                       title={isCollapsed ? item.title : undefined}
                     >
-                      <item.icon className="h-4 w-4 flex-shrink-0" />
+                      <item.icon className="h-4 w-4 sm:h-4 sm:w-4 flex-shrink-0" />
                       {!isCollapsed && (
                         <>
-                          <span className="flex-1">{item.title}</span>
+                          <span className="flex-1 text-left text-sm">{item.title}</span>
                           {item.badge !== undefined && item.badge > 0 && (
-                            <span className="bg-destructive text-destructive-foreground text-xs font-bold px-2 py-0.5 rounded-full">
+                            <span className="bg-destructive text-destructive-foreground text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full">
                               {item.badge}
                             </span>
                           )}
@@ -175,7 +183,7 @@ export function AdminSidebar({ isCollapsed = false, onToggle, alerts }: AdminSid
                       {isCollapsed && item.badge !== undefined && item.badge > 0 && (
                         <span className="absolute top-0 right-0 w-2 h-2 bg-destructive rounded-full" />
                       )}
-                    </Link>
+                    </button>
                   );
                 })}
               </div>
