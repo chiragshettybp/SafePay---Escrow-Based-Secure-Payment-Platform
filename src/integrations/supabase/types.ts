@@ -299,6 +299,39 @@ export type Database = {
           },
         ]
       }
+      faqs: {
+        Row: {
+          answer: string
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          order_index: number
+          question: string
+          updated_at: string
+        }
+        Insert: {
+          answer: string
+          category: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          order_index?: number
+          question: string
+          updated_at?: string
+        }
+        Update: {
+          answer?: string
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          order_index?: number
+          question?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       kyc_records: {
         Row: {
           address: string | null
@@ -1225,6 +1258,151 @@ export type Database = {
           },
         ]
       }
+      support_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          message_id: string | null
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          message_id?: string | null
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          message_id?: string | null
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "support_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_messages: {
+        Row: {
+          attachments: string[] | null
+          created_at: string
+          id: string
+          is_staff: boolean
+          message: string
+          sender_id: string
+          ticket_id: string
+        }
+        Insert: {
+          attachments?: string[] | null
+          created_at?: string
+          id?: string
+          is_staff?: boolean
+          message: string
+          sender_id: string
+          ticket_id: string
+        }
+        Update: {
+          attachments?: string[] | null
+          created_at?: string
+          id?: string
+          is_staff?: boolean
+          message?: string
+          sender_id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          assigned_to: string | null
+          category: string
+          created_at: string
+          description: string
+          id: string
+          priority: string
+          related_order_id: string | null
+          resolved_at: string | null
+          status: string
+          subject: string
+          ticket_number: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          category: string
+          created_at?: string
+          description: string
+          id?: string
+          priority?: string
+          related_order_id?: string | null
+          resolved_at?: string | null
+          status?: string
+          subject: string
+          ticket_number: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          priority?: string
+          related_order_id?: string | null
+          resolved_at?: string | null
+          status?: string
+          subject?: string
+          ticket_number?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tracking: {
         Row: {
           carrier: string | null
@@ -1307,6 +1485,108 @@ export type Database = {
           },
         ]
       }
+      user_notification_prefs: {
+        Row: {
+          created_at: string
+          dispute_email: boolean
+          dispute_in_app: boolean
+          dispute_sms: boolean
+          id: string
+          order_email: boolean
+          order_in_app: boolean
+          order_sms: boolean
+          payment_email: boolean
+          payment_in_app: boolean
+          payment_sms: boolean
+          refund_email: boolean
+          refund_in_app: boolean
+          refund_sms: boolean
+          system_email: boolean
+          system_in_app: boolean
+          system_sms: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dispute_email?: boolean
+          dispute_in_app?: boolean
+          dispute_sms?: boolean
+          id?: string
+          order_email?: boolean
+          order_in_app?: boolean
+          order_sms?: boolean
+          payment_email?: boolean
+          payment_in_app?: boolean
+          payment_sms?: boolean
+          refund_email?: boolean
+          refund_in_app?: boolean
+          refund_sms?: boolean
+          system_email?: boolean
+          system_in_app?: boolean
+          system_sms?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dispute_email?: boolean
+          dispute_in_app?: boolean
+          dispute_sms?: boolean
+          id?: string
+          order_email?: boolean
+          order_in_app?: boolean
+          order_sms?: boolean
+          payment_email?: boolean
+          payment_in_app?: boolean
+          payment_sms?: boolean
+          refund_email?: boolean
+          refund_in_app?: boolean
+          refund_sms?: boolean
+          system_email?: boolean
+          system_in_app?: boolean
+          system_sms?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_privacy_requests: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          processed_at: string | null
+          processed_by: string | null
+          request_type: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          request_type: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          request_type?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1324,6 +1604,36 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_security: {
+        Row: {
+          created_at: string
+          id: string
+          last_password_change: string | null
+          two_factor_enabled: boolean
+          two_factor_method: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_password_change?: string | null
+          two_factor_enabled?: boolean
+          two_factor_method?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_password_change?: string | null
+          two_factor_enabled?: boolean
+          two_factor_method?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
