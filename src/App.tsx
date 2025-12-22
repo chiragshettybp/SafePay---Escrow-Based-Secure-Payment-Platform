@@ -34,6 +34,16 @@ import WalletWithdraw from "./pages/WalletWithdraw";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 import Kyc from "./pages/Kyc";
+import CustomerSettings from "./pages/CustomerSettings";
+import CustomerSettingsProfile from "./pages/CustomerSettingsProfile";
+import CustomerSettingsSecurity from "./pages/CustomerSettingsSecurity";
+import CustomerSettingsNotifications from "./pages/CustomerSettingsNotifications";
+import CustomerSettingsPrivacy from "./pages/CustomerSettingsPrivacy";
+import CustomerSupport from "./pages/CustomerSupport";
+import CustomerSupportCreate from "./pages/CustomerSupportCreate";
+import CustomerSupportTickets from "./pages/CustomerSupportTickets";
+import CustomerSupportTicketDetails from "./pages/CustomerSupportTicketDetails";
+import CustomerSupportFaq from "./pages/CustomerSupportFaq";
 import MerchantLogin from "./pages/MerchantLogin";
 import MerchantSignup from "./pages/MerchantSignup";
 import MerchantDashboard from "./pages/MerchantDashboard";
@@ -107,6 +117,18 @@ const App = () => (
             <Route path="/payment/new" element={<NewPayment />} />
             <Route path="/payment/review/:orderId" element={<PaymentReview />} />
             <Route path="/payment/success/:orderId" element={<PaymentSuccess />} />
+            {/* Customer Settings Routes */}
+            <Route path="/settings" element={<CustomerSettings />} />
+            <Route path="/settings/profile" element={<CustomerSettingsProfile />} />
+            <Route path="/settings/security" element={<CustomerSettingsSecurity />} />
+            <Route path="/settings/notifications" element={<CustomerSettingsNotifications />} />
+            <Route path="/settings/privacy" element={<CustomerSettingsPrivacy />} />
+            {/* Customer Support Routes */}
+            <Route path="/support" element={<CustomerSupport />} />
+            <Route path="/support/create" element={<CustomerSupportCreate />} />
+            <Route path="/support/tickets" element={<CustomerSupportTickets />} />
+            <Route path="/support/ticket/:ticketId" element={<CustomerSupportTicketDetails />} />
+            <Route path="/support/faq" element={<CustomerSupportFaq />} />
             {/* Merchant Routes */}
             <Route path="/merchant" element={<MerchantRouteRoot />}>
               <Route path="login" element={<MerchantLogin />} />
