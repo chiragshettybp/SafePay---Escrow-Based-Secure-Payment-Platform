@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.admin-confirm-reset]
 verify_jwt = false
+
+[functions.admin-force-release]
+verify_jwt = true
+
+[functions.admin-force-refund]
+verify_jwt = true

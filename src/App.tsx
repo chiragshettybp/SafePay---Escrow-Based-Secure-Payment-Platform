@@ -87,6 +87,10 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminResetPassword from "./pages/AdminResetPassword";
 import AdminResetPasswordConfirm from "./pages/AdminResetPasswordConfirm";
+import AdminPayments from "./pages/AdminPayments";
+import AdminPaymentDetails from "./pages/AdminPaymentDetails";
+import AdminForceRelease from "./pages/AdminForceRelease";
+import AdminForceRefund from "./pages/AdminForceRefund";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -189,6 +193,10 @@ const App = () => (
               <Route path="/admin/reset-password" element={<AdminResetPassword />} />
               <Route path="/admin/reset-password/confirm" element={<AdminResetPasswordConfirm />} />
               <Route path="/admin/dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
+              <Route path="/admin/payments" element={<AdminProtectedRoute><AdminPayments /></AdminProtectedRoute>} />
+              <Route path="/admin/payments/:paymentId" element={<AdminProtectedRoute><AdminPaymentDetails /></AdminProtectedRoute>} />
+              <Route path="/admin/payments/:paymentId/force-release" element={<AdminProtectedRoute><AdminForceRelease /></AdminProtectedRoute>} />
+              <Route path="/admin/payments/:paymentId/force-refund" element={<AdminProtectedRoute><AdminForceRefund /></AdminProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AdminAuthProvider>
