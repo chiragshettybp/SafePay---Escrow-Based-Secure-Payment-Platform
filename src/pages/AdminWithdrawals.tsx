@@ -9,16 +9,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminWithdrawals, WithdrawalFilters } from "@/hooks/useAdminWithdrawals";
-import { Search, DollarSign, Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { Search, IndianRupee, Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 
 export default function AdminWithdrawals() {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<WithdrawalFilters>({});
   const [searchTerm, setSearchTerm] = useState("");
   const { withdrawals, metrics, isLoading } = useAdminWithdrawals({ ...filters, search: searchTerm });
-
-  const formatCurrency = (amount: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(amount);
 
   const getStatusVariant = (status: string) => {
     switch (status) {

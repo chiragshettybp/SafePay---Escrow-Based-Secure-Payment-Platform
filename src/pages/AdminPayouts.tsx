@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Eye, DollarSign, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Search, Eye, IndianRupee, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { useAdminPayouts, PayoutFilters } from "@/hooks/useAdminPayouts";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }> = {
   processing: { label: "Processing", variant: "secondary", icon: <Clock className="h-3 w-3" /> },
@@ -46,14 +47,6 @@ export default function AdminPayouts() {
 
   const handleFilterChange = (key: keyof PayoutFilters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount);
   };
 
   // Stats

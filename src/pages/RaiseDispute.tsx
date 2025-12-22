@@ -22,10 +22,11 @@ import {
   ArrowRight, 
   AlertTriangle,
   Store, 
-  DollarSign,
+  IndianRupee,
   FileText,
   Loader2
 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
 export default function RaiseDispute() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -161,10 +162,10 @@ export default function RaiseDispute() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/30">
-                    <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <IndianRupee className="h-4 w-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
                       <p className="text-[10px] text-muted-foreground">Amount</p>
-                      <p className="font-medium text-xs">₹{order.amount.toFixed(0)}</p>
+                      <p className="font-medium text-xs">{formatCurrency(order.amount)}</p>
                     </div>
                   </div>
                 </div>

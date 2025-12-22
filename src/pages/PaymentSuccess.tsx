@@ -14,7 +14,7 @@ import {
   Download, 
   Copy, 
   Store, 
-  DollarSign,
+  IndianRupee,
   FileText,
   Lock,
   Calendar,
@@ -23,6 +23,7 @@ import {
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import { formatCurrency } from "@/lib/utils";
 
 export default function PaymentSuccess() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -204,11 +205,11 @@ export default function PaymentSuccess() {
 
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-[hsl(var(--success))]/20 flex items-center justify-center shrink-0">
-                    <DollarSign className="h-5 w-5 text-[hsl(var(--success))]" />
+                    <IndianRupee className="h-5 w-5 text-[hsl(var(--success))]" />
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Total Amount</p>
-                    <p className="text-xl font-bold">₹{totalAmount.toFixed(2)}</p>
+                    <p className="text-xl font-bold">{formatCurrency(totalAmount)}</p>
                   </div>
                 </div>
 

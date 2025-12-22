@@ -53,11 +53,12 @@ import {
   Package,
   MapPin,
   Calendar,
-  DollarSign,
+  IndianRupee,
   FileText,
   Send,
 } from "lucide-react";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ComponentType<{ className?: string }> }> = {
   pending: { label: "Pending", variant: "secondary", icon: Clock },

@@ -22,7 +22,7 @@ import {
   Ban,
   Calendar,
   Phone,
-  DollarSign,
+  IndianRupee,
   AlertCircle,
   CheckCircle,
   XCircle,
@@ -34,6 +34,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { formatCurrency } from '@/lib/utils';
 
 export default function AdminUserDetails() {
   const { user_id } = useParams<{ user_id: string }>();
@@ -170,8 +171,8 @@ export default function AdminUserDetails() {
                 </div>
                 <div className="p-4 bg-muted/50 rounded-lg">
                   <div className="text-2xl font-bold flex items-center">
-                    <DollarSign className="h-5 w-5" />
-                    ₹{((user as any).total_spend || 0).toLocaleString()}
+                    <IndianRupee className="h-5 w-5" />
+                    {formatCurrency((user as any).total_spend || 0)}
                   </div>
                   <div className="text-sm text-muted-foreground">Total Spend</div>
                 </div>

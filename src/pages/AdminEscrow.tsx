@@ -10,22 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminEscrow, EscrowFilters } from "@/hooks/useAdminEscrow";
-import { Search, Filter, Wallet, Lock, Unlock, AlertTriangle, Snowflake, DollarSign } from "lucide-react";
+import { Search, Filter, Wallet, Lock, Unlock, AlertTriangle, Snowflake, IndianRupee } from "lucide-react";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 
 export default function AdminEscrow() {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<EscrowFilters>({});
   const [searchTerm, setSearchTerm] = useState("");
   const { escrowAccounts, metrics, isLoading } = useAdminEscrow({ ...filters, search: searchTerm });
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const MetricCard = ({ title, value, icon: Icon, className }: { title: string; value: string | number; icon: React.ElementType; className?: string }) => (
     <Card className={className}>
@@ -102,7 +95,7 @@ export default function AdminEscrow() {
               <MetricCard title="Total Escrow" value={metrics?.totalEscrowBalance || 0} icon={Wallet} />
               <MetricCard title="Locked Funds" value={metrics?.totalLockedFunds || 0} icon={Lock} />
               <MetricCard title="Releasable" value={metrics?.totalReleasableFunds || 0} icon={Unlock} />
-              <MetricCard title="Pending Withdrawals" value={metrics?.pendingWithdrawals || 0} icon={DollarSign} />
+              <MetricCard title="Pending Withdrawals" value={metrics?.pendingWithdrawals || 0} icon={IndianRupee} />
               <MetricCard title="Failed Payouts" value={metrics?.failedPayouts || 0} icon={AlertTriangle} className="border-destructive/50" />
               <MetricCard title="Frozen Accounts" value={metrics?.frozenAccounts || 0} icon={Snowflake} />
             </>

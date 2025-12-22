@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   ArrowLeft, 
-  DollarSign, 
+  IndianRupee, 
   Building2, 
   CreditCard, 
   Clock, 
@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useAdminPayoutDetails } from "@/hooks/useAdminPayouts";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode; color: string }> = {
   processing: { label: "Processing", variant: "secondary", icon: <Clock className="h-4 w-4" />, color: "text-yellow-600" },
@@ -36,13 +37,6 @@ export default function AdminPayoutDetails() {
   const { payoutId } = useParams<{ payoutId: string }>();
   const { payout, loading } = useAdminPayoutDetails(payoutId);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const canReview = payout && ["processing", "pending"].includes(payout.status);
   const status = payout ? (statusConfig[payout.status] || statusConfig.pending) : statusConfig.pending;
@@ -115,8 +109,8 @@ export default function AdminPayoutDetails() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2">
+                    <IndianRupee className="h-5 w-5" />
                     Payout Summary
                   </CardTitle>
                   <CardDescription>Request details and status</CardDescription>

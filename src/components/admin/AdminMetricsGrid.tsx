@@ -14,6 +14,7 @@ import {
   FileCheck,
 } from "lucide-react";
 import type { DashboardMetrics } from "@/hooks/useAdminDashboard";
+import { formatCurrency } from "@/lib/utils";
 
 interface MetricCardProps {
   title: string;
@@ -40,9 +41,9 @@ function MetricCard({
 
   const formattedValue =
     format === "currency"
-      ? `₹${Number(value).toLocaleString("en-IN")}`
+      ? formatCurrency(Number(value))
       : typeof value === "number"
-      ? value.toLocaleString()
+      ? value.toLocaleString("en-IN")
       : value;
 
   return (
