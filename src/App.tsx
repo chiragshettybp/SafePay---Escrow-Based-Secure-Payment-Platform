@@ -101,6 +101,9 @@ import AdminMerchantBan from "./pages/AdminMerchantBan";
 import AdminUsers from "./pages/AdminUsers";
 import AdminUserDetails from "./pages/AdminUserDetails";
 import AdminUserBan from "./pages/AdminUserBan";
+import AdminPayouts from "./pages/AdminPayouts";
+import AdminPayoutDetails from "./pages/AdminPayoutDetails";
+import AdminPayoutVerify from "./pages/AdminPayoutVerify";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -217,6 +220,9 @@ const App = () => (
               <Route path="/admin/users" element={<AdminProtectedRoute><AdminUsers /></AdminProtectedRoute>} />
               <Route path="/admin/users/:user_id" element={<AdminProtectedRoute><AdminUserDetails /></AdminProtectedRoute>} />
               <Route path="/admin/users/:user_id/ban" element={<AdminProtectedRoute><AdminUserBan /></AdminProtectedRoute>} />
+              <Route path="/admin/payouts" element={<AdminProtectedRoute><AdminPayouts /></AdminProtectedRoute>} />
+              <Route path="/admin/payouts/:payoutId" element={<AdminProtectedRoute><AdminPayoutDetails /></AdminProtectedRoute>} />
+              <Route path="/admin/payouts/:payoutId/verify" element={<AdminProtectedRoute><AdminPayoutVerify /></AdminProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AdminAuthProvider>

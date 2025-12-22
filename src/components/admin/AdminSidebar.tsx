@@ -68,7 +68,7 @@ export function AdminSidebar({ isCollapsed = false, onToggle, alerts }: AdminSid
         { title: "Orders", href: "/admin/orders", icon: ShoppingCart },
         { title: "Shipments", href: "/admin/shipments", icon: Truck },
         { title: "Payments", href: "/admin/payments", icon: Wallet },
-        { title: "Withdrawals", href: "/admin/withdrawals", icon: Wallet, badge: alerts?.pendingWithdrawals },
+        { title: "Payouts", href: "/admin/payouts", icon: Wallet, badge: alerts?.pendingWithdrawals },
       ],
     },
     {
