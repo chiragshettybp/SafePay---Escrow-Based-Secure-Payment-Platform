@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -215,7 +215,15 @@ export default function AdminLogin() {
               </Button>
             </form>
 
-            <div className="mt-6 pt-6 border-t">
+            <div className="mt-6 pt-6 border-t space-y-3">
+              <div className="text-center">
+                <Link 
+                  to="/admin/reset-password" 
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot Password?
+                </Link>
+              </div>
               <p className="text-xs text-center text-muted-foreground">
                 This is a restricted area. All login attempts are monitored and logged.
               </p>
