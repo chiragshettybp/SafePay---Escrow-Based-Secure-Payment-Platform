@@ -1377,6 +1377,100 @@ export type Database = {
           },
         ]
       }
+      shipment_actions_log: {
+        Row: {
+          action_type: string
+          admin_id: string
+          admin_notes: string | null
+          created_at: string
+          description: string | null
+          id: string
+          new_value: Json | null
+          previous_value: Json | null
+          shipment_id: string
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          admin_notes?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          new_value?: Json | null
+          previous_value?: Json | null
+          shipment_id: string
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          admin_notes?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          new_value?: Json | null
+          previous_value?: Json | null
+          shipment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_actions_log_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "tracking"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipment_issues: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          issue_status: string
+          issue_type: string
+          order_impact: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          shipment_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          issue_status?: string
+          issue_type: string
+          order_impact?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          shipment_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          issue_status?: string
+          issue_type?: string
+          order_impact?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          shipment_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_issues_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "tracking"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_attachments: {
         Row: {
           created_at: string
@@ -1527,34 +1621,49 @@ export type Database = {
       }
       tracking: {
         Row: {
+          actual_delivery_date: string | null
           carrier: string | null
           created_at: string
           estimated_delivery: string | null
+          expected_delivery_date: string | null
           id: string
+          is_delayed: boolean
           location: string | null
+          logistics_provider: string | null
           order_id: string
+          shipment_number: string | null
           status: string
           tracking_number: string | null
           updated_at: string
         }
         Insert: {
+          actual_delivery_date?: string | null
           carrier?: string | null
           created_at?: string
           estimated_delivery?: string | null
+          expected_delivery_date?: string | null
           id?: string
+          is_delayed?: boolean
           location?: string | null
+          logistics_provider?: string | null
           order_id: string
+          shipment_number?: string | null
           status?: string
           tracking_number?: string | null
           updated_at?: string
         }
         Update: {
+          actual_delivery_date?: string | null
           carrier?: string | null
           created_at?: string
           estimated_delivery?: string | null
+          expected_delivery_date?: string | null
           id?: string
+          is_delayed?: boolean
           location?: string | null
+          logistics_provider?: string | null
           order_id?: string
+          shipment_number?: string | null
           status?: string
           tracking_number?: string | null
           updated_at?: string
