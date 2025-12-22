@@ -125,6 +125,12 @@ import AdminSupportTicketConversation from "./pages/AdminSupportTicketConversati
 import AdminSupportTicketAttachments from "./pages/AdminSupportTicketAttachments";
 import AdminSupportTicketHistory from "./pages/AdminSupportTicketHistory";
 import AdminSupportTicketActions from "./pages/AdminSupportTicketActions";
+import AdminNotifications from "./pages/AdminNotifications";
+import AdminNotificationCreate from "./pages/AdminNotificationCreate";
+import AdminNotificationDetails from "./pages/AdminNotificationDetails";
+import AdminNotificationRecipients from "./pages/AdminNotificationRecipients";
+import AdminNotificationHistory from "./pages/AdminNotificationHistory";
+import AdminNotificationActions from "./pages/AdminNotificationActions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -271,6 +277,13 @@ const App = () => (
                 <Route path="history" element={<AdminSupportTicketHistory />} />
                 <Route path="actions" element={<AdminSupportTicketActions />} />
               </Route>
+              {/* Admin Notifications Routes */}
+              <Route path="/admin/notifications" element={<AdminProtectedRoute><AdminNotifications /></AdminProtectedRoute>} />
+              <Route path="/admin/notifications/create" element={<AdminProtectedRoute><AdminNotificationCreate /></AdminProtectedRoute>} />
+              <Route path="/admin/notifications/:notificationId" element={<AdminProtectedRoute><AdminNotificationDetails /></AdminProtectedRoute>} />
+              <Route path="/admin/notifications/:notificationId/recipients" element={<AdminProtectedRoute><AdminNotificationRecipients /></AdminProtectedRoute>} />
+              <Route path="/admin/notifications/:notificationId/history" element={<AdminProtectedRoute><AdminNotificationHistory /></AdminProtectedRoute>} />
+              <Route path="/admin/notifications/:notificationId/actions" element={<AdminProtectedRoute><AdminNotificationActions /></AdminProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AdminAuthProvider>
