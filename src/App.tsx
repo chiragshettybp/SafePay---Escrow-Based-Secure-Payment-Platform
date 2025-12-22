@@ -101,6 +101,9 @@ import AdminMerchantBan from "./pages/AdminMerchantBan";
 import AdminUsers from "./pages/AdminUsers";
 import AdminUserDetails from "./pages/AdminUserDetails";
 import AdminUserBan from "./pages/AdminUserBan";
+import AdminUserKyc from "./pages/AdminUserKyc";
+import AdminUserBankVerify from "./pages/AdminUserBankVerify";
+import AdminUserVerificationHistory from "./pages/AdminUserVerificationHistory";
 import AdminPayouts from "./pages/AdminPayouts";
 import AdminPayoutDetails from "./pages/AdminPayoutDetails";
 import AdminPayoutVerify from "./pages/AdminPayoutVerify";
@@ -290,6 +293,10 @@ const App = () => (
               <Route path="/admin/notifications/:notificationId/recipients" element={<AdminProtectedRoute><AdminNotificationRecipients /></AdminProtectedRoute>} />
               <Route path="/admin/notifications/:notificationId/history" element={<AdminProtectedRoute><AdminNotificationHistory /></AdminProtectedRoute>} />
               <Route path="/admin/notifications/:notificationId/actions" element={<AdminProtectedRoute><AdminNotificationActions /></AdminProtectedRoute>} />
+              {/* Admin User Verification Routes */}
+              <Route path="/admin/users/:user_id/kyc" element={<AdminProtectedRoute><AdminUserKyc /></AdminProtectedRoute>} />
+              <Route path="/admin/users/:user_id/bankdetails-verify" element={<AdminProtectedRoute><AdminUserBankVerify /></AdminProtectedRoute>} />
+              <Route path="/admin/users/:user_id/verification-history" element={<AdminProtectedRoute><AdminUserVerificationHistory /></AdminProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AdminAuthProvider>

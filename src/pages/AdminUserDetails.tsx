@@ -338,6 +338,29 @@ export default function AdminUserDetails() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Verification</CardTitle>
+            <CardDescription>KYC and bank account verification</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-4">
+              <Button variant="outline" onClick={() => navigate(`/admin/users/${user_id}/kyc`)}>
+                <User className="h-4 w-4 mr-2" />
+                View KYC
+              </Button>
+              <Button variant="outline" onClick={() => navigate(`/admin/users/${user_id}/bankdetails-verify`)}>
+                <IndianRupee className="h-4 w-4 mr-2" />
+                Bank Verification
+              </Button>
+              <Button variant="outline" onClick={() => navigate(`/admin/users/${user_id}/verification-history`)}>
+                <Calendar className="h-4 w-4 mr-2" />
+                Verification History
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Admin Actions */}
         <Card>
           <CardHeader>
