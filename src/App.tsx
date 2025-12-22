@@ -91,6 +91,9 @@ import AdminPayments from "./pages/AdminPayments";
 import AdminPaymentDetails from "./pages/AdminPaymentDetails";
 import AdminForceRelease from "./pages/AdminForceRelease";
 import AdminForceRefund from "./pages/AdminForceRefund";
+import AdminDisputes from "./pages/AdminDisputes";
+import AdminDisputeReview from "./pages/AdminDisputeReview";
+import AdminDisputeDecision from "./pages/AdminDisputeDecision";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -197,6 +200,9 @@ const App = () => (
               <Route path="/admin/payments/:paymentId" element={<AdminProtectedRoute><AdminPaymentDetails /></AdminProtectedRoute>} />
               <Route path="/admin/payments/:paymentId/force-release" element={<AdminProtectedRoute><AdminForceRelease /></AdminProtectedRoute>} />
               <Route path="/admin/payments/:paymentId/force-refund" element={<AdminProtectedRoute><AdminForceRefund /></AdminProtectedRoute>} />
+              <Route path="/admin/disputes" element={<AdminProtectedRoute><AdminDisputes /></AdminProtectedRoute>} />
+              <Route path="/admin/disputes/:disputeId" element={<AdminProtectedRoute><AdminDisputeReview /></AdminProtectedRoute>} />
+              <Route path="/admin/disputes/:disputeId/decision" element={<AdminProtectedRoute><AdminDisputeDecision /></AdminProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AdminAuthProvider>
