@@ -147,6 +147,19 @@ export default function AdminUserBankVerify() {
       return;
     }
 
+    // Prevent duplicate submissions
+    if (isSubmitting) return;
+
+    // Prevent duplicate approvals
+    if (actionType === 'approve' && selectedAccount.verification_status === 'verified') {
+      toast({
+        title: 'Already Verified',
+        description: 'This bank account is already verified',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -157,24 +170,43 @@ export default function AdminUserBankVerify() {
       const isVerified = actionType === 'approve';
 
       // Update bank account status
-      const { error: updateError } = await supabase
+      const { data: updatedAccount, error: updateError } = await supabase
         .from('bank_accounts')
         .update({
           verification_status: newStatus,
           is_verified: isVerified,
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', selectedAccount.id);
+        .eq('id', selectedAccount.id)
+        .select()
+        .single();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
 
       // Log to verification history
-      await supabase.from('user_verification_history').insert({
+      const { error: logError } = await supabase.from('user_verification_history').insert({
         user_id: user_id,
         action_type: `bank_${actionType === 'approve' ? 'approved' : actionType === 'reject' ? 'rejected' : 'reupload_requested'}`,
         admin_id: session.user.id,
         reason: reason || null,
         metadata: { bank_account_id: selectedAccount.id, account_number_masked: maskAccountNumber(selectedAccount.account_number) },
       });
+
+      if (logError) {
+        console.error('Log error:', logError);
+      }
+
+      // Immediately update local state for instant UI feedback
+      setBankAccounts((prev) =>
+        prev.map((acc) =>
+          acc.id === selectedAccount.id
+            ? { ...acc, verification_status: newStatus, is_verified: isVerified, updated_at: new Date().toISOString() }
+            : acc
+        )
+      );
 
       toast({
         title: 'Success',
@@ -184,12 +216,11 @@ export default function AdminUserBankVerify() {
       setActionType(null);
       setReason('');
       setSelectedAccount(null);
-      fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update bank account status',
+        description: error?.message || 'Failed to update bank account status',
         variant: 'destructive',
       });
     } finally {
