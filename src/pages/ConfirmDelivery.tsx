@@ -15,7 +15,7 @@ import {
   ArrowLeft,
   Package,
   User,
-  DollarSign,
+  IndianRupee,
   Calendar,
   CheckCircle,
   Loader2,
@@ -26,6 +26,7 @@ import {
   Shield,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ACCEPTED_FILE_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -204,10 +205,10 @@ export default function ConfirmDelivery() {
                 </div>
                 
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                  <DollarSign className="h-5 w-5 text-muted-foreground" />
+                  <IndianRupee className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">Amount</p>
-                    <p className="font-medium text-foreground">₹{order.amount.toFixed(2)}</p>
+                    <p className="font-medium text-foreground">{formatCurrency(order.amount)}</p>
                   </div>
                 </div>
 

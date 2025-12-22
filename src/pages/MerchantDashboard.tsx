@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Seo } from "@/components/seo/Seo";
+import { formatCurrency } from "@/lib/utils";
 
 function MerchantDashboardContent() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,13 +51,6 @@ function MerchantDashboardContent() {
     setStatusFilter(filter === statusFilter ? null : filter);
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   return (
     <MerchantLayout searchQuery={searchQuery} onSearchChange={setSearchQuery}>

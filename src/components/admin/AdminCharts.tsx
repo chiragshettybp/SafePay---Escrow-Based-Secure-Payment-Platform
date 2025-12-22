@@ -15,6 +15,7 @@ import {
   Legend,
 } from "recharts";
 import type { ChartData } from "@/hooks/useAdminDashboard";
+import { formatCurrency } from "@/lib/utils";
 
 interface AdminChartsProps {
   chartData: ChartData;
@@ -34,10 +35,8 @@ export function AdminCharts({
     return date.toLocaleDateString("en-IN", { month: "short", day: "numeric" });
   };
 
-  const formatCurrency = (value: number) => {
-    if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
-    if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
-    return `₹${value}`;
+  const formatCompactCurrency = (value: number) => {
+    return formatCurrency(value, { compact: true });
   };
 
   return (
@@ -83,7 +82,7 @@ export function AdminCharts({
                   <YAxis
                     yAxisId="right"
                     orientation="right"
-                    tickFormatter={formatCurrency}
+                    tickFormatter={formatCompactCurrency}
                     className="text-xs"
                     tick={{ fill: "hsl(var(--muted-foreground))" }}
                   />
