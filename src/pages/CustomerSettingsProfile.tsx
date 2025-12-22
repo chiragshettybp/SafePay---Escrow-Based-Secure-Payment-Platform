@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { PageTransition } from "@/components/layout/PageTransition";
@@ -59,14 +59,14 @@ const CustomerSettingsProfile = () => {
   };
 
   // Update form when profile loads
-  useState(() => {
+  useEffect(() => {
     if (profile) {
       setFormData({
         full_name: profile.full_name || "",
         phone: profile.phone || "",
       });
     }
-  });
+  }, [profile]);
 
   const getInitials = () => {
     if (profile?.full_name) {
