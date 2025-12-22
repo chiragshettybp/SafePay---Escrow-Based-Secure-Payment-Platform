@@ -118,6 +118,13 @@ import AdminWithdrawalDetails from "./pages/AdminWithdrawalDetails";
 import AdminWithdrawalMerchant from "./pages/AdminWithdrawalMerchant";
 import AdminWithdrawalHistory from "./pages/AdminWithdrawalHistory";
 import AdminWithdrawalActions from "./pages/AdminWithdrawalActions";
+import AdminSupport from "./pages/AdminSupport";
+import AdminSupportTicket from "./pages/AdminSupportTicket";
+import AdminSupportTicketDetails from "./pages/AdminSupportTicketDetails";
+import AdminSupportTicketConversation from "./pages/AdminSupportTicketConversation";
+import AdminSupportTicketAttachments from "./pages/AdminSupportTicketAttachments";
+import AdminSupportTicketHistory from "./pages/AdminSupportTicketHistory";
+import AdminSupportTicketActions from "./pages/AdminSupportTicketActions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -254,6 +261,15 @@ const App = () => (
                 <Route path="merchant" element={<AdminWithdrawalMerchant />} />
                 <Route path="history" element={<AdminWithdrawalHistory />} />
                 <Route path="actions" element={<AdminWithdrawalActions />} />
+              </Route>
+              {/* Admin Support Routes */}
+              <Route path="/admin/support" element={<AdminProtectedRoute><AdminSupport /></AdminProtectedRoute>} />
+              <Route path="/admin/support/:ticketId" element={<AdminProtectedRoute><AdminSupportTicket /></AdminProtectedRoute>}>
+                <Route path="details" element={<AdminSupportTicketDetails />} />
+                <Route path="conversation" element={<AdminSupportTicketConversation />} />
+                <Route path="attachments" element={<AdminSupportTicketAttachments />} />
+                <Route path="history" element={<AdminSupportTicketHistory />} />
+                <Route path="actions" element={<AdminSupportTicketActions />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
