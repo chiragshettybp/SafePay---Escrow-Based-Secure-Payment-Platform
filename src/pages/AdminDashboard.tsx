@@ -34,13 +34,15 @@ export default function AdminDashboard() {
           openTickets: metrics.openSupportTickets,
         }}
       >
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Page Header */}
-          <div>
-            <h1 className="text-2xl font-bold">Dashboard Overview</h1>
-            <p className="text-muted-foreground">
-              Real-time overview of your marketplace performance
-            </p>
+          <div className="admin-page-header">
+            <div>
+              <h1 className="admin-page-title">Dashboard Overview</h1>
+              <p className="admin-page-subtitle">
+                Real-time overview of your marketplace performance
+              </p>
+            </div>
           </div>
 
           {/* Metrics Grid */}
@@ -55,7 +57,7 @@ export default function AdminDashboard() {
           />
 
           {/* Alerts, Activity & Quick Actions */}
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 lg:grid-cols-3">
             <AdminAlerts alerts={alerts} />
             <AdminActivityFeed activities={recentActivity} isLoading={isLoading} />
             <AdminQuickActions
