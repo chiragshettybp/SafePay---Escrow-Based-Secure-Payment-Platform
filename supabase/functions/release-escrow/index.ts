@@ -99,6 +99,26 @@ Deno.serve(async (req) => {
       );
     }
 
+    // CRITICAL: Check for open disputes that would block escrow release
+    // (unless the reason is specifically to close a dispute)
+    if (reason === "delivery_confirmed" && !disputeId) {
+      const { data: openDisputes } = await supabase
+        .from("disputes")
+        .select("id, status")
+        .eq("order_id", orderId)
+        .in("status", ["open", "under_review"]);
+
+      if (openDisputes && openDisputes.length > 0) {
+        console.error("Cannot release escrow while dispute is open");
+        return new Response(
+          JSON.stringify({ 
+            error: "Cannot release escrow while a dispute is open. Please close the dispute first or use 'Close Dispute & Confirm Delivery'." 
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Fetch payment record
     const { data: payment, error: paymentError } = await supabase
       .from("payments")
@@ -113,18 +133,39 @@ Deno.serve(async (req) => {
     // Start transaction-like operations
     const now = new Date().toISOString();
     
-    // 1. Update order status to completed
-    const { error: updateOrderError } = await supabase
+    // 1. Update order status to completed (with optimistic locking via status check)
+    const { data: updatedOrder, error: updateOrderError } = await supabase
       .from("orders")
       .update({ 
         status: "completed",
         completed_at: now,
         updated_at: now
       })
-      .eq("id", orderId);
+      .eq("id", orderId)
+      .neq("status", "completed") // Prevent double update
+      .neq("status", "refunded")
+      .select()
+      .single();
 
     if (updateOrderError) {
       console.error("Failed to update order:", updateOrderError);
+      // Check if it's because order was already completed
+      const { data: checkOrder } = await supabase
+        .from("orders")
+        .select("status")
+        .eq("id", orderId)
+        .single();
+      
+      if (checkOrder?.status === "completed" || checkOrder?.status === "refunded") {
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: "Escrow already released",
+            alreadyReleased: true 
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       throw updateOrderError;
     }
 
@@ -136,7 +177,8 @@ Deno.serve(async (req) => {
           status: "released",
           updated_at: now
         })
-        .eq("id", payment.id);
+        .eq("id", payment.id)
+        .neq("status", "released"); // Prevent double update
 
       if (updatePaymentError) {
         console.error("Failed to update payment:", updatePaymentError);
@@ -186,39 +228,46 @@ Deno.serve(async (req) => {
         created_by: "system",
       });
     }
-    
-    // 3b. If delivery confirmed on a disputed order (without specific disputeId), find and close any open disputes
-    if (reason === "delivery_confirmed" && !disputeId && order.status === "disputed") {
-      // Find any open disputes for this order
-      const { data: openDisputes } = await supabase
-        .from("disputes")
-        .select("id")
-        .eq("order_id", orderId)
-        .in("status", ["open", "under_review"]);
+
+    // 4. Update escrow_accounts - debit the locked balance
+    const { data: escrowAccount } = await supabase
+      .from("escrow_accounts")
+      .select("*")
+      .eq("merchant_id", order.merchant_id)
+      .single();
+
+    if (escrowAccount) {
+      const newLockedBalance = Math.max(0, escrowAccount.locked_balance - order.amount);
+      const newAvailableBalance = escrowAccount.available_balance + order.amount;
       
-      if (openDisputes && openDisputes.length > 0) {
-        for (const d of openDisputes) {
-          await supabase
-            .from("disputes")
-            .update({ 
-              status: "closed",
-              final_decision: "Customer confirmed delivery",
-              updated_at: now
-            })
-            .eq("id", d.id);
-          
-          await supabase.from("dispute_updates").insert({
-            dispute_id: d.id,
-            title: "Dispute Closed - Delivery Confirmed",
-            description: "Customer confirmed delivery. Escrow funds have been released to the merchant.",
-            status: "closed",
-            created_by: "system",
-          });
-        }
+      // Update escrow account - move from locked to available
+      const { error: escrowUpdateError } = await supabase
+        .from("escrow_accounts")
+        .update({
+          locked_balance: newLockedBalance,
+          available_balance: newAvailableBalance,
+          updated_at: now
+        })
+        .eq("id", escrowAccount.id);
+
+      if (escrowUpdateError) {
+        console.error("Failed to update escrow account:", escrowUpdateError);
       }
+
+      // Create escrow transaction record for the release
+      await supabase.from("escrow_transactions").insert({
+        escrow_account_id: escrowAccount.id,
+        order_id: orderId,
+        transaction_type: "unlock",
+        amount: order.amount,
+        balance_before: escrowAccount.locked_balance,
+        balance_after: newLockedBalance,
+        reason: `Escrow released: ${reason.replace(/_/g, " ")}`,
+        created_by: user.id,
+      });
     }
 
-    // 4. Credit merchant wallet with earnings
+    // 5. Credit merchant wallet with earnings
     const { data: merchantWallet } = await supabase
       .from("merchant_wallets")
       .select("*")
@@ -249,7 +298,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 5. Create order event
+    // 6. Create order event
     await supabase.from("order_events").insert({
       order_id: orderId,
       event_type: "escrow_released",
@@ -258,16 +307,17 @@ Deno.serve(async (req) => {
       metadata: { reason, disputeId, amount: order.amount }
     });
 
-    // 6. Notify merchant
-    await supabase.from("notifications").insert({
-      user_id: order.merchant_id,
+    // 7. Notify merchant via merchant_notifications table
+    await supabase.from("merchant_notifications").insert({
+      merchant_id: order.merchant_id,
       title: "Payment Released",
-      message: `Payment of ₹${order.amount} for order #${orderId.slice(0, 8)} has been released to your wallet.`,
+      body: `Payment of ₹${order.amount} for order #${orderId.slice(0, 8)} has been released to your wallet.`,
       type: "payment",
-      order_id: orderId,
+      related_order_id: orderId,
+      priority: "high",
     });
 
-    // 7. Notify customer
+    // 8. Notify customer
     await supabase.from("notifications").insert({
       user_id: order.customer_id,
       title: "Order Completed",

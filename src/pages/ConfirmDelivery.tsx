@@ -207,7 +207,7 @@ export default function ConfirmDelivery() {
                   <DollarSign className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">Amount</p>
-                    <p className="font-medium text-foreground">${order.amount.toFixed(2)}</p>
+                    <p className="font-medium text-foreground">₹{order.amount.toFixed(2)}</p>
                   </div>
                 </div>
 
@@ -297,7 +297,7 @@ export default function ConfirmDelivery() {
                   <p className="font-medium text-primary mb-1">Important Notice</p>
                   <p className="text-muted-foreground">
                     By confirming delivery, you acknowledge that you have received the product/service 
-                    in satisfactory condition. The payment of ${order.amount.toFixed(2)} will be 
+                    in satisfactory condition. The payment of ₹{order.amount.toFixed(2)} will be 
                     released to the merchant. This action cannot be undone.
                   </p>
                 </div>

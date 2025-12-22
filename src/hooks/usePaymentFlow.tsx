@@ -122,12 +122,29 @@ export function usePaymentFlow() {
       if (fetchError) throw fetchError;
       if (!order) throw new Error("Order not found");
 
+      // Check if already processed to prevent duplicates
+      if (order.status !== 'draft') {
+        throw new Error("Order has already been processed");
+      }
+
+      // Check if payment already exists for this order
+      const { data: existingPayment } = await supabase
+        .from('payments')
+        .select('id')
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+      if (existingPayment) {
+        throw new Error("Payment already exists for this order");
+      }
+
       // Update order status to escrow_locked
       const { error: updateError } = await supabase
         .from('orders')
         .update({ status: 'escrow_locked' })
         .eq('id', orderId)
-        .eq('customer_id', user.id);
+        .eq('customer_id', user.id)
+        .eq('status', 'draft'); // Only update if still draft (prevents race conditions)
 
       if (updateError) throw updateError;
 
@@ -145,15 +162,58 @@ export function usePaymentFlow() {
 
       if (paymentError) throw paymentError;
 
+      // Update merchant's escrow account - credit the escrow
+      const { data: escrowAccount } = await supabase
+        .from('escrow_accounts')
+        .select('*')
+        .eq('merchant_id', order.merchant_id)
+        .maybeSingle();
+
+      if (escrowAccount) {
+        // Update escrow balance
+        await supabase
+          .from('escrow_accounts')
+          .update({
+            total_balance: escrowAccount.total_balance + order.amount,
+            locked_balance: escrowAccount.locked_balance + order.amount,
+          })
+          .eq('id', escrowAccount.id);
+
+        // Create escrow transaction record
+        await supabase
+          .from('escrow_transactions')
+          .insert({
+            escrow_account_id: escrowAccount.id,
+            order_id: orderId,
+            transaction_type: 'credit',
+            amount: order.amount,
+            balance_before: escrowAccount.total_balance,
+            balance_after: escrowAccount.total_balance + order.amount,
+            reason: 'Payment locked in escrow',
+            created_by: user.id,
+          });
+      }
+
       // Create notification for customer
       await supabase
         .from('notifications')
         .insert({
           user_id: user.id,
           title: 'Payment Locked in Escrow',
-          message: `Your payment of $${order.amount} to ${order.merchant_name} has been locked in escrow.`,
+          message: `Your payment of ₹${order.amount.toFixed(2)} to ${order.merchant_name} has been locked in escrow.`,
           type: 'payment',
           order_id: orderId,
+        });
+
+      // Create notification for merchant
+      await supabase
+        .from('merchant_notifications')
+        .insert({
+          merchant_id: order.merchant_id,
+          title: 'New Order Received',
+          body: `New order of ₹${order.amount.toFixed(2)} for ${order.product_name} has been placed. Funds are locked in escrow.`,
+          type: 'order',
+          related_order_id: orderId,
         });
 
       return { orderId, order };
@@ -162,12 +222,13 @@ export function usePaymentFlow() {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['order-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['escrow'] });
       navigate(`/payment/success/${orderId}`);
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Payment Failed",
-        description: "Failed to process payment. Please try again.",
+        description: error.message || "Failed to process payment. Please try again.",
         variant: "destructive",
       });
       console.error("Payment confirmation error:", error);

@@ -120,7 +120,7 @@ export default function OrderDetails() {
                     <DollarSign className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-xs text-muted-foreground">Amount in Escrow</p>
-                      <p className="font-medium text-foreground">${order.amount.toFixed(2)}</p>
+                      <p className="font-medium text-foreground">₹{order.amount.toFixed(2)}</p>
                     </div>
                   </div>
 
@@ -154,6 +154,7 @@ export default function OrderDetails() {
                   </Link>
                 </Button>
 
+                {/* Show Confirm Delivery only for non-disputed orders */}
                 {(order.status === "delivered" || order.status === "escrow_locked" || order.status === "in_progress") && (
                   <Button asChild className="flex-1 sm:flex-none">
                     <Link to={`/order/${order.id}/confirm`}>
@@ -162,7 +163,18 @@ export default function OrderDetails() {
                     </Link>
                   </Button>
                 )}
+
+                {/* Show View Dispute for disputed orders */}
+                {order.status === "disputed" && (
+                  <Button asChild variant="secondary" className="flex-1 sm:flex-none">
+                    <Link to={`/disputes`}>
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      View Dispute
+                    </Link>
+                  </Button>
+                )}
                 
+                {/* Only show Report Issue for valid statuses */}
                 {(order.status === "pending" || order.status === "in_progress" || order.status === "delivered" || order.status === "escrow_locked") && (
                   <Button asChild variant="destructive" className="flex-1 sm:flex-none">
                     <Link to={`/order/${order.id}/report`}>

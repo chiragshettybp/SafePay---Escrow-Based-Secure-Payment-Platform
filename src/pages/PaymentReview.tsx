@@ -175,17 +175,17 @@ export default function PaymentReview() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Payment Amount</span>
-                    <span className="font-medium">${order.amount.toFixed(2)}</span>
+                    <span className="font-medium">₹{order.amount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Escrow Fee (2.5%)</span>
-                    <span className="font-medium">${escrowFee.toFixed(2)}</span>
+                    <span className="font-medium">₹{escrowFee.toFixed(2)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center">
                     <span className="font-semibold">Total</span>
                     <span className="text-xl font-bold text-primary">
-                      ${totalAmount.toFixed(2)}
+                      ₹{totalAmount.toFixed(2)}
                     </span>
                   </div>
                 </div>

@@ -208,7 +208,7 @@ export default function PaymentSuccess() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Total Amount</p>
-                    <p className="text-xl font-bold">${totalAmount.toFixed(2)}</p>
+                    <p className="text-xl font-bold">₹{totalAmount.toFixed(2)}</p>
                   </div>
                 </div>
 
