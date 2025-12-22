@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
-interface SeoProps {
+export interface SeoProps {
   title: string;
   description?: string;
   canonicalPath?: string;
+  noIndex?: boolean;
 }
 
 function upsertMeta(name: string, content: string) {
@@ -27,7 +28,7 @@ function upsertCanonical(href: string) {
   link.href = href;
 }
 
-export function Seo({ title, description, canonicalPath }: SeoProps) {
+export function Seo({ title, description, canonicalPath, noIndex }: SeoProps) {
   const location = useLocation();
 
   useEffect(() => {
@@ -40,9 +41,20 @@ export function Seo({ title, description, canonicalPath }: SeoProps) {
       upsertMeta("description", safeDescription);
     }
 
+    // Handle noIndex for admin pages
+    if (noIndex) {
+      upsertMeta("robots", "noindex, nofollow");
+    } else {
+      // Remove noindex if it was previously set
+      const robotsMeta = document.querySelector('meta[name="robots"]');
+      if (robotsMeta) {
+        robotsMeta.remove();
+      }
+    }
+
     const canonicalUrl = `${window.location.origin}${canonicalPath ?? location.pathname}`;
     upsertCanonical(canonicalUrl);
-  }, [title, description, canonicalPath, location.pathname]);
+  }, [title, description, canonicalPath, noIndex, location.pathname]);
 
   return null;
 }
