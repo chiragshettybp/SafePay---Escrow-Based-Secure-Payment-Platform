@@ -108,6 +108,16 @@ import AdminOrders from "./pages/AdminOrders";
 import AdminOrderDetails from "./pages/AdminOrderDetails";
 import AdminShipments from "./pages/AdminShipments";
 import AdminShipmentDetails from "./pages/AdminShipmentDetails";
+import AdminEscrow from "./pages/AdminEscrow";
+import AdminEscrowDetails from "./pages/AdminEscrowDetails";
+import AdminEscrowOrders from "./pages/AdminEscrowOrders";
+import AdminEscrowHistory from "./pages/AdminEscrowHistory";
+import AdminEscrowActions from "./pages/AdminEscrowActions";
+import AdminWithdrawals from "./pages/AdminWithdrawals";
+import AdminWithdrawalDetails from "./pages/AdminWithdrawalDetails";
+import AdminWithdrawalMerchant from "./pages/AdminWithdrawalMerchant";
+import AdminWithdrawalHistory from "./pages/AdminWithdrawalHistory";
+import AdminWithdrawalActions from "./pages/AdminWithdrawalActions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -231,6 +241,20 @@ const App = () => (
               <Route path="/admin/orders/:orderId" element={<AdminProtectedRoute><AdminOrderDetails /></AdminProtectedRoute>} />
               <Route path="/admin/shipments" element={<AdminProtectedRoute><AdminShipments /></AdminProtectedRoute>} />
               <Route path="/admin/shipments/:shipmentId" element={<AdminProtectedRoute><AdminShipmentDetails /></AdminProtectedRoute>} />
+              {/* Admin Escrow Routes */}
+              <Route path="/admin/escrow" element={<AdminProtectedRoute><AdminEscrow /></AdminProtectedRoute>} />
+              <Route path="/admin/escrow/:escrow_id" element={<AdminProtectedRoute><AdminEscrowDetails /></AdminProtectedRoute>}>
+                <Route path="orders" element={<AdminEscrowOrders />} />
+                <Route path="history" element={<AdminEscrowHistory />} />
+                <Route path="actions" element={<AdminEscrowActions />} />
+              </Route>
+              {/* Admin Withdrawals Routes */}
+              <Route path="/admin/withdrawals" element={<AdminProtectedRoute><AdminWithdrawals /></AdminProtectedRoute>} />
+              <Route path="/admin/withdrawals/:withdrawal_id" element={<AdminProtectedRoute><AdminWithdrawalDetails /></AdminProtectedRoute>}>
+                <Route path="merchant" element={<AdminWithdrawalMerchant />} />
+                <Route path="history" element={<AdminWithdrawalHistory />} />
+                <Route path="actions" element={<AdminWithdrawalActions />} />
+              </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AdminAuthProvider>

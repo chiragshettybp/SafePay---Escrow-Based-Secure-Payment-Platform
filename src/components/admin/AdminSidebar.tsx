@@ -17,6 +17,8 @@ import {
   TrendingUp,
   Bell,
   Truck,
+  Vault,
+  ArrowDownToLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -69,6 +71,13 @@ export function AdminSidebar({ isCollapsed = false, onToggle, alerts }: AdminSid
         { title: "Shipments", href: "/admin/shipments", icon: Truck },
         { title: "Payments", href: "/admin/payments", icon: Wallet },
         { title: "Payouts", href: "/admin/payouts", icon: Wallet, badge: alerts?.pendingWithdrawals },
+      ],
+    },
+    {
+      title: "Finance",
+      items: [
+        { title: "Escrow", href: "/admin/escrow", icon: Vault },
+        { title: "Withdrawals", href: "/admin/withdrawals", icon: ArrowDownToLine },
       ],
     },
     {
