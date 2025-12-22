@@ -66,11 +66,15 @@ Deno.serve(async (req) => {
 
     if (updateError) throw updateError;
 
+    console.log(`Merchant ${merchantId} ${action} by admin ${user.id}: ${reason}`);
+
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("Ban/suspend error:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -94,6 +94,10 @@ import AdminForceRefund from "./pages/AdminForceRefund";
 import AdminDisputes from "./pages/AdminDisputes";
 import AdminDisputeReview from "./pages/AdminDisputeReview";
 import AdminDisputeDecision from "./pages/AdminDisputeDecision";
+import AdminMerchants from "./pages/AdminMerchants";
+import AdminMerchantDetails from "./pages/AdminMerchantDetails";
+import AdminMerchantVerification from "./pages/AdminMerchantVerification";
+import AdminMerchantBan from "./pages/AdminMerchantBan";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -203,6 +207,10 @@ const App = () => (
               <Route path="/admin/disputes" element={<AdminProtectedRoute><AdminDisputes /></AdminProtectedRoute>} />
               <Route path="/admin/disputes/:disputeId" element={<AdminProtectedRoute><AdminDisputeReview /></AdminProtectedRoute>} />
               <Route path="/admin/disputes/:disputeId/decision" element={<AdminProtectedRoute><AdminDisputeDecision /></AdminProtectedRoute>} />
+              <Route path="/admin/merchants" element={<AdminProtectedRoute><AdminMerchants /></AdminProtectedRoute>} />
+              <Route path="/admin/merchants/:merchant_id" element={<AdminProtectedRoute><AdminMerchantDetails /></AdminProtectedRoute>} />
+              <Route path="/admin/merchants/:merchant_id/verification" element={<AdminProtectedRoute><AdminMerchantVerification /></AdminProtectedRoute>} />
+              <Route path="/admin/merchants/:merchant_id/ban" element={<AdminProtectedRoute><AdminMerchantBan /></AdminProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AdminAuthProvider>

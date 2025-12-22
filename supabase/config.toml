@@ -32,3 +32,9 @@ verify_jwt = true
 
 [functions.admin-dispute-decision]
 verify_jwt = true
+
+[functions.admin-merchant-verification]
+verify_jwt = true
+
+[functions.admin-merchant-ban]
+verify_jwt = true

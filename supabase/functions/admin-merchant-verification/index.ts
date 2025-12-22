@@ -80,11 +80,15 @@ Deno.serve(async (req) => {
       if (merchantError) throw merchantError;
     }
 
+    console.log(`Merchant ${merchantId} verification ${decision} by admin ${user.id}`);
+
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("Verification error:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
