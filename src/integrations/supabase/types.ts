@@ -2258,6 +2258,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_verification_history: {
+        Row: {
+          action_type: string
+          admin_id: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_warnings: {
         Row: {
           admin_id: string
