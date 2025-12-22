@@ -85,6 +85,8 @@ import MerchantSupportResult from "./pages/MerchantSupportResult";
 import MerchantSupportFaq from "./pages/MerchantSupportFaq";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminResetPassword from "./pages/AdminResetPassword";
+import AdminResetPasswordConfirm from "./pages/AdminResetPasswordConfirm";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -184,6 +186,8 @@ const App = () => (
               </Route>
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin/reset-password" element={<AdminResetPassword />} />
+              <Route path="/admin/reset-password/confirm" element={<AdminResetPasswordConfirm />} />
               <Route path="/admin/dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>

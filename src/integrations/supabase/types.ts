@@ -44,6 +44,47 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_password_resets: {
+        Row: {
+          admin_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          ip_address: string | null
+          reset_token: string
+          used: boolean
+          user_agent: string | null
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          reset_token: string
+          used?: boolean
+          user_agent?: string | null
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          reset_token?: string
+          used?: boolean
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_password_resets_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_users: {
         Row: {
           created_at: string
