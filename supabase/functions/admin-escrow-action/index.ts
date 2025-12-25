@@ -6,6 +6,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Valid escrow actions
+type EscrowAction = "lock" | "unlock" | "adjust" | "freeze" | "unfreeze";
+
+// Finalized states where no further action is allowed
+const FINALIZED_STATES = ["released", "refunded", "force_released", "force_refunded"];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -34,7 +40,7 @@ serve(async (req) => {
       });
     }
 
-    // Verify admin role
+    // Verify admin role using user_roles table
     const { data: adminRole } = await supabase
       .from("user_roles")
       .select("role")
@@ -49,6 +55,21 @@ serve(async (req) => {
       });
     }
 
+    // Also verify in admin_users table for active status
+    const { data: adminUser } = await supabase
+      .from("admin_users")
+      .select("id, email, is_active")
+      .eq("user_id", userData.user.id)
+      .eq("is_active", true)
+      .single();
+
+    if (!adminUser) {
+      return new Response(JSON.stringify({ error: "Admin account not active" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body = await req.json();
     const { escrowId, withdrawalId, action, amount, reason } = body;
 
@@ -56,9 +77,11 @@ serve(async (req) => {
 
     // Get IP address for logging
     const ipAddress = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown";
+    const now = new Date().toISOString();
 
     // Handle escrow actions
     if (escrowId) {
+      // Fetch escrow account with version for optimistic locking
       const { data: escrowAccount, error: escrowError } = await supabase
         .from("escrow_accounts")
         .select("*")
@@ -72,11 +95,48 @@ serve(async (req) => {
         });
       }
 
-      let updateData: Record<string, unknown> = {};
+      // VALIDATION: Check if escrow is finalized (no actions allowed)
+      if (escrowAccount.notes && FINALIZED_STATES.some(state => escrowAccount.notes?.toLowerCase().includes(state))) {
+        return new Response(JSON.stringify({ 
+          error: "Cannot modify finalized escrow account",
+          details: "This escrow account has been finalized and no further actions are permitted"
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // VALIDATION: Block all actions (except unfreeze) on frozen accounts
+      if (escrowAccount.is_frozen && action !== "unfreeze") {
+        return new Response(JSON.stringify({ 
+          error: "Escrow account is frozen",
+          details: "This account must be unfrozen before any other actions can be performed"
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // VALIDATION: Reason is mandatory for all actions
+      if (!reason || reason.trim().length < 5) {
+        return new Response(JSON.stringify({ error: "Reason is required (minimum 5 characters)" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Get merchant info for notifications
+      const { data: merchant } = await supabase
+        .from("merchants")
+        .select("user_id, business_name, email")
+        .eq("user_id", escrowAccount.merchant_id)
+        .single();
+
+      let updateData: Record<string, unknown> = { updated_at: now };
       let transactionType = "";
       let transactionAmount = 0;
 
-      switch (action) {
+      switch (action as EscrowAction) {
         case "lock":
           if (!amount || amount <= 0) {
             return new Response(JSON.stringify({ error: "Amount is required for lock action" }), {
@@ -91,6 +151,7 @@ serve(async (req) => {
             });
           }
           updateData = {
+            ...updateData,
             locked_balance: escrowAccount.locked_balance + amount,
             available_balance: escrowAccount.available_balance - amount,
           };
@@ -112,6 +173,7 @@ serve(async (req) => {
             });
           }
           updateData = {
+            ...updateData,
             locked_balance: escrowAccount.locked_balance - amount,
             available_balance: escrowAccount.available_balance + amount,
           };
@@ -135,6 +197,7 @@ serve(async (req) => {
             });
           }
           updateData = {
+            ...updateData,
             total_balance: newBalance,
             available_balance: newAvailable,
           };
@@ -143,12 +206,24 @@ serve(async (req) => {
           break;
 
         case "freeze":
-          updateData = { is_frozen: true };
+          if (escrowAccount.is_frozen) {
+            return new Response(JSON.stringify({ error: "Account is already frozen" }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          updateData = { ...updateData, is_frozen: true };
           transactionType = "freeze";
           break;
 
         case "unfreeze":
-          updateData = { is_frozen: false };
+          if (!escrowAccount.is_frozen) {
+            return new Response(JSON.stringify({ error: "Account is not frozen" }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          updateData = { ...updateData, is_frozen: false };
           transactionType = "unfreeze";
           break;
 
@@ -159,16 +234,22 @@ serve(async (req) => {
           });
       }
 
-      // Update escrow account
-      const { error: updateError } = await supabase
+      // OPTIMISTIC LOCKING: Use updated_at to prevent race conditions
+      const { data: updatedAccount, error: updateError } = await supabase
         .from("escrow_accounts")
         .update(updateData)
-        .eq("id", escrowId);
+        .eq("id", escrowId)
+        .eq("updated_at", escrowAccount.updated_at) // Version check
+        .select()
+        .single();
 
-      if (updateError) {
+      if (updateError || !updatedAccount) {
         console.error("Failed to update escrow account:", updateError);
-        return new Response(JSON.stringify({ error: "Failed to update escrow account" }), {
-          status: 500,
+        return new Response(JSON.stringify({ 
+          error: "Failed to update escrow account - concurrent modification detected",
+          details: "Another admin may have modified this account. Please refresh and try again."
+        }), {
+          status: 409, // Conflict
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -188,7 +269,7 @@ serve(async (req) => {
         });
       }
 
-      // Log admin action
+      // Log admin action (immutable audit)
       await supabase.from("admin_financial_actions_log").insert({
         admin_id: userData.user.id,
         action_type: `escrow_${action}`,
@@ -197,10 +278,78 @@ serve(async (req) => {
         amount: transactionAmount || null,
         reason,
         ip_address: ipAddress,
-        metadata: { previous_state: escrowAccount },
+        metadata: { 
+          previous_state: {
+            total_balance: escrowAccount.total_balance,
+            locked_balance: escrowAccount.locked_balance,
+            available_balance: escrowAccount.available_balance,
+            is_frozen: escrowAccount.is_frozen
+          },
+          new_state: {
+            total_balance: updatedAccount.total_balance,
+            locked_balance: updatedAccount.locked_balance,
+            available_balance: updatedAccount.available_balance,
+            is_frozen: updatedAccount.is_frozen
+          },
+          admin_email: adminUser.email,
+          merchant_id: escrowAccount.merchant_id
+        },
       });
 
-      return new Response(JSON.stringify({ success: true, action }), {
+      // MANDATORY NOTIFICATIONS: Notify merchant on freeze/unfreeze
+      if (merchant && (action === "freeze" || action === "unfreeze")) {
+        await supabase.from("merchant_notifications").insert({
+          merchant_id: merchant.user_id,
+          title: action === "freeze" ? "Escrow Account Frozen" : "Escrow Account Unfrozen",
+          body: action === "freeze" 
+            ? `Your escrow account has been frozen by admin. Reason: ${reason}. All withdrawals are blocked until unfrozen. Contact support for assistance.`
+            : `Your escrow account has been unfrozen. You can now resume normal operations. Reason: ${reason}`,
+          type: "system",
+          priority: "high",
+        });
+      }
+
+      // Notify merchant on lock/unlock/adjust actions
+      if (merchant && (action === "lock" || action === "unlock" || action === "adjust")) {
+        const formatCurrency = (amt: number) => `₹${Math.abs(amt).toLocaleString("en-IN")}`;
+        let notificationTitle = "";
+        let notificationBody = "";
+
+        switch (action) {
+          case "lock":
+            notificationTitle = "Funds Locked";
+            notificationBody = `${formatCurrency(amount)} has been locked in your escrow account. Reason: ${reason}`;
+            break;
+          case "unlock":
+            notificationTitle = "Funds Unlocked";
+            notificationBody = `${formatCurrency(amount)} has been unlocked in your escrow account. Reason: ${reason}`;
+            break;
+          case "adjust":
+            notificationTitle = amount > 0 ? "Escrow Balance Increased" : "Escrow Balance Decreased";
+            notificationBody = `Your escrow balance has been ${amount > 0 ? "increased" : "decreased"} by ${formatCurrency(amount)}. Reason: ${reason}`;
+            break;
+        }
+
+        await supabase.from("merchant_notifications").insert({
+          merchant_id: merchant.user_id,
+          title: notificationTitle,
+          body: notificationBody,
+          type: "payment",
+          priority: "normal",
+        });
+      }
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        action,
+        escrowId,
+        newState: {
+          total_balance: updatedAccount.total_balance,
+          locked_balance: updatedAccount.locked_balance,
+          available_balance: updatedAccount.available_balance,
+          is_frozen: updatedAccount.is_frozen
+        }
+      }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -217,6 +366,23 @@ serve(async (req) => {
       if (withdrawalError || !withdrawal) {
         return new Response(JSON.stringify({ error: "Withdrawal not found" }), {
           status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Check if merchant's escrow is frozen (block all withdrawals)
+      const { data: merchantEscrow } = await supabase
+        .from("escrow_accounts")
+        .select("is_frozen")
+        .eq("merchant_id", withdrawal.merchant_id)
+        .single();
+
+      if (merchantEscrow?.is_frozen && action === "approve") {
+        return new Response(JSON.stringify({ 
+          error: "Cannot approve withdrawal - Merchant escrow is frozen",
+          details: "The merchant's escrow account must be unfrozen before approving withdrawals"
+        }), {
+          status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -252,7 +418,7 @@ serve(async (req) => {
           newStatus = "rejected";
           message = `Withdrawal rejected: ${reason}`;
 
-          // Return funds to escrow
+          // Return funds to escrow atomically
           const { data: escrowForReject } = await supabase
             .from("escrow_accounts")
             .select("*")
@@ -260,13 +426,36 @@ serve(async (req) => {
             .single();
 
           if (escrowForReject) {
-            await supabase
+            const { error: escrowUpdateError } = await supabase
               .from("escrow_accounts")
               .update({
                 available_balance: escrowForReject.available_balance + withdrawal.amount,
                 total_balance: escrowForReject.total_balance + withdrawal.amount,
+                updated_at: now
               })
               .eq("id", escrowForReject.id);
+
+            if (escrowUpdateError) {
+              console.error("Failed to return funds to escrow:", escrowUpdateError);
+              return new Response(JSON.stringify({ 
+                error: "Failed to return funds to escrow",
+                details: "Withdrawal rejection aborted to prevent fund loss"
+              }), {
+                status: 500,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+
+            // Record escrow transaction
+            await supabase.from("escrow_transactions").insert({
+              escrow_account_id: escrowForReject.id,
+              transaction_type: "credit",
+              amount: withdrawal.amount,
+              balance_before: escrowForReject.total_balance,
+              balance_after: escrowForReject.total_balance + withdrawal.amount,
+              reason: `Withdrawal rejection: ${reason}`,
+              created_by: userData.user.id,
+            });
           }
           break;
 
@@ -328,9 +517,9 @@ serve(async (req) => {
       }
 
       // Update withdrawal status
-      const updatePayload: Record<string, unknown> = { status: newStatus };
+      const updatePayload: Record<string, unknown> = { status: newStatus, updated_at: now };
       if (action === "paid") {
-        updatePayload.processed_at = new Date().toISOString();
+        updatePayload.processed_at = now;
       }
       if (action === "failed" || action === "reject") {
         updatePayload.failure_reason = reason;
@@ -366,7 +555,21 @@ serve(async (req) => {
         amount: withdrawal.amount,
         reason,
         ip_address: ipAddress,
-        metadata: { previous_status: withdrawal.status },
+        metadata: { 
+          previous_status: withdrawal.status,
+          new_status: newStatus,
+          admin_email: adminUser.email,
+          merchant_id: withdrawal.merchant_id
+        },
+      });
+
+      // Notify merchant
+      await supabase.from("merchant_notifications").insert({
+        merchant_id: withdrawal.merchant_id,
+        title: `Withdrawal ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`,
+        body: message,
+        type: "payout",
+        priority: action === "paid" ? "high" : "normal",
       });
 
       return new Response(JSON.stringify({ success: true, action, newStatus }), {
