@@ -66,6 +66,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (reason.length < 10) {
+      return new Response(
+        JSON.stringify({ error: "Reason must be at least 10 characters" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.log(`Admin ${adminUser.email} initiating force refund for payment ${paymentId}`);
 
     // Fetch the payment with order details
@@ -110,6 +117,18 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Check high value threshold
+    const { data: thresholdSetting } = await supabase
+      .from("order_settings")
+      .select("setting_value")
+      .eq("setting_key", "high_value_threshold")
+      .single();
+
+    const highValueThreshold = parseFloat(thresholdSetting?.setting_value || "50000");
+    if (actualRefundAmount > highValueThreshold) {
+      console.warn(`High value force refund: ₹${actualRefundAmount} exceeds threshold ₹${highValueThreshold}`);
+    }
+
     const now = new Date().toISOString();
 
     // 1. Update payment status to refunded
@@ -119,7 +138,8 @@ Deno.serve(async (req) => {
         status: "refunded",
         updated_at: now
       })
-      .eq("id", paymentId);
+      .eq("id", paymentId)
+      .neq("status", "refunded"); // Prevent double update
 
     if (updatePaymentError) {
       console.error("Failed to update payment:", updatePaymentError);
@@ -133,7 +153,8 @@ Deno.serve(async (req) => {
         status: "refunded",
         updated_at: now
       })
-      .eq("id", order.id);
+      .eq("id", order.id)
+      .neq("status", "refunded");
 
     if (updateOrderError) {
       console.error("Failed to update order:", updateOrderError);
@@ -168,6 +189,46 @@ Deno.serve(async (req) => {
       }
     }
 
+    // FIX GAP 1: Debit escrow account
+    const { data: escrowAccount } = await supabase
+      .from("escrow_accounts")
+      .select("*")
+      .eq("merchant_id", order.merchant_id)
+      .single();
+
+    if (escrowAccount) {
+      const newLockedBalance = Math.max(0, escrowAccount.locked_balance - actualRefundAmount);
+      const newTotalBalance = Math.max(0, escrowAccount.total_balance - actualRefundAmount);
+
+      // Debit escrow - reduce locked balance for refund
+      const { error: escrowUpdateError } = await supabase
+        .from("escrow_accounts")
+        .update({
+          locked_balance: newLockedBalance,
+          total_balance: newTotalBalance,
+          updated_at: now
+        })
+        .eq("id", escrowAccount.id);
+
+      if (escrowUpdateError) {
+        console.error("Failed to update escrow account:", escrowUpdateError);
+      }
+
+      // Create escrow transaction record for the debit
+      await supabase.from("escrow_transactions").insert({
+        escrow_account_id: escrowAccount.id,
+        order_id: order.id,
+        transaction_type: "debit",
+        amount: actualRefundAmount,
+        balance_before: escrowAccount.locked_balance,
+        balance_after: newLockedBalance,
+        reason: `Admin force refund: ${reason}`,
+        created_by: user.id,
+      });
+
+      console.log(`Debited ₹${actualRefundAmount} from escrow account for refund`);
+    }
+
     // 4. Create refund record
     const { data: refundRecord, error: refundError } = await supabase
       .from("refunds")
@@ -178,7 +239,7 @@ Deno.serve(async (req) => {
         amount: actualRefundAmount,
         reason: `Admin Force Refund: ${reason}`,
         status: "initiated",
-        payment_method: "original_payment",
+        payment_method: "wallet",
       })
       .select()
       .single();
@@ -187,7 +248,7 @@ Deno.serve(async (req) => {
       console.error("Failed to create refund record:", refundError);
     }
 
-    // 5. Credit customer wallet
+    // 5. Credit customer wallet (using proper wallets table)
     const { data: customerWallet } = await supabase
       .from("wallets")
       .select("*")
@@ -195,13 +256,30 @@ Deno.serve(async (req) => {
       .single();
 
     if (customerWallet) {
+      const newBalance = customerWallet.balance + actualRefundAmount;
+      
       await supabase
         .from("wallets")
         .update({
-          balance: customerWallet.balance + actualRefundAmount,
+          balance: newBalance,
           updated_at: now
         })
         .eq("id", customerWallet.id);
+
+      // Create wallet transaction record
+      await supabase.from("wallet_transactions").insert({
+        wallet_id: customerWallet.id,
+        customer_id: order.customer_id,
+        transaction_type: "refund",
+        amount: actualRefundAmount,
+        balance_before: customerWallet.balance,
+        balance_after: newBalance,
+        reference_type: "refund",
+        reference_id: refundRecord?.id,
+        description: `Admin force refund for order #${order.id.slice(0, 8)}`,
+        status: "completed"
+      });
+
       console.log(`Credited ₹${actualRefundAmount} to customer wallet`);
 
       // Update refund status to completed
@@ -213,13 +291,51 @@ Deno.serve(async (req) => {
       }
     } else {
       // Create wallet if doesn't exist
-      await supabase.from("wallets").insert({
-        customer_id: order.customer_id,
-        balance: actualRefundAmount,
-        currency: "INR"
-      });
+      const { data: newWallet } = await supabase
+        .from("wallets")
+        .insert({
+          customer_id: order.customer_id,
+          balance: actualRefundAmount,
+          currency: "INR"
+        })
+        .select()
+        .single();
+
+      if (newWallet) {
+        await supabase.from("wallet_transactions").insert({
+          wallet_id: newWallet.id,
+          customer_id: order.customer_id,
+          transaction_type: "refund",
+          amount: actualRefundAmount,
+          balance_before: 0,
+          balance_after: actualRefundAmount,
+          reference_type: "refund",
+          reference_id: refundRecord?.id,
+          description: `Admin force refund for order #${order.id.slice(0, 8)}`,
+          status: "completed"
+        });
+      }
+
       console.log(`Created wallet and credited ₹${actualRefundAmount} to customer`);
     }
+
+    // FIX GAP 3: Log admin financial action
+    await supabase.from("admin_financial_actions_log").insert({
+      admin_id: user.id,
+      action_type: "force_refund",
+      target_type: "payment",
+      target_id: paymentId,
+      amount: actualRefundAmount,
+      reason: reason,
+      metadata: {
+        admin_email: adminUser.email,
+        order_id: order.id,
+        customer_id: order.customer_id,
+        refund_type: refundType,
+        high_value: actualRefundAmount > highValueThreshold,
+        escrow_debited: !!escrowAccount
+      }
+    });
 
     // 6. Create order event
     await supabase.from("order_events").insert({
@@ -232,7 +348,8 @@ Deno.serve(async (req) => {
         admin_email: adminUser.email, 
         reason, 
         refund_type: refundType,
-        amount: actualRefundAmount 
+        amount: actualRefundAmount,
+        escrow_debited: !!escrowAccount
       }
     });
 
@@ -265,7 +382,8 @@ Deno.serve(async (req) => {
         orderId: order.id,
         refundAmount: actualRefundAmount,
         refundType,
-        customerId: order.customer_id
+        customerId: order.customer_id,
+        escrowDebited: !!escrowAccount
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

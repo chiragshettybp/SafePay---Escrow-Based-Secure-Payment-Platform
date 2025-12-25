@@ -72,6 +72,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (reason.length < 10) {
+      return new Response(
+        JSON.stringify({ error: "Reason must be at least 10 characters" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.log(`Admin ${adminUser.email} making decision on dispute ${disputeId}: ${decision}`);
 
     // Fetch dispute with order and payment
@@ -113,15 +120,111 @@ Deno.serve(async (req) => {
       .eq("order_id", order.id)
       .single();
 
+    // Fetch escrow account for balance updates
+    const { data: escrowAccount } = await supabase
+      .from("escrow_accounts")
+      .select("*")
+      .eq("merchant_id", order.merchant_id)
+      .single();
+
     const now = new Date().toISOString();
     let finalDecision = "";
     let refundAmount = 0;
+    let merchantAmount = 0;
+
+    // Helper function to debit escrow
+    const debitEscrow = async (amount: number, txReason: string) => {
+      if (!escrowAccount) return;
+      
+      const newLockedBalance = Math.max(0, escrowAccount.locked_balance - amount);
+      const newTotalBalance = Math.max(0, escrowAccount.total_balance - amount);
+
+      await supabase
+        .from("escrow_accounts")
+        .update({
+          locked_balance: newLockedBalance,
+          total_balance: newTotalBalance,
+          updated_at: now
+        })
+        .eq("id", escrowAccount.id);
+
+      await supabase.from("escrow_transactions").insert({
+        escrow_account_id: escrowAccount.id,
+        order_id: order.id,
+        transaction_type: "debit",
+        amount: amount,
+        balance_before: escrowAccount.locked_balance,
+        balance_after: newLockedBalance,
+        reason: txReason,
+        created_by: user.id,
+      });
+
+      console.log(`Debited ₹${amount} from escrow: ${txReason}`);
+    };
+
+    // Helper function to credit customer wallet
+    const creditCustomerWallet = async (amount: number, refundId?: string) => {
+      const { data: customerWallet } = await supabase
+        .from("wallets")
+        .select("*")
+        .eq("customer_id", order.customer_id)
+        .single();
+
+      if (customerWallet) {
+        const newBalance = customerWallet.balance + amount;
+        
+        await supabase
+          .from("wallets")
+          .update({ balance: newBalance, updated_at: now })
+          .eq("id", customerWallet.id);
+
+        await supabase.from("wallet_transactions").insert({
+          wallet_id: customerWallet.id,
+          customer_id: order.customer_id,
+          transaction_type: "refund",
+          amount: amount,
+          balance_before: customerWallet.balance,
+          balance_after: newBalance,
+          reference_type: "dispute",
+          reference_id: refundId || disputeId,
+          description: `Dispute resolution refund for order #${order.id.slice(0, 8)}`,
+          status: "completed"
+        });
+      } else {
+        const { data: newWallet } = await supabase
+          .from("wallets")
+          .insert({
+            customer_id: order.customer_id,
+            balance: amount,
+            currency: "INR"
+          })
+          .select()
+          .single();
+
+        if (newWallet) {
+          await supabase.from("wallet_transactions").insert({
+            wallet_id: newWallet.id,
+            customer_id: order.customer_id,
+            transaction_type: "refund",
+            amount: amount,
+            balance_before: 0,
+            balance_after: amount,
+            reference_type: "dispute",
+            reference_id: refundId || disputeId,
+            description: `Dispute resolution refund for order #${order.id.slice(0, 8)}`,
+            status: "completed"
+          });
+        }
+      }
+      console.log(`Credited ₹${amount} to customer wallet`);
+    };
 
     // Process decision
     switch (decision) {
       case "release_to_merchant":
         finalDecision = "Funds released to merchant";
-        
+        merchantAmount = order.amount;
+
         // Update payment status
         if (payment) {
           await supabase
@@ -135,6 +238,9 @@ Deno.serve(async (req) => {
           .from("orders")
           .update({ status: "completed", completed_at: now, updated_at: now })
           .eq("id", order.id);
+
+        // FIX GAP 2: Debit escrow and credit merchant wallet
+        await debitEscrow(order.amount, `Dispute resolved - released to merchant: ${reason}`);
 
         // Credit merchant wallet
         const { data: merchantWallet } = await supabase
@@ -199,7 +305,7 @@ Deno.serve(async (req) => {
           .eq("id", order.id);
 
         // Create refund record
-        await supabase.from("refunds").insert({
+        const { data: fullRefund } = await supabase.from("refunds").insert({
           order_id: order.id,
           customer_id: order.customer_id,
           dispute_id: disputeId,
@@ -207,30 +313,13 @@ Deno.serve(async (req) => {
           reason: `Dispute resolved: ${reason}`,
           status: "completed",
           credited_at: now,
-        });
+        }).select().single();
+
+        // FIX GAP 2: Debit escrow
+        await debitEscrow(refundAmount, `Dispute resolved - refund to customer: ${reason}`);
 
         // Credit customer wallet
-        const { data: customerWallet } = await supabase
-          .from("wallets")
-          .select("*")
-          .eq("customer_id", order.customer_id)
-          .single();
-
-        if (customerWallet) {
-          await supabase
-            .from("wallets")
-            .update({
-              balance: customerWallet.balance + refundAmount,
-              updated_at: now
-            })
-            .eq("id", customerWallet.id);
-        } else {
-          await supabase.from("wallets").insert({
-            customer_id: order.customer_id,
-            balance: refundAmount,
-            currency: "INR"
-          });
-        }
+        await creditCustomerWallet(refundAmount, fullRefund?.id);
 
         // Notify customer
         await supabase.from("notifications").insert({
@@ -263,7 +352,7 @@ Deno.serve(async (req) => {
         
         finalDecision = `Partial refund of ₹${partialAmount} to customer`;
         refundAmount = partialAmount;
-        const merchantAmount = order.amount - partialAmount;
+        merchantAmount = order.amount - partialAmount;
 
         // Update payment status
         if (payment) {
@@ -280,7 +369,7 @@ Deno.serve(async (req) => {
           .eq("id", order.id);
 
         // Create refund record for partial amount
-        await supabase.from("refunds").insert({
+        const { data: partialRefund } = await supabase.from("refunds").insert({
           order_id: order.id,
           customer_id: order.customer_id,
           dispute_id: disputeId,
@@ -288,30 +377,13 @@ Deno.serve(async (req) => {
           reason: `Partial refund - Dispute resolved: ${reason}`,
           status: "completed",
           credited_at: now,
-        });
+        }).select().single();
+
+        // FIX GAP 2: Debit full amount from escrow
+        await debitEscrow(order.amount, `Dispute resolved - partial refund: ${reason}`);
 
         // Credit customer wallet (partial)
-        const { data: custWallet } = await supabase
-          .from("wallets")
-          .select("*")
-          .eq("customer_id", order.customer_id)
-          .single();
-
-        if (custWallet) {
-          await supabase
-            .from("wallets")
-            .update({
-              balance: custWallet.balance + refundAmount,
-              updated_at: now
-            })
-            .eq("id", custWallet.id);
-        } else {
-          await supabase.from("wallets").insert({
-            customer_id: order.customer_id,
-            balance: refundAmount,
-            currency: "INR"
-          });
-        }
+        await creditCustomerWallet(refundAmount, partialRefund?.id);
 
         // Credit merchant wallet (remaining)
         const { data: merchWallet } = await supabase
@@ -402,6 +474,24 @@ Deno.serve(async (req) => {
       created_by: adminUser.email,
     });
 
+    // FIX GAP 3: Log admin financial action
+    await supabase.from("admin_financial_actions_log").insert({
+      admin_id: user.id,
+      action_type: `dispute_${decision}`,
+      target_type: "dispute",
+      target_id: disputeId,
+      amount: refundAmount || merchantAmount || 0,
+      reason: reason,
+      metadata: {
+        admin_email: adminUser.email,
+        order_id: order.id,
+        decision,
+        refund_amount: refundAmount,
+        merchant_amount: merchantAmount,
+        escrow_debited: !!escrowAccount && decision !== "resolve_no_funds"
+      }
+    });
+
     // Create order event
     await supabase.from("order_events").insert({
       order_id: order.id,
@@ -413,7 +503,9 @@ Deno.serve(async (req) => {
         admin_email: adminUser.email,
         decision,
         reason,
-        refund_amount: refundAmount
+        refund_amount: refundAmount,
+        merchant_amount: merchantAmount,
+        escrow_debited: !!escrowAccount && decision !== "resolve_no_funds"
       }
     });
 
@@ -425,7 +517,9 @@ Deno.serve(async (req) => {
         message: "Dispute resolved successfully",
         disputeId,
         decision: finalDecision,
-        refundAmount
+        refundAmount,
+        merchantAmount,
+        escrowDebited: !!escrowAccount && decision !== "resolve_no_funds"
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
