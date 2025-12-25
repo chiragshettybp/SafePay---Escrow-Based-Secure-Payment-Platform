@@ -115,10 +115,39 @@ export function useDisputes() {
     };
   }, [user?.id, queryClient]);
 
-  // Create dispute with validation
+  // Create dispute with validation and rate limiting
   const createDispute = useMutation({
     mutationFn: async (data: CreateDisputeData) => {
       if (!user?.id) throw new Error("Not authenticated");
+
+      // BB-DISP-02 FIX: Rate limit - max 5 disputes per user per 24 hours
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: recentDisputes, error: rateError } = await supabase
+        .from("disputes")
+        .select("id")
+        .eq("customer_id", user.id)
+        .gte("created_at", oneDayAgo);
+
+      if (rateError) throw rateError;
+
+      const MAX_DISPUTES_PER_DAY = 5;
+      if (recentDisputes && recentDisputes.length >= MAX_DISPUTES_PER_DAY) {
+        throw new Error(`Rate limit exceeded. You can file a maximum of ${MAX_DISPUTES_PER_DAY} disputes per day.`);
+      }
+
+      // BB-DISP-02 FIX: Prevent multiple disputes on same order ever
+      const { data: allOrderDisputes, error: orderDisputeError } = await supabase
+        .from("disputes")
+        .select("id, status")
+        .eq("order_id", data.order_id);
+
+      if (orderDisputeError) throw orderDisputeError;
+
+      // Count total disputes for this order (not just open ones)
+      const MAX_DISPUTES_PER_ORDER = 2; // Allow 1 retry if first was closed
+      if (allOrderDisputes && allOrderDisputes.length >= MAX_DISPUTES_PER_ORDER) {
+        throw new Error("Maximum disputes reached for this order.");
+      }
 
       // Fetch the order to validate dispute window
       const { data: order, error: orderError } = await supabase
