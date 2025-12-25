@@ -119,6 +119,29 @@ Deno.serve(async (req) => {
       }
     }
 
+    // FIX GAP 5: Check if merchant is banned/suspended
+    const { data: merchant } = await supabase
+      .from("merchants")
+      .select("status, business_name")
+      .eq("user_id", order.merchant_id)
+      .single();
+
+    if (merchant?.status === "banned") {
+      console.error("Cannot release funds - Merchant is banned");
+      return new Response(
+        JSON.stringify({ error: "Cannot release funds - Merchant account is banned. Please contact support." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (merchant?.status === "suspended") {
+      console.error("Cannot release funds - Merchant is suspended");
+      return new Response(
+        JSON.stringify({ error: "Cannot release funds - Merchant account is suspended. Please contact support." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Fetch payment record
     const { data: payment, error: paymentError } = await supabase
       .from("payments")
@@ -238,14 +261,14 @@ Deno.serve(async (req) => {
 
     if (escrowAccount) {
       const newLockedBalance = Math.max(0, escrowAccount.locked_balance - order.amount);
-      const newAvailableBalance = escrowAccount.available_balance + order.amount;
+      const newTotalBalance = Math.max(0, escrowAccount.total_balance - order.amount);
       
-      // Update escrow account - move from locked to available
+      // Update escrow account - debit locked balance and total
       const { error: escrowUpdateError } = await supabase
         .from("escrow_accounts")
         .update({
           locked_balance: newLockedBalance,
-          available_balance: newAvailableBalance,
+          total_balance: newTotalBalance,
           updated_at: now
         })
         .eq("id", escrowAccount.id);
@@ -254,17 +277,19 @@ Deno.serve(async (req) => {
         console.error("Failed to update escrow account:", escrowUpdateError);
       }
 
-      // Create escrow transaction record for the release
+      // Create escrow transaction record for the release (debit)
       await supabase.from("escrow_transactions").insert({
         escrow_account_id: escrowAccount.id,
         order_id: orderId,
-        transaction_type: "unlock",
+        transaction_type: "debit",
         amount: order.amount,
         balance_before: escrowAccount.locked_balance,
         balance_after: newLockedBalance,
         reason: `Escrow released: ${reason.replace(/_/g, " ")}`,
         created_by: user.id,
       });
+
+      console.log(`Debited ₹${order.amount} from escrow account`);
     }
 
     // 5. Credit merchant wallet with earnings
@@ -304,7 +329,13 @@ Deno.serve(async (req) => {
       event_type: "escrow_released",
       title: "Escrow Released",
       description: `Payment of ₹${order.amount} has been released to the merchant. Reason: ${reason.replace(/_/g, " ")}`,
-      metadata: { reason, disputeId, amount: order.amount }
+      metadata: { 
+        reason, 
+        disputeId, 
+        amount: order.amount,
+        escrow_debited: !!escrowAccount,
+        merchant_credited: true
+      }
     });
 
     // 7. Notify merchant via merchant_notifications table
@@ -334,7 +365,9 @@ Deno.serve(async (req) => {
         message: "Escrow released successfully",
         orderId,
         amount: order.amount,
-        merchantId: order.merchant_id
+        merchantId: order.merchant_id,
+        escrowDebited: !!escrowAccount,
+        merchantCredited: true
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
