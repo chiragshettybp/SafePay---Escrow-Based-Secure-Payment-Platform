@@ -18,11 +18,56 @@ export interface MerchantOption {
   name: string;
 }
 
+interface OrderSettings {
+  min_order_amount: number;
+  auto_confirm_days: number;
+  dispute_window_days: number;
+  high_value_threshold: number;
+}
+
+const DEFAULT_SETTINGS: OrderSettings = {
+  min_order_amount: 100,
+  auto_confirm_days: 7,
+  dispute_window_days: 14,
+  high_value_threshold: 50000,
+};
+
 export function usePaymentFlow() {
   const { user } = useSupabaseAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [draftOrderId, setDraftOrderId] = useState<string | null>(null);
+
+  // Fetch order settings
+  const { data: orderSettings } = useQuery({
+    queryKey: ['order-settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('order_settings')
+        .select('setting_key, setting_value');
+
+      if (error) {
+        console.error('Error fetching order settings:', error);
+        return DEFAULT_SETTINGS;
+      }
+
+      const settings: OrderSettings = { ...DEFAULT_SETTINGS };
+      data?.forEach(setting => {
+        if (setting.setting_key === 'min_order_amount') {
+          settings.min_order_amount = parseFloat(setting.setting_value) || DEFAULT_SETTINGS.min_order_amount;
+        } else if (setting.setting_key === 'auto_confirm_days') {
+          settings.auto_confirm_days = parseInt(setting.setting_value) || DEFAULT_SETTINGS.auto_confirm_days;
+        } else if (setting.setting_key === 'dispute_window_days') {
+          settings.dispute_window_days = parseInt(setting.setting_value) || DEFAULT_SETTINGS.dispute_window_days;
+        } else if (setting.setting_key === 'high_value_threshold') {
+          settings.high_value_threshold = parseFloat(setting.setting_value) || DEFAULT_SETTINGS.high_value_threshold;
+        }
+      });
+
+      return settings;
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
 
   // Fetch real merchants from the merchants table
   const { data: merchants, isLoading: isMerchantsLoading } = useQuery({
@@ -47,10 +92,44 @@ export function usePaymentFlow() {
     enabled: !!user?.id,
   });
 
-  // Create draft order
+  // Create draft order with validation
   const createDraft = useMutation({
     mutationFn: async (draft: DraftOrder) => {
       if (!user?.id) throw new Error("Not authenticated");
+
+      const settings = orderSettings || DEFAULT_SETTINGS;
+
+      // Validate minimum order amount
+      if (draft.amount < settings.min_order_amount) {
+        throw new Error(`Minimum order amount is ₹${settings.min_order_amount}`);
+      }
+
+      // Check if merchant exists and is active
+      const { data: merchant, error: merchantError } = await supabase
+        .from('merchants')
+        .select('user_id, status')
+        .eq('user_id', draft.merchant_id)
+        .single();
+
+      if (merchantError || !merchant) {
+        throw new Error("Merchant not found");
+      }
+
+      if (merchant.status !== 'active') {
+        throw new Error("Merchant is not available for orders");
+      }
+
+      // Check if merchant is banned
+      const { data: banRecord } = await supabase
+        .from('user_bans')
+        .select('id')
+        .eq('user_id', draft.merchant_id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (banRecord) {
+        throw new Error("Merchant is currently suspended");
+      }
 
       const { data, error } = await supabase
         .from('orders')
@@ -77,7 +156,7 @@ export function usePaymentFlow() {
     onError: (error: Error) => {
       const message = error.message === "Not authenticated" 
         ? "Please log in to create a payment."
-        : "Failed to create payment draft. Please try again.";
+        : error.message || "Failed to create payment draft. Please try again.";
       toast({
         title: "Error",
         description: message,
@@ -262,5 +341,6 @@ export function usePaymentFlow() {
     isConfirmingPayment: confirmPayment.isPending,
     deleteDraft: deleteDraft.mutate,
     draftOrderId,
+    orderSettings: orderSettings || DEFAULT_SETTINGS,
   };
 }

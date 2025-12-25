@@ -115,10 +115,71 @@ export function useDisputes() {
     };
   }, [user?.id, queryClient]);
 
-  // Create dispute
+  // Create dispute with validation
   const createDispute = useMutation({
     mutationFn: async (data: CreateDisputeData) => {
       if (!user?.id) throw new Error("Not authenticated");
+
+      // Fetch the order to validate dispute window
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("id", data.order_id)
+        .eq("customer_id", user.id)
+        .single();
+
+      if (orderError || !order) {
+        throw new Error("Order not found");
+      }
+
+      // Check if order is in a valid state for dispute
+      const validStatuses = ['escrow_locked', 'in_progress', 'delivered'];
+      if (!validStatuses.includes(order.status)) {
+        throw new Error(`Cannot create dispute for order with status: ${order.status}`);
+      }
+
+      // Check for existing open dispute
+      const { data: existingDispute } = await supabase
+        .from("disputes")
+        .select("id, status")
+        .eq("order_id", data.order_id)
+        .in("status", ["open", "under_review"])
+        .maybeSingle();
+
+      if (existingDispute) {
+        throw new Error("A dispute already exists for this order");
+      }
+
+      // Check if escrow has been released
+      const { data: payment } = await supabase
+        .from("payments")
+        .select("status")
+        .eq("order_id", data.order_id)
+        .maybeSingle();
+
+      if (payment?.status === 'released') {
+        throw new Error("Cannot dispute: escrow has already been released");
+      }
+
+      // Fetch dispute window setting
+      const { data: settings } = await supabase
+        .from("order_settings")
+        .select("setting_value")
+        .eq("setting_key", "dispute_window_days")
+        .maybeSingle();
+
+      const disputeWindowDays = settings ? parseInt(settings.setting_value) : 14;
+
+      // Check dispute window for delivered orders
+      if (order.status === 'delivered' && order.delivered_at) {
+        const deliveredDate = new Date(order.delivered_at);
+        const now = new Date();
+        const daysSinceDelivery = Math.floor((now.getTime() - deliveredDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysSinceDelivery > disputeWindowDays) {
+          throw new Error(`Dispute window has expired. You have ${disputeWindowDays} days after delivery to raise a dispute.`);
+        }
+      }
 
       const { data: dispute, error } = await supabase
         .from("disputes")
@@ -143,6 +204,20 @@ export function useDisputes() {
         .update({ status: "disputed" })
         .eq("id", data.order_id);
 
+      // Freeze the escrow
+      const { data: escrowAccount } = await supabase
+        .from("escrow_accounts")
+        .select("id")
+        .eq("merchant_id", order.merchant_id)
+        .maybeSingle();
+
+      if (escrowAccount) {
+        await supabase
+          .from("escrow_accounts")
+          .update({ is_frozen: true, notes: `Frozen due to dispute ${dispute.id}` })
+          .eq("id", escrowAccount.id);
+      }
+
       // Create initial dispute update
       await supabase.from("dispute_updates").insert({
         dispute_id: dispute.id,
@@ -152,13 +227,24 @@ export function useDisputes() {
         created_by: "customer",
       });
 
-      // Create notification
+      // Create notification for customer
       await supabase.from("notifications").insert({
         user_id: user.id,
         title: "Dispute Submitted",
         message: `Your dispute for order has been submitted and is under review.`,
         type: "dispute",
         order_id: data.order_id,
+      });
+
+      // Create notification for merchant
+      await supabase.from("merchant_notifications").insert({
+        merchant_id: order.merchant_id,
+        title: "Dispute Filed",
+        body: `A customer has filed a dispute for order. Please respond within 48 hours.`,
+        type: "dispute",
+        priority: "high",
+        related_order_id: data.order_id,
+        related_dispute_id: dispute.id,
       });
 
       return dispute as Dispute;

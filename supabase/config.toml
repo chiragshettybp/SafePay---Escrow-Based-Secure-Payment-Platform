@@ -53,3 +53,6 @@ verify_jwt = true
 
 [functions.admin-escrow-action]
 verify_jwt = true
+
+[functions.auto-confirm-orders]
+verify_jwt = false
