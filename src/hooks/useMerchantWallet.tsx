@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { merchantSupabase } from "@/integrations/supabase/merchantClient";
 import { useMerchantAuth } from "@/hooks/useMerchantAuth";
 import { toast } from "@/hooks/use-toast";
 import { useEffect } from "react";
@@ -76,7 +76,7 @@ export function useMerchantWallet() {
   const { data: wallet, isLoading: isLoadingWallet } = useQuery({
     queryKey: ["merchant-wallet", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await merchantSupabase
         .from("merchant_wallets")
         .select("*")
         .eq("merchant_id", user?.id)
@@ -86,7 +86,7 @@ export function useMerchantWallet() {
       
       // If no wallet exists, create one
       if (!data && user?.id) {
-        const { data: newWallet, error: createError } = await supabase
+        const { data: newWallet, error: createError } = await merchantSupabase
           .from("merchant_wallets")
           .insert({ merchant_id: user.id })
           .select()
@@ -105,7 +105,7 @@ export function useMerchantWallet() {
   const { data: bankAccounts, isLoading: isLoadingBankAccounts } = useQuery({
     queryKey: ["merchant-bank-accounts", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await merchantSupabase
         .from("merchant_bank_accounts")
         .select("*")
         .eq("merchant_id", user?.id)
@@ -122,7 +122,7 @@ export function useMerchantWallet() {
   const { data: payouts, isLoading: isLoadingPayouts } = useQuery({
     queryKey: ["merchant-payouts", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await merchantSupabase
         .from("merchant_payouts")
         .select(`
           *,
@@ -147,7 +147,7 @@ export function useMerchantWallet() {
   useEffect(() => {
     if (!user?.id) return;
 
-    const walletChannel = supabase
+    const walletChannel = merchantSupabase
       .channel(`merchant-wallet-${user.id}`)
       .on(
         "postgres_changes",
@@ -188,7 +188,7 @@ export function useMerchantWallet() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(walletChannel);
+      merchantSupabase.removeChannel(walletChannel);
     };
   }, [user?.id, queryClient]);
 
@@ -199,13 +199,13 @@ export function useMerchantWallet() {
 
       // If setting as default, unset other defaults first
       if (data.is_default) {
-        await supabase
+        await merchantSupabase
           .from("merchant_bank_accounts")
           .update({ is_default: false })
           .eq("merchant_id", user.id);
       }
 
-      const { data: account, error } = await supabase
+      const { data: account, error } = await merchantSupabase
         .from("merchant_bank_accounts")
         .insert({
           merchant_id: user.id,
@@ -220,7 +220,7 @@ export function useMerchantWallet() {
 
       // Simulate async verification (in production, this would be a webhook)
       setTimeout(async () => {
-        await supabase
+        await merchantSupabase
           .from("merchant_bank_accounts")
           .update({ 
             verification_status: "verified",
@@ -254,13 +254,13 @@ export function useMerchantWallet() {
 
       // If setting as default, unset other defaults first
       if (data.is_default) {
-        await supabase
+        await merchantSupabase
           .from("merchant_bank_accounts")
           .update({ is_default: false })
           .eq("merchant_id", user.id);
       }
 
-      const { data: account, error } = await supabase
+      const { data: account, error } = await merchantSupabase
         .from("merchant_bank_accounts")
         .update(data)
         .eq("id", id)
@@ -292,7 +292,7 @@ export function useMerchantWallet() {
     mutationFn: async (id: string) => {
       if (!user?.id) throw new Error("Not authenticated");
 
-      const { error } = await supabase
+      const { error } = await merchantSupabase
         .from("merchant_bank_accounts")
         .delete()
         .eq("id", id)
@@ -327,7 +327,7 @@ export function useMerchantWallet() {
       }
 
       // BB-WAL-01 FIX: Check for any pending payouts to prevent double withdrawal
-      const { data: pendingPayouts, error: pendingError } = await supabase
+      const { data: pendingPayouts, error: pendingError } = await merchantSupabase
         .from("merchant_payouts")
         .select("id, amount, status")
         .eq("merchant_id", user.id)
@@ -341,7 +341,7 @@ export function useMerchantWallet() {
       }
 
       // BB-WAL-02 FIX: Re-fetch wallet balance atomically to prevent race condition
-      const { data: freshWallet, error: freshWalletError } = await supabase
+      const { data: freshWallet, error: freshWalletError } = await merchantSupabase
         .from("merchant_wallets")
         .select("*")
         .eq("merchant_id", user.id)
@@ -364,7 +364,7 @@ export function useMerchantWallet() {
       const netAmount = data.amount - fee;
 
       // BB-WAL-01 FIX: Atomic wallet update with balance check condition
-      const { data: updatedWallet, error: walletError } = await supabase
+      const { data: updatedWallet, error: walletError } = await merchantSupabase
         .from("merchant_wallets")
         .update({
           available_balance: freshWallet.available_balance - data.amount,
@@ -380,7 +380,7 @@ export function useMerchantWallet() {
       }
 
       // Create payout record after successful balance deduction
-      const { data: payout, error: payoutError } = await supabase
+      const { data: payout, error: payoutError } = await merchantSupabase
         .from("merchant_payouts")
         .insert({
           merchant_id: user.id,
@@ -397,7 +397,7 @@ export function useMerchantWallet() {
 
       if (payoutError) {
         // Rollback wallet update on payout creation failure
-        await supabase
+        await merchantSupabase
           .from("merchant_wallets")
           .update({
             available_balance: freshWallet.available_balance,
@@ -409,14 +409,14 @@ export function useMerchantWallet() {
 
       // Simulate async payout processing (in production, this would be a webhook)
       setTimeout(async () => {
-        const { data: currentWallet } = await supabase
+        const { data: currentWallet } = await merchantSupabase
           .from("merchant_wallets")
           .select("*")
           .eq("id", freshWallet.id)
           .single();
 
         if (currentWallet) {
-          await supabase
+          await merchantSupabase
             .from("merchant_wallets")
             .update({
               pending_balance: Math.max(0, currentWallet.pending_balance - data.amount),
@@ -425,7 +425,7 @@ export function useMerchantWallet() {
             .eq("id", freshWallet.id);
         }
 
-        await supabase
+        await merchantSupabase
           .from("merchant_payouts")
           .update({ 
             status: "completed",
