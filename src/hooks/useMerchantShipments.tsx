@@ -214,7 +214,7 @@ export function useMerchantShipments(filters?: ShipmentFilters) {
     mutationFn: async (data: CreateShipmentData) => {
       if (!merchant?.user_id) throw new Error("Not authenticated");
 
-      // Verify order belongs to merchant
+      // Verify order belongs to merchant and is in valid state for shipping
       const { data: order, error: orderError } = await merchantSupabase
         .from("orders")
         .select("id, customer_id, status")
@@ -224,12 +224,42 @@ export function useMerchantShipments(filters?: ShipmentFilters) {
 
       if (orderError || !order) throw new Error("Order not found");
 
+      // TC-SHIP-02: Block shipping unpaid orders
+      const validShippingStatuses = ['escrow_locked', 'in_progress'];
+      if (!validShippingStatuses.includes(order.status)) {
+        throw new Error(`Cannot ship order with status: ${order.status}. Order must be paid first.`);
+      }
+
+      // TC-SHIP-03: Check for duplicate tracking number
+      if (data.tracking_number) {
+        const { data: existingTracking } = await merchantSupabase
+          .from("tracking")
+          .select("id, order_id")
+          .eq("tracking_number", data.tracking_number.trim())
+          .maybeSingle();
+
+        if (existingTracking) {
+          throw new Error("This tracking number is already in use for another shipment");
+        }
+      }
+
+      // Check if order already has a shipment
+      const { data: existingShipment } = await merchantSupabase
+        .from("tracking")
+        .select("id")
+        .eq("order_id", data.order_id)
+        .maybeSingle();
+
+      if (existingShipment) {
+        throw new Error("A shipment already exists for this order");
+      }
+
       // Create tracking record
       const { data: tracking, error: trackingError } = await merchantSupabase
         .from("tracking")
         .insert({
           order_id: data.order_id,
-          tracking_number: data.tracking_number,
+          tracking_number: data.tracking_number?.trim() || null,
           carrier: data.carrier,
           status: "shipped",
           estimated_delivery: data.estimated_delivery || null,

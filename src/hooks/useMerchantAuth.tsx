@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { User, Session } from "@supabase/supabase-js";
 import { merchantSupabase } from "@/integrations/supabase/merchantClient";
 
@@ -268,4 +268,43 @@ export function useMerchantAuth() {
     throw new Error("useMerchantAuth must be used within a MerchantAuthProvider");
   }
   return context;
+}
+
+// TC-AUTH-02: Protected route for merchant pages
+export function MerchantProtectedRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isLoading, isMerchant } = useMerchantAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Skip protection for login/signup pages
+    const publicPaths = ['/merchant/login', '/merchant/signup'];
+    if (publicPaths.includes(location.pathname)) {
+      return;
+    }
+
+    if (!isLoading && (!isAuthenticated || !isMerchant)) {
+      navigate('/merchant/login', { replace: true });
+    }
+  }, [isAuthenticated, isLoading, isMerchant, navigate, location.pathname]);
+
+  // Skip loading state for public paths
+  const publicPaths = ['/merchant/login', '/merchant/signup'];
+  if (publicPaths.includes(location.pathname)) {
+    return <>{children}</>;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !isMerchant) {
+    return null;
+  }
+
+  return <>{children}</>;
 }
