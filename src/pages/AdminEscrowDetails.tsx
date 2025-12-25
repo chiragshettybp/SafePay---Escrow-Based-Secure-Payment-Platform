@@ -1,13 +1,14 @@
-import { useParams, useNavigate, Outlet, useLocation } from "react-router-dom";
+import { useParams, useNavigate, Outlet, useLocation, Navigate } from "react-router-dom";
+import { useEffect } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAdminEscrowDetails } from "@/hooks/useAdminEscrow";
-import { ArrowLeft, Wallet, Lock, Unlock, ExternalLink, Building2, Shield } from "lucide-react";
-
+import { ArrowLeft, Wallet, Lock, Unlock, ExternalLink, Building2, Shield, Snowflake, AlertTriangle } from "lucide-react";
 export default function AdminEscrowDetails() {
   const { escrow_id } = useParams<{ escrow_id: string }>();
   const navigate = useNavigate();
@@ -22,17 +23,25 @@ export default function AdminEscrowDetails() {
     }).format(amount);
   };
 
-  const currentTab = location.pathname.includes("/orders")
-    ? "orders"
-    : location.pathname.includes("/history")
-    ? "history"
-    : location.pathname.includes("/actions")
-    ? "actions"
+  // Determine current tab from URL
+  const pathSegments = location.pathname.split('/');
+  const lastSegment = pathSegments[pathSegments.length - 1];
+  const currentTab = ["orders", "history", "actions"].includes(lastSegment) 
+    ? lastSegment 
     : "orders";
+
+  // Redirect to /orders if on base escrow detail path
+  const isBasePath = location.pathname === `/admin/escrow/${escrow_id}` || 
+                     location.pathname === `/admin/escrow/${escrow_id}/`;
 
   const handleTabChange = (value: string) => {
     navigate(`/admin/escrow/${escrow_id}/${value}`);
   };
+
+  // Redirect to orders tab by default
+  if (isBasePath && !isLoading) {
+    return <Navigate to={`/admin/escrow/${escrow_id}/orders`} replace />;
+  }
 
   if (isLoading) {
     return (
@@ -69,27 +78,50 @@ export default function AdminEscrowDetails() {
   return (
     <AdminLayout>
       <div className="p-4 md:p-6 space-y-6">
+        {/* Frozen Account Alert */}
+        {escrowAccount.is_frozen && (
+          <Alert variant="destructive" className="border-destructive bg-destructive/10">
+            <Snowflake className="h-4 w-4" />
+            <AlertDescription className="flex items-center gap-2">
+              <strong>This escrow account is FROZEN.</strong> All withdrawals and actions are blocked until unfrozen.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Risk Flag Alert */}
+        {escrowAccount.risk_flag === "high" && (
+          <Alert variant="destructive" className="border-amber-500 bg-amber-500/10">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertDescription className="text-amber-700 dark:text-amber-400">
+              <strong>High Risk Account.</strong> Review all transactions carefully before taking any action.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/admin/escrow")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-2xl md:text-3xl font-bold">
                 {escrowAccount.merchant?.business_name || "Unknown Merchant"}
               </h1>
-              {escrowAccount.is_frozen && <Badge variant="destructive">Frozen</Badge>}
+              {escrowAccount.is_frozen && (
+                <Badge variant="destructive" className="flex items-center gap-1">
+                  <Snowflake className="h-3 w-3" /> Frozen
+                </Badge>
+              )}
               {escrowAccount.risk_flag && (
                 <Badge variant={escrowAccount.risk_flag === "high" ? "destructive" : "secondary"}>
                   {escrowAccount.risk_flag} risk
                 </Badge>
               )}
             </div>
-            <p className="text-muted-foreground">Escrow Account Details</p>
+            <p className="text-muted-foreground">Escrow Account Details • ID: {escrow_id?.slice(0, 8)}...</p>
           </div>
         </div>
-
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
