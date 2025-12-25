@@ -299,7 +299,7 @@ Deno.serve(async (req) => {
       console.log(`Debited ₹${order.amount} from escrow account`);
     }
 
-    // 5. Credit merchant wallet with earnings
+    // 5. Credit merchant wallet with earnings (move from pending to available)
     const { data: merchantWallet } = await supabase
       .from("merchant_wallets")
       .select("*")
@@ -307,10 +307,15 @@ Deno.serve(async (req) => {
       .single();
 
     if (merchantWallet) {
+      // Deduct from pending_balance and add to available_balance
+      const newPendingBalance = Math.max(0, merchantWallet.pending_balance - order.amount);
+      const newAvailableBalance = merchantWallet.available_balance + order.amount;
+      
       const { error: walletUpdateError } = await supabase
         .from("merchant_wallets")
         .update({
-          available_balance: merchantWallet.available_balance + order.amount,
+          available_balance: newAvailableBalance,
+          pending_balance: newPendingBalance,
           updated_at: now
         })
         .eq("id", merchantWallet.id);
@@ -318,7 +323,7 @@ Deno.serve(async (req) => {
       if (walletUpdateError) {
         console.error("Failed to update merchant wallet:", walletUpdateError);
       } else {
-        console.log(`Credited ₹${order.amount} to merchant wallet`);
+        console.log(`Credited ₹${order.amount} to merchant wallet (pending: ${merchantWallet.pending_balance} -> ${newPendingBalance}, available: ${merchantWallet.available_balance} -> ${newAvailableBalance})`);
       }
     } else {
       console.log("No merchant wallet found, creating one");
@@ -326,6 +331,7 @@ Deno.serve(async (req) => {
       await supabase.from("merchant_wallets").insert({
         merchant_id: order.merchant_id,
         available_balance: order.amount,
+        pending_balance: 0,
         currency: "INR"
       });
     }

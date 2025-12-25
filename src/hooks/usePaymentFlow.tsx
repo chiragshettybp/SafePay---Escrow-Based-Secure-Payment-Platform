@@ -273,6 +273,22 @@ export function usePaymentFlow() {
           });
       }
 
+      // Also update merchant_wallets.pending_balance for UI display
+      const { data: merchantWallet } = await supabase
+        .from('merchant_wallets')
+        .select('*')
+        .eq('merchant_id', order.merchant_id)
+        .maybeSingle();
+
+      if (merchantWallet) {
+        await supabase
+          .from('merchant_wallets')
+          .update({
+            pending_balance: merchantWallet.pending_balance + order.amount,
+          })
+          .eq('id', merchantWallet.id);
+      }
+
       // Create notification for customer
       await supabase
         .from('notifications')
