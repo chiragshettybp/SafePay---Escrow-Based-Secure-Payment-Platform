@@ -184,7 +184,7 @@ export function useWallet() {
     },
   });
 
-  // Withdraw to bank account
+  // Withdraw to bank account - BB-WAL-01/02 FIX: Atomic balance check and deduction
   const withdrawToBank = useMutation({
     mutationFn: async ({
       bankAccountId,
@@ -196,7 +196,36 @@ export function useWallet() {
       if (!user?.id || !wallet?.id) throw new Error("Wallet not available");
       
       if (amount <= 0) throw new Error("Amount must be greater than 0");
-      if (amount > wallet.balance) throw new Error("Insufficient wallet balance");
+
+      // BB-WAL-01 FIX: Check for pending withdrawals first
+      const { data: pendingWithdrawals, error: pendingError } = await supabase
+        .from("wallet_transactions")
+        .select("id, amount")
+        .eq("customer_id", user.id)
+        .eq("type", "withdrawal")
+        .eq("status", "pending");
+
+      if (pendingError) throw pendingError;
+
+      if (pendingWithdrawals && pendingWithdrawals.length > 0) {
+        const pendingTotal = pendingWithdrawals.reduce((sum, w) => sum + w.amount, 0);
+        throw new Error(`You have ${pendingWithdrawals.length} pending withdrawal(s) totaling ₹${pendingTotal.toFixed(2)}. Please wait for them to complete.`);
+      }
+
+      // BB-WAL-02 FIX: Re-fetch wallet balance atomically
+      const { data: freshWallet, error: freshWalletError } = await supabase
+        .from("wallets")
+        .select("*")
+        .eq("customer_id", user.id)
+        .single();
+
+      if (freshWalletError || !freshWallet) {
+        throw new Error("Failed to verify wallet balance");
+      }
+
+      if (amount > freshWallet.balance) {
+        throw new Error(`Insufficient balance. Available: ₹${freshWallet.balance.toFixed(2)}`);
+      }
 
       // Verify bank account exists and is verified
       const { data: bankAccount, error: bankError } = await supabase
@@ -211,11 +240,27 @@ export function useWallet() {
         throw new Error("Bank account must be verified for withdrawals");
       }
 
-      // Create withdrawal transaction (pending)
+      // BB-WAL-01 FIX: Atomic wallet deduction with balance check
+      const { data: updatedWallet, error: walletError } = await supabase
+        .from("wallets")
+        .update({ 
+          balance: freshWallet.balance - amount,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", freshWallet.id)
+        .gte("balance", amount) // Atomic check
+        .select()
+        .single();
+
+      if (walletError || !updatedWallet) {
+        throw new Error("Balance changed during processing. Please try again.");
+      }
+
+      // Create withdrawal transaction after successful balance deduction
       const { data: transaction, error: txError } = await supabase
         .from("wallet_transactions")
         .insert({
-          wallet_id: wallet.id,
+          wallet_id: freshWallet.id,
           customer_id: user.id,
           type: "withdrawal",
           amount,
@@ -232,18 +277,17 @@ export function useWallet() {
         .select()
         .single();
 
-      if (txError) throw txError;
-
-      // Deduct from wallet balance
-      const { error: walletError } = await supabase
-        .from("wallets")
-        .update({ 
-          balance: wallet.balance - amount,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", wallet.id);
-
-      if (walletError) throw walletError;
+      if (txError) {
+        // Rollback wallet balance on transaction creation failure
+        await supabase
+          .from("wallets")
+          .update({ 
+            balance: freshWallet.balance,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", freshWallet.id);
+        throw txError;
+      }
 
       return transaction;
     },

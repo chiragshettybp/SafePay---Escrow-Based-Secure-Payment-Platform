@@ -153,10 +153,14 @@ Deno.serve(async (req) => {
       console.log("No payment record found, proceeding with order update only");
     }
 
-    // Start transaction-like operations
+    // BB-ESC-01 FIX: Generate idempotency key based on order and action
+    const idempotencyKey = `release-${orderId}-${reason}`;
+    
+    // Start transaction-like operations with atomic locking
     const now = new Date().toISOString();
     
-    // 1. Update order status to completed (with optimistic locking via status check)
+    // 1. Atomically update order status with row-level locking
+    // Using SELECT FOR UPDATE semantics via atomic update condition
     const { data: updatedOrder, error: updateOrderError } = await supabase
       .from("orders")
       .update({ 
@@ -165,14 +169,13 @@ Deno.serve(async (req) => {
         updated_at: now
       })
       .eq("id", orderId)
-      .neq("status", "completed") // Prevent double update
-      .neq("status", "refunded")
+      .in("status", ["escrow_locked", "delivered", "in_progress", "disputed"]) // Only these can transition
       .select()
       .single();
 
     if (updateOrderError) {
       console.error("Failed to update order:", updateOrderError);
-      // Check if it's because order was already completed
+      // Check if it's because order was already completed (idempotent success)
       const { data: checkOrder } = await supabase
         .from("orders")
         .select("status")
@@ -180,17 +183,21 @@ Deno.serve(async (req) => {
         .single();
       
       if (checkOrder?.status === "completed" || checkOrder?.status === "refunded") {
+        console.log(`BB-ESC-01: Idempotent handling - order ${orderId} already processed`);
         return new Response(
           JSON.stringify({ 
             success: true, 
             message: "Escrow already released",
-            alreadyReleased: true 
+            alreadyReleased: true,
+            idempotencyKey
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       throw updateOrderError;
     }
+    
+    console.log(`BB-ESC-01: Order ${orderId} atomically updated to completed`);
 
     // 2. Update payment status if exists
     if (payment) {

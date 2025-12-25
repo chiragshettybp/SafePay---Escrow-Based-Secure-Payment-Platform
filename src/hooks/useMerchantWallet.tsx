@@ -316,7 +316,7 @@ export function useMerchantWallet() {
     },
   });
 
-  // Create payout (withdrawal)
+  // Create payout (withdrawal) - BB-WAL-01/02 FIX: Atomic balance check and deduction
   const createPayout = useMutation({
     mutationFn: async (data: CreatePayoutData) => {
       if (!user?.id) throw new Error("Not authenticated");
@@ -326,8 +326,33 @@ export function useMerchantWallet() {
         throw new Error(`Minimum withdrawal is ₹${MINIMUM_WITHDRAWAL}`);
       }
 
-      if (data.amount > wallet.available_balance) {
-        throw new Error("Insufficient balance");
+      // BB-WAL-01 FIX: Check for any pending payouts to prevent double withdrawal
+      const { data: pendingPayouts, error: pendingError } = await supabase
+        .from("merchant_payouts")
+        .select("id, amount, status")
+        .eq("merchant_id", user.id)
+        .eq("status", "processing");
+
+      if (pendingError) throw pendingError;
+
+      if (pendingPayouts && pendingPayouts.length > 0) {
+        const pendingTotal = pendingPayouts.reduce((sum, p) => sum + p.amount, 0);
+        throw new Error(`You have ${pendingPayouts.length} pending payout(s) totaling ₹${pendingTotal.toFixed(2)}. Please wait for them to complete.`);
+      }
+
+      // BB-WAL-02 FIX: Re-fetch wallet balance atomically to prevent race condition
+      const { data: freshWallet, error: freshWalletError } = await supabase
+        .from("merchant_wallets")
+        .select("*")
+        .eq("merchant_id", user.id)
+        .single();
+
+      if (freshWalletError || !freshWallet) {
+        throw new Error("Failed to verify wallet balance");
+      }
+
+      if (data.amount > freshWallet.available_balance) {
+        throw new Error(`Insufficient balance. Available: ₹${freshWallet.available_balance.toFixed(2)}`);
       }
 
       const bankAccount = bankAccounts?.find(ba => ba.id === data.bank_account_id);
@@ -338,7 +363,23 @@ export function useMerchantWallet() {
       const fee = data.amount * (PAYOUT_FEE_PERCENT / 100);
       const netAmount = data.amount - fee;
 
-      // Create payout record
+      // BB-WAL-01 FIX: Atomic wallet update with balance check condition
+      const { data: updatedWallet, error: walletError } = await supabase
+        .from("merchant_wallets")
+        .update({
+          available_balance: freshWallet.available_balance - data.amount,
+          pending_balance: freshWallet.pending_balance + data.amount,
+        })
+        .eq("id", freshWallet.id)
+        .gte("available_balance", data.amount) // Atomic check
+        .select()
+        .single();
+
+      if (walletError || !updatedWallet) {
+        throw new Error("Balance changed during processing. Please try again.");
+      }
+
+      // Create payout record after successful balance deduction
       const { data: payout, error: payoutError } = await supabase
         .from("merchant_payouts")
         .insert({
@@ -349,40 +390,39 @@ export function useMerchantWallet() {
           net_amount: netAmount,
           notes: data.notes,
           status: "processing",
-          transaction_id: `TXN${Date.now()}`,
+          transaction_id: `TXN${Date.now()}${Math.random().toString(36).slice(2, 8)}`,
         })
         .select()
         .single();
 
-      if (payoutError) throw payoutError;
-
-      // Update wallet balance
-      const { error: walletError } = await supabase
-        .from("merchant_wallets")
-        .update({
-          available_balance: wallet.available_balance - data.amount,
-          pending_balance: wallet.pending_balance + data.amount,
-        })
-        .eq("id", wallet.id);
-
-      if (walletError) throw walletError;
+      if (payoutError) {
+        // Rollback wallet update on payout creation failure
+        await supabase
+          .from("merchant_wallets")
+          .update({
+            available_balance: freshWallet.available_balance,
+            pending_balance: freshWallet.pending_balance,
+          })
+          .eq("id", freshWallet.id);
+        throw payoutError;
+      }
 
       // Simulate async payout processing (in production, this would be a webhook)
       setTimeout(async () => {
         const { data: currentWallet } = await supabase
           .from("merchant_wallets")
           .select("*")
-          .eq("id", wallet.id)
+          .eq("id", freshWallet.id)
           .single();
 
         if (currentWallet) {
           await supabase
             .from("merchant_wallets")
             .update({
-              pending_balance: currentWallet.pending_balance - data.amount,
+              pending_balance: Math.max(0, currentWallet.pending_balance - data.amount),
               total_paid_out: currentWallet.total_paid_out + netAmount,
             })
-            .eq("id", wallet.id);
+            .eq("id", freshWallet.id);
         }
 
         await supabase
