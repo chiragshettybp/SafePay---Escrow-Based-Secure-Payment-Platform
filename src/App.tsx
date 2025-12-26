@@ -52,6 +52,9 @@ import CheckoutExpired from "./pages/CheckoutExpired";
 import CheckoutFailed from "./pages/CheckoutFailed";
 import CheckoutAddressEdit from "./pages/CheckoutAddressEdit";
 import CheckoutLogin from "./pages/CheckoutLogin";
+import MerchantCheckoutDashboard from "./pages/MerchantCheckoutDashboard";
+import MerchantCheckoutSessions from "./pages/MerchantCheckoutSessions";
+import MerchantCheckoutSessionDetail from "./pages/MerchantCheckoutSessionDetail";
 import MerchantLogin from "./pages/MerchantLogin";
 import MerchantSignup from "./pages/MerchantSignup";
 import MerchantDashboard from "./pages/MerchantDashboard";
@@ -253,6 +256,10 @@ const App = () => (
                 <Route path="support/upload/:ticketId" element={<MerchantSupportUpload />} />
                 <Route path="support/result/:ticketId" element={<MerchantSupportResult />} />
                 <Route path="support/faq" element={<MerchantSupportFaq />} />
+                {/* Checkout Routes */}
+                <Route path="checkout" element={<MerchantCheckoutDashboard />} />
+                <Route path="checkout/sessions" element={<MerchantCheckoutSessions />} />
+                <Route path="checkout/session/:session_id" element={<MerchantCheckoutSessionDetail />} />
               </Route>
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
