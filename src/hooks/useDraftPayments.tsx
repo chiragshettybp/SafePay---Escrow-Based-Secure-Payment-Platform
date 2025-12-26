@@ -4,7 +4,7 @@ import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { toast } from "@/hooks/use-toast";
 import { useEffect } from "react";
 
-export type DraftStatus = 'active' | 'submitted' | 'cancelled' | 'deleted' | 'expired' | 'change_requested' | 'rejected';
+export type DraftStatus = 'draft' | 'active' | 'submitted' | 'cancelled' | 'deleted' | 'expired' | 'change_requested' | 'rejected' | 'paid';
 
 export interface DraftPayment {
   id: string;
@@ -222,13 +222,17 @@ export function useCustomerDrafts() {
   return {
     drafts: drafts || [],
     isLoading,
-    submitDraft: (orderId: string) => draftAction.mutate({ orderId, action: 'submit' }),
-    cancelDraft: (orderId: string, reason?: string) => draftAction.mutate({ orderId, action: 'cancel', reason }),
-    deleteDraft: (orderId: string) => draftAction.mutate({ orderId, action: 'delete' }),
-    restoreDraft: (orderId: string) => draftAction.mutate({ orderId, action: 'restore' }),
-    updateDraft: updateDraft.mutate,
+    submitDraft: (orderId: string) => draftAction.mutateAsync({ orderId, action: 'submit' }),
+    cancelDraft: (orderId: string, reason?: string) => draftAction.mutateAsync({ orderId, action: 'cancel', reason }),
+    deleteDraft: (orderId: string) => draftAction.mutateAsync({ orderId, action: 'delete' }),
+    restoreDraft: (orderId: string) => draftAction.mutateAsync({ orderId, action: 'restore' }),
+    updateDraft: updateDraft.mutateAsync,
     isUpdating: updateDraft.isPending,
     isActioning: draftAction.isPending,
+    isSubmitting: draftAction.isPending,
+    isCancelling: draftAction.isPending,
+    isDeleting: draftAction.isPending,
+    isRestoring: draftAction.isPending,
     useDraftAuditLogs,
     refetch,
   };
