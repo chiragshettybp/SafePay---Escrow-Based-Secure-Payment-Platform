@@ -1952,6 +1952,50 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_webhook_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_type: string
+          id: string
+          payload: Json
+          payment_id: string | null
+          processed_at: string
+          razorpay_event_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_type: string
+          id?: string
+          payload: Json
+          payment_id?: string | null
+          processed_at?: string
+          razorpay_event_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          payment_id?: string | null
+          processed_at?: string
+          razorpay_event_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_webhook_logs_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -2093,6 +2137,8 @@ export type Database = {
       }
       refunds: {
         Row: {
+          admin_id: string | null
+          admin_notes: string | null
           amount: number
           created_at: string
           credited_at: string | null
@@ -2100,17 +2146,23 @@ export type Database = {
           dispute_id: string | null
           failure_reason: string | null
           id: string
+          initiated_by: string | null
           order_id: string
+          payment_id: string | null
           payment_method: string | null
           payment_method_last4: string | null
+          razorpay_refund_id: string | null
           reason: string
           receipt_url: string | null
+          refund_type: string | null
           retry_allowed: boolean | null
           status: string
           transaction_id: string | null
           updated_at: string
         }
         Insert: {
+          admin_id?: string | null
+          admin_notes?: string | null
           amount: number
           created_at?: string
           credited_at?: string | null
@@ -2118,17 +2170,23 @@ export type Database = {
           dispute_id?: string | null
           failure_reason?: string | null
           id?: string
+          initiated_by?: string | null
           order_id: string
+          payment_id?: string | null
           payment_method?: string | null
           payment_method_last4?: string | null
+          razorpay_refund_id?: string | null
           reason: string
           receipt_url?: string | null
+          refund_type?: string | null
           retry_allowed?: boolean | null
           status?: string
           transaction_id?: string | null
           updated_at?: string
         }
         Update: {
+          admin_id?: string | null
+          admin_notes?: string | null
           amount?: number
           created_at?: string
           credited_at?: string | null
@@ -2136,11 +2194,15 @@ export type Database = {
           dispute_id?: string | null
           failure_reason?: string | null
           id?: string
+          initiated_by?: string | null
           order_id?: string
+          payment_id?: string | null
           payment_method?: string | null
           payment_method_last4?: string | null
+          razorpay_refund_id?: string | null
           reason?: string
           receipt_url?: string | null
+          refund_type?: string | null
           retry_allowed?: boolean | null
           status?: string
           transaction_id?: string | null
@@ -2159,6 +2221,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
             referencedColumns: ["id"]
           },
         ]
