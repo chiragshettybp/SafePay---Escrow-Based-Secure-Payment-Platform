@@ -1554,10 +1554,12 @@ export type Database = {
           merchant_id: string
           net_amount: number
           notes: string | null
+          platform_fee: number | null
           processed_at: string | null
           status: string
           transaction_id: string | null
           updated_at: string
+          withdrawal_fee: number | null
         }
         Insert: {
           amount: number
@@ -1571,10 +1573,12 @@ export type Database = {
           merchant_id: string
           net_amount: number
           notes?: string | null
+          platform_fee?: number | null
           processed_at?: string | null
           status?: string
           transaction_id?: string | null
           updated_at?: string
+          withdrawal_fee?: number | null
         }
         Update: {
           amount?: number
@@ -1588,10 +1592,12 @@ export type Database = {
           merchant_id?: string
           net_amount?: number
           notes?: string | null
+          platform_fee?: number | null
           processed_at?: string | null
           status?: string
           transaction_id?: string | null
           updated_at?: string
+          withdrawal_fee?: number | null
         }
         Relationships: [
           {
@@ -1610,6 +1616,8 @@ export type Database = {
           balance_before: number
           created_at: string
           created_by: string | null
+          currency: string | null
+          entry_type: string | null
           id: string
           merchant_id: string
           reason: string | null
@@ -1624,6 +1632,8 @@ export type Database = {
           balance_before: number
           created_at?: string
           created_by?: string | null
+          currency?: string | null
+          entry_type?: string | null
           id?: string
           merchant_id: string
           reason?: string | null
@@ -1638,6 +1648,8 @@ export type Database = {
           balance_before?: number
           created_at?: string
           created_by?: string | null
+          currency?: string | null
+          entry_type?: string | null
           id?: string
           merchant_id?: string
           reason?: string | null
@@ -1888,6 +1900,9 @@ export type Database = {
           id: string
           merchant_id: string
           merchant_name: string
+          merchant_net_amount: number | null
+          platform_fee: number | null
+          platform_fee_gst: number | null
           product_description: string | null
           product_name: string
           status: Database["public"]["Enums"]["order_status"]
@@ -1906,6 +1921,9 @@ export type Database = {
           id?: string
           merchant_id: string
           merchant_name: string
+          merchant_net_amount?: number | null
+          platform_fee?: number | null
+          platform_fee_gst?: number | null
           product_description?: string | null
           product_name: string
           status?: Database["public"]["Enums"]["order_status"]
@@ -1924,6 +1942,9 @@ export type Database = {
           id?: string
           merchant_id?: string
           merchant_name?: string
+          merchant_net_amount?: number | null
+          platform_fee?: number | null
+          platform_fee_gst?: number | null
           product_description?: string | null
           product_name?: string
           status?: Database["public"]["Enums"]["order_status"]
@@ -3037,9 +3058,34 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      merchant_wallet_balances: {
+        Row: {
+          available_balance: number | null
+          currency: string | null
+          current_balance: number | null
+          frozen_amount: number | null
+          merchant_id: string | null
+          pending_releases: number | null
+          total_credits: number | null
+          total_debits: number | null
+          total_withdrawn: number | null
+          wallet_status: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      can_merchant_withdraw: {
+        Args: { p_amount: number; p_merchant_id: string }
+        Returns: {
+          allowed: boolean
+          available_balance: number
+          has_disputes: boolean
+          is_frozen: boolean
+          kyc_status: string
+          reason: string
+        }[]
+      }
       check_all_wallet_consistency: {
         Args: never
         Returns: {
@@ -3080,6 +3126,19 @@ export type Database = {
         Args: { p_user_id: string; p_user_type: string }
         Returns: boolean
       }
+      complete_withdrawal: { Args: { p_payout_id: string }; Returns: boolean }
+      compute_merchant_balance_from_ledger: {
+        Args: { p_merchant_id: string }
+        Returns: {
+          available_balance: number
+          current_balance: number
+          frozen_amount: number
+          pending_releases: number
+          total_credits: number
+          total_debits: number
+          total_withdrawn: number
+        }[]
+      }
       compute_merchant_wallet_balances: {
         Args: { p_merchant_id: string }
         Returns: {
@@ -3091,6 +3150,24 @@ export type Database = {
       compute_wallet_balance: {
         Args: { p_customer_id: string }
         Returns: number
+      }
+      create_merchant_withdrawal: {
+        Args: {
+          p_amount: number
+          p_bank_account_id: string
+          p_idempotency_key?: string
+          p_merchant_id: string
+          p_notes?: string
+        }
+        Returns: {
+          amount: number
+          error: string
+          gst_on_fee: number
+          net_amount: number
+          payout_id: string
+          success: boolean
+          withdrawal_fee: number
+        }[]
       }
       has_role: {
         Args: {
@@ -3110,6 +3187,10 @@ export type Database = {
           p_target_type: string
         }
         Returns: string
+      }
+      reverse_failed_withdrawal: {
+        Args: { p_failure_reason?: string; p_payout_id: string }
+        Returns: boolean
       }
     }
     Enums: {
