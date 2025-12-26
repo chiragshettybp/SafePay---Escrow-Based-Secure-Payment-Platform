@@ -373,7 +373,7 @@ Deno.serve(async (req) => {
       console.log(`Debited ₹${order.amount} from escrow account`);
     }
 
-    // 5. Credit merchant wallet with earnings (move from pending to available)
+    // 5. Create merchant wallet ledger entry for escrow release (LEDGER-FIRST APPROACH)
     const { data: merchantWallet } = await supabase
       .from("merchant_wallets")
       .select("*")
@@ -381,33 +381,52 @@ Deno.serve(async (req) => {
       .single();
 
     if (merchantWallet) {
-      // Deduct from pending_balance and add to available_balance
-      const newPendingBalance = Math.max(0, merchantWallet.pending_balance - order.amount);
-      const newAvailableBalance = merchantWallet.available_balance + order.amount;
-      
-      const { error: walletUpdateError } = await supabase
-        .from("merchant_wallets")
-        .update({
-          available_balance: newAvailableBalance,
-          pending_balance: newPendingBalance,
-          updated_at: now
-        })
-        .eq("id", merchantWallet.id);
+      // Create ledger entry - wallet balance will be auto-synced via trigger
+      const { error: ledgerError } = await supabase
+        .from("merchant_wallet_transactions")
+        .insert({
+          merchant_id: order.merchant_id,
+          transaction_type: "escrow_release",
+          amount: order.amount,
+          balance_before: merchantWallet.available_balance,
+          balance_after: merchantWallet.available_balance + order.amount,
+          status: "success",
+          reference_type: "order",
+          reference_id: orderId,
+          reason: `Escrow released: ${reason.replace(/_/g, " ")}`,
+          created_by: user.id,
+        });
 
-      if (walletUpdateError) {
-        console.error("Failed to update merchant wallet:", walletUpdateError);
+      if (ledgerError) {
+        console.error("Failed to create merchant wallet ledger entry:", ledgerError);
       } else {
-        console.log(`Credited ₹${order.amount} to merchant wallet (pending: ${merchantWallet.pending_balance} -> ${newPendingBalance}, available: ${merchantWallet.available_balance} -> ${newAvailableBalance})`);
+        console.log(`LEDGER: Merchant wallet escrow_release entry: +₹${order.amount}`);
       }
     } else {
-      console.log("No merchant wallet found, creating one");
-      // Create wallet if doesn't exist
+      console.log("No merchant wallet found, creating one with initial balance");
+      // Create wallet first
       await supabase.from("merchant_wallets").insert({
         merchant_id: order.merchant_id,
-        available_balance: order.amount,
+        available_balance: 0,
         pending_balance: 0,
         currency: "INR"
       });
+      // Then create ledger entry
+      await supabase
+        .from("merchant_wallet_transactions")
+        .insert({
+          merchant_id: order.merchant_id,
+          transaction_type: "escrow_release",
+          amount: order.amount,
+          balance_before: 0,
+          balance_after: order.amount,
+          status: "success",
+          reference_type: "order",
+          reference_id: orderId,
+          reason: `Escrow released: ${reason.replace(/_/g, " ")}`,
+          created_by: user.id,
+        });
+      console.log(`LEDGER: Created merchant wallet and escrow_release entry: +₹${order.amount}`);
     }
 
     // 6. Log to escrow_resolution_log (immutable audit trail)

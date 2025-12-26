@@ -270,7 +270,7 @@ Deno.serve(async (req) => {
       console.error("Failed to create refund record:", refundError);
     }
 
-    // 5. Credit customer wallet (using proper wallets table)
+    // 5. Credit customer wallet using LEDGER-FIRST approach
     const { data: customerWallet } = await supabase
       .from("wallets")
       .select("*")
@@ -278,33 +278,20 @@ Deno.serve(async (req) => {
       .single();
 
     if (customerWallet) {
-      const newBalance = customerWallet.balance + actualRefundAmount;
-      
-      await supabase
-        .from("wallets")
-        .update({
-          balance: newBalance,
-          updated_at: now
-        })
-        .eq("id", customerWallet.id);
-
-      // Create wallet transaction record
+      // Create ledger entry - balance will auto-sync via trigger
       await supabase.from("wallet_transactions").insert({
         wallet_id: customerWallet.id,
         customer_id: order.customer_id,
-        transaction_type: "refund",
+        type: "refund",
         amount: actualRefundAmount,
-        balance_before: customerWallet.balance,
-        balance_after: newBalance,
         reference_type: "refund",
         reference_id: refundRecord?.id,
         description: `Admin force refund for order #${order.id.slice(0, 8)}`,
-        status: "completed"
+        status: "success"
       });
 
-      console.log(`Credited ₹${actualRefundAmount} to customer wallet`);
+      console.log(`LEDGER: Credited ₹${actualRefundAmount} to customer wallet via ledger`);
 
-      // Update refund status to completed
       if (refundRecord) {
         await supabase
           .from("refunds")
@@ -312,12 +299,12 @@ Deno.serve(async (req) => {
           .eq("id", refundRecord.id);
       }
     } else {
-      // Create wallet if doesn't exist
+      // Create wallet first, then ledger entry
       const { data: newWallet } = await supabase
         .from("wallets")
         .insert({
           customer_id: order.customer_id,
-          balance: actualRefundAmount,
+          balance: 0,
           currency: "INR"
         })
         .select()
@@ -327,18 +314,16 @@ Deno.serve(async (req) => {
         await supabase.from("wallet_transactions").insert({
           wallet_id: newWallet.id,
           customer_id: order.customer_id,
-          transaction_type: "refund",
+          type: "refund",
           amount: actualRefundAmount,
-          balance_before: 0,
-          balance_after: actualRefundAmount,
           reference_type: "refund",
           reference_id: refundRecord?.id,
           description: `Admin force refund for order #${order.id.slice(0, 8)}`,
-          status: "completed"
+          status: "success"
         });
       }
 
-      console.log(`Created wallet and credited ₹${actualRefundAmount} to customer`);
+      console.log(`LEDGER: Created wallet and credited ₹${actualRefundAmount} via ledger`);
     }
 
     // FIX GAP 3: Log admin financial action

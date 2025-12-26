@@ -313,7 +313,7 @@ serve(async (req) => {
       console.log(`ATOMIC: Escrow credited: ₹${order.amount}`);
     }
 
-    // 11. Update merchant wallet pending balance (non-blocking)
+    // 11. Create merchant wallet ledger entry (LEDGER-FIRST APPROACH)
     const { data: merchantWallet } = await supabase
       .from("merchant_wallets")
       .select("*")
@@ -321,14 +321,22 @@ serve(async (req) => {
       .maybeSingle();
 
     if (merchantWallet) {
+      // Create ledger entry - wallet balance will be auto-synced via trigger
       await supabase
-        .from("merchant_wallets")
-        .update({
-          pending_balance: merchantWallet.pending_balance + order.amount,
-          updated_at: now
-        })
-        .eq("id", merchantWallet.id);
-      console.log(`Merchant wallet pending balance updated: +₹${order.amount}`);
+        .from("merchant_wallet_transactions")
+        .insert({
+          merchant_id: order.merchant_id,
+          transaction_type: "escrow_credit",
+          amount: order.amount,
+          balance_before: merchantWallet.pending_balance,
+          balance_after: merchantWallet.pending_balance + order.amount,
+          status: "success",
+          reference_type: "order",
+          reference_id: orderId,
+          reason: `Payment locked in escrow for order ${orderId.slice(0, 8)}`,
+          created_by: user.id,
+        });
+      console.log(`LEDGER: Merchant wallet escrow_credit entry: +₹${order.amount}`);
     }
 
     // 12. Create notifications (non-blocking)
