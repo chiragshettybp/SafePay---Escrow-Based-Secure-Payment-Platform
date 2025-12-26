@@ -19,7 +19,10 @@ import {
   Key,
   Webhook,
   TestTube,
-  Link
+  Link,
+  BarChart3,
+  PieChart,
+  PackageX
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -286,6 +289,38 @@ export default function MerchantCheckoutDashboard() {
                 description="View complete checkout configuration"
                 icon={Settings}
                 onClick={() => navigate('/merchant/checkout/settings')}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Checkout Reports */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Checkout Reports
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <SettingsCard
+                title="Reports Overview"
+                description="View checkout analytics summary"
+                icon={PieChart}
+                onClick={() => navigate('/merchant/checkout/reports')}
+              />
+              <SettingsCard
+                title="Conversion Report"
+                description="Funnel analysis & drop-off metrics"
+                icon={TrendingUp}
+                onClick={() => navigate('/merchant/checkout/reports/conversion')}
+              />
+              <SettingsCard
+                title="RTO / Failure Report"
+                description="Prepaid failure & refund analysis"
+                icon={PackageX}
+                onClick={() => navigate('/merchant/checkout/reports/rto')}
               />
             </div>
           </CardContent>
