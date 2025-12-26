@@ -5,10 +5,8 @@ import {
   Plus, 
   Copy, 
   Trash2, 
-  RotateCcw,
   Eye,
   EyeOff,
-  ShieldCheck,
   AlertTriangle,
   Loader2,
   ArrowLeft,
@@ -19,7 +17,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -56,11 +53,10 @@ export default function MerchantCheckoutIntegrationApiKeys() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { merchant } = useMerchantAuth();
-  const { apiKeys, isLoading, generateApiKey, revokeApiKey } = useMerchantIntegration(merchant?.id);
+  const { apiKeys, isLoading, generateApiKey, revokeApiKey, logKeyCopy } = useMerchantIntegration(merchant?.id);
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showRevokeDialog, setShowRevokeDialog] = useState<string | null>(null);
-  const [showKeyDialog, setShowKeyDialog] = useState<string | null>(null);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyType, setNewKeyType] = useState<'public' | 'secret'>('secret');
   const [newKeyEnv, setNewKeyEnv] = useState<'test' | 'live'>('test');
@@ -79,16 +75,16 @@ export default function MerchantCheckoutIntegrationApiKeys() {
     }
 
     setIsGenerating(true);
-    const keyValue = await generateApiKey(newKeyName.trim(), newKeyType, newKeyEnv);
+    const result = await generateApiKey(newKeyType, newKeyEnv, newKeyName.trim());
     setIsGenerating(false);
 
-    if (keyValue) {
-      setGeneratedKey(keyValue);
+    if (result) {
+      setGeneratedKey(result.rawKey);
       setNewKeyName('');
     }
   };
 
-  const handleCopyKey = (key: string) => {
+  const handleCopyKey = async (key: string, keyId?: string) => {
     navigator.clipboard.writeText(key);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
@@ -96,6 +92,11 @@ export default function MerchantCheckoutIntegrationApiKeys() {
       title: 'Copied',
       description: 'API key copied to clipboard',
     });
+    
+    // Log the copy action if keyId is provided
+    if (keyId) {
+      await logKeyCopy(keyId);
+    }
   };
 
   const handleRevokeKey = async (keyId: string) => {
@@ -170,7 +171,7 @@ export default function MerchantCheckoutIntegrationApiKeys() {
                   <KeyCard
                     key={key.id}
                     apiKey={key}
-                    onCopy={() => handleCopyKey(key.key_prefix + '...')}
+                    onCopy={() => handleCopyKey(key.key_prefix + '...', key.id)}
                     onRevoke={() => setShowRevokeDialog(key.id)}
                     copied={copiedKey === key.key_prefix + '...'}
                   />
@@ -342,8 +343,10 @@ function KeyCard({
   onRevoke: () => void;
   copied: boolean;
 }) {
+  const isActive = apiKey.status === 'active';
+  
   return (
-    <div className={`p-4 rounded-lg border ${apiKey.is_active ? 'bg-card' : 'bg-muted/50 opacity-60'}`}>
+    <div className={`p-4 rounded-lg border ${isActive ? 'bg-card' : 'bg-muted/50 opacity-60'}`}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -354,7 +357,7 @@ function KeyCard({
             <Badge variant={apiKey.environment === 'live' ? 'default' : 'outline'}>
               {apiKey.environment}
             </Badge>
-            {!apiKey.is_active && (
+            {!isActive && (
               <Badge variant="destructive">Revoked</Badge>
             )}
           </div>
@@ -371,7 +374,7 @@ function KeyCard({
           </div>
         </div>
 
-        {apiKey.is_active && (
+        {isActive && (
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={onCopy}>
               {copied ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
