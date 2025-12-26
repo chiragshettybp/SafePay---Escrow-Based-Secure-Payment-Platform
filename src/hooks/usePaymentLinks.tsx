@@ -97,33 +97,124 @@ export function usePaymentLinks() {
     if (!merchant?.id) {
       toast({
         title: "Error",
-        description: "Merchant not found",
+        description: "Merchant not found. Please log in again.",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    // Input validation
+    const title = data.title?.trim();
+    if (!title || title.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Title is required",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    if (title.length > 200) {
+      toast({
+        title: "Validation Error",
+        description: "Title must be less than 200 characters",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    const amount = Number(data.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Amount must be a positive number",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    if (amount > 10000000) { // 1 crore limit
+      toast({
+        title: "Validation Error",
+        description: "Amount exceeds maximum limit",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    // Validate expiry date if provided
+    if (data.expires_at) {
+      const expiryDate = new Date(data.expires_at);
+      if (isNaN(expiryDate.getTime()) || expiryDate <= new Date()) {
+        toast({
+          title: "Validation Error",
+          description: "Expiry date must be in the future",
+          variant: "destructive",
+        });
+        return null;
+      }
+    }
+
+    // Validate URLs if provided
+    const validateUrl = (url: string | undefined): boolean => {
+      if (!url) return true;
+      try {
+        const parsed = new URL(url);
+        return ['http:', 'https:'].includes(parsed.protocol);
+      } catch {
+        return false;
+      }
+    };
+
+    if (!validateUrl(data.success_redirect_url)) {
+      toast({
+        title: "Validation Error",
+        description: "Invalid success redirect URL",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    if (!validateUrl(data.cancel_redirect_url)) {
+      toast({
+        title: "Validation Error",
+        description: "Invalid cancel redirect URL",
         variant: "destructive",
       });
       return null;
     }
 
     try {
-      // Generate a unique link code
-      const linkCode = `PLINK_${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      // Generate a unique link code with collision protection
+      const timestamp = Date.now().toString(36).toUpperCase();
+      const random = Math.random().toString(36).substring(2, 10).toUpperCase();
+      const linkCode = `PLINK_${timestamp}${random}`;
       
       // Use merchantSupabase for authenticated merchant operations
       const { data: newLink, error } = await merchantSupabase
         .from("payment_links")
         .insert([{
           merchant_id: merchant.id,
-          title: data.title,
-          description: data.description || null,
-          amount: data.amount,
+          title: title,
+          description: data.description?.trim() || null,
+          amount: amount,
           expires_at: data.expires_at || null,
-          success_redirect_url: data.success_redirect_url || null,
-          cancel_redirect_url: data.cancel_redirect_url || null,
+          success_redirect_url: data.success_redirect_url?.trim() || null,
+          cancel_redirect_url: data.cancel_redirect_url?.trim() || null,
           link_code: linkCode,
         }])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Handle duplicate link code (extremely rare)
+        if (error.code === '23505' && error.message?.includes('link_code')) {
+          // Retry with new code
+          console.warn("Link code collision, retrying...");
+          return createLink(data);
+        }
+        throw error;
+      }
 
       toast({
         title: "Success",
@@ -134,9 +225,10 @@ export function usePaymentLinks() {
       return newLink as PaymentLink;
     } catch (error: unknown) {
       console.error("Error creating payment link:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to create payment link";
       toast({
         title: "Error",
-        description: "Failed to create payment link",
+        description: errorMessage.includes("violates") ? "Invalid data. Please check your input." : errorMessage,
         variant: "destructive",
       });
       return null;
