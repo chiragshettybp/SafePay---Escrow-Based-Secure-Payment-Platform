@@ -177,8 +177,7 @@ export function useWallet() {
     },
   });
 
-  // Withdraw to bank account - LEDGER-FIRST APPROACH
-  // Wallet balance will be auto-synced via database trigger
+  // Withdraw to bank account - Uses server-side atomic edge function
   const withdrawToBank = useMutation({
     mutationFn: async ({
       bankAccountId,
@@ -191,79 +190,34 @@ export function useWallet() {
       
       if (amount <= 0) throw new Error("Amount must be greater than 0");
 
-      // Check for pending withdrawals first
-      const { data: pendingWithdrawals, error: pendingError } = await supabase
-        .from("wallet_transactions")
-        .select("id, amount")
-        .eq("customer_id", user.id)
-        .eq("type", "withdrawal")
-        .eq("status", "pending");
+      // Get current session for auth header
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Session expired. Please log in again.");
 
-      if (pendingError) throw pendingError;
-
-      if (pendingWithdrawals && pendingWithdrawals.length > 0) {
-        const pendingTotal = pendingWithdrawals.reduce((sum, w) => sum + w.amount, 0);
-        throw new Error(`You have ${pendingWithdrawals.length} pending withdrawal(s) totaling ₹${pendingTotal.toFixed(2)}. Please wait for them to complete.`);
-      }
-
-      // Compute current balance from ledger for accurate check
-      const { data: freshWallet, error: freshWalletError } = await supabase
-        .from("wallets")
-        .select("*")
-        .eq("customer_id", user.id)
-        .single();
-
-      if (freshWalletError || !freshWallet) {
-        throw new Error("Failed to verify wallet balance");
-      }
-
-      if (amount > freshWallet.balance) {
-        throw new Error(`Insufficient balance. Available: ₹${freshWallet.balance.toFixed(2)}`);
-      }
-
-      // Verify bank account exists and is verified
-      const { data: bankAccount, error: bankError } = await supabase
-        .from("bank_accounts")
-        .select("*")
-        .eq("id", bankAccountId)
-        .eq("customer_id", user.id)
-        .single();
-
-      if (bankError || !bankAccount) throw new Error("Bank account not found");
-      if (bankAccount.verification_status !== "verified") {
-        throw new Error("Bank account must be verified for withdrawals");
-      }
-
-      // LEDGER-FIRST: Create withdrawal transaction (ledger entry)
-      // Balance will be auto-synced via database trigger
-      const { data: transaction, error: txError } = await supabase
-        .from("wallet_transactions")
-        .insert({
-          wallet_id: freshWallet.id,
-          customer_id: user.id,
-          type: "withdrawal",
-          amount,
-          description: `Withdrawal to ${bankAccount.bank_name} ••••${bankAccount.account_number.slice(-4)}`,
-          status: "pending",
-          reference_id: bankAccountId,
-          reference_type: "bank_account",
-          metadata: {
-            bank_name: bankAccount.bank_name,
-            account_last4: bankAccount.account_number.slice(-4),
-            ifsc_code: bankAccount.ifsc_code,
+      // Call atomic edge function for secure server-side processing
+      const response = await fetch(
+        `https://sgpefhfmcykwtfqfwzcq.supabase.co/functions/v1/customer-withdraw`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNncGVmaGZtY3lrd3RmcWZ3emNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3NjI2NzUsImV4cCI6MjA4MDMzODY3NX0.qYiFr5kI2UK4uLyw57lvvX-pZsYdiYo1x0E7U9FsSEQ',
           },
-        })
-        .select()
-        .single();
+          body: JSON.stringify({
+            amount,
+            bank_account_id: bankAccountId,
+          }),
+        }
+      );
 
-      if (txError) {
-        throw new Error("Failed to create withdrawal transaction");
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Withdrawal failed');
       }
 
-      // Note: Wallet balance is now auto-synced via database trigger (sync_wallet_balance_from_ledger)
-      // The trigger computes: balance = SUM(credits) - SUM(debits including pending withdrawals)
-
-      return transaction;
+      return result.transaction;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wallet"] });

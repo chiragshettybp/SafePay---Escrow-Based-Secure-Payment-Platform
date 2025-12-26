@@ -1263,7 +1263,9 @@ export type Database = {
           created_at: string
           failure_reason: string | null
           fee: number
+          gst: number | null
           id: string
+          idempotency_key: string | null
           merchant_id: string
           net_amount: number
           notes: string | null
@@ -1278,7 +1280,9 @@ export type Database = {
           created_at?: string
           failure_reason?: string | null
           fee?: number
+          gst?: number | null
           id?: string
+          idempotency_key?: string | null
           merchant_id: string
           net_amount: number
           notes?: string | null
@@ -1293,7 +1297,9 @@ export type Database = {
           created_at?: string
           failure_reason?: string | null
           fee?: number
+          gst?: number | null
           id?: string
+          idempotency_key?: string | null
           merchant_id?: string
           net_amount?: number
           notes?: string | null
@@ -2516,6 +2522,7 @@ export type Database = {
           customer_id: string
           description: string | null
           id: string
+          idempotency_key: string | null
           metadata: Json | null
           reference_id: string | null
           reference_type: string | null
@@ -2530,6 +2537,7 @@ export type Database = {
           customer_id: string
           description?: string | null
           id?: string
+          idempotency_key?: string | null
           metadata?: Json | null
           reference_id?: string | null
           reference_type?: string | null
@@ -2544,6 +2552,7 @@ export type Database = {
           customer_id?: string
           description?: string | null
           id?: string
+          idempotency_key?: string | null
           metadata?: Json | null
           reference_id?: string | null
           reference_type?: string | null
@@ -2589,6 +2598,117 @@ export type Database = {
           id?: string
           status?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      withdrawal_abuse_signals: {
+        Row: {
+          created_at: string
+          details: Json | null
+          id: string
+          ip_address: string | null
+          signal_type: string
+          user_agent: string | null
+          user_id: string
+          user_type: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          signal_type: string
+          user_agent?: string | null
+          user_id: string
+          user_type: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          signal_type?: string
+          user_agent?: string | null
+          user_id?: string
+          user_type?: string
+        }
+        Relationships: []
+      }
+      withdrawal_actions_log: {
+        Row: {
+          account_last4: string | null
+          action_type: string
+          amount: number
+          balance_after: number
+          balance_before: number
+          bank_account_id: string | null
+          bank_name: string | null
+          created_at: string
+          fee: number | null
+          gst: number | null
+          id: string
+          idempotency_key: string | null
+          ip_address: string | null
+          metadata: Json | null
+          new_status: string | null
+          previous_status: string | null
+          session_id: string | null
+          total_debit: number
+          user_agent: string | null
+          user_id: string
+          user_type: string
+          withdrawal_id: string
+          withdrawal_type: string
+        }
+        Insert: {
+          account_last4?: string | null
+          action_type: string
+          amount: number
+          balance_after: number
+          balance_before: number
+          bank_account_id?: string | null
+          bank_name?: string | null
+          created_at?: string
+          fee?: number | null
+          gst?: number | null
+          id?: string
+          idempotency_key?: string | null
+          ip_address?: string | null
+          metadata?: Json | null
+          new_status?: string | null
+          previous_status?: string | null
+          session_id?: string | null
+          total_debit: number
+          user_agent?: string | null
+          user_id: string
+          user_type: string
+          withdrawal_id: string
+          withdrawal_type: string
+        }
+        Update: {
+          account_last4?: string | null
+          action_type?: string
+          amount?: number
+          balance_after?: number
+          balance_before?: number
+          bank_account_id?: string | null
+          bank_name?: string | null
+          created_at?: string
+          fee?: number | null
+          gst?: number | null
+          id?: string
+          idempotency_key?: string | null
+          ip_address?: string | null
+          metadata?: Json | null
+          new_status?: string | null
+          previous_status?: string | null
+          session_id?: string | null
+          total_debit?: number
+          user_agent?: string | null
+          user_id?: string
+          user_type?: string
+          withdrawal_id?: string
+          withdrawal_type?: string
         }
         Relationships: []
       }
@@ -2643,6 +2763,10 @@ export type Database = {
           ledger_balance: number
           wallet_balance: number
         }[]
+      }
+      check_withdrawal_rate_limit: {
+        Args: { p_user_id: string; p_user_type: string }
+        Returns: boolean
       }
       compute_merchant_wallet_balances: {
         Args: { p_merchant_id: string }
