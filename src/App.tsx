@@ -55,6 +55,11 @@ import CheckoutLogin from "./pages/CheckoutLogin";
 import MerchantCheckoutDashboard from "./pages/MerchantCheckoutDashboard";
 import MerchantCheckoutSessions from "./pages/MerchantCheckoutSessions";
 import MerchantCheckoutSessionDetail from "./pages/MerchantCheckoutSessionDetail";
+import MerchantCheckoutSettings from "./pages/MerchantCheckoutSettings";
+import MerchantCheckoutSettingsLogin from "./pages/MerchantCheckoutSettingsLogin";
+import MerchantCheckoutSettingsPaymentOrder from "./pages/MerchantCheckoutSettingsPaymentOrder";
+import MerchantCheckoutSettingsCod from "./pages/MerchantCheckoutSettingsCod";
+import MerchantCheckoutSettingsPrepaidNudges from "./pages/MerchantCheckoutSettingsPrepaidNudges";
 import MerchantLogin from "./pages/MerchantLogin";
 import MerchantSignup from "./pages/MerchantSignup";
 import MerchantDashboard from "./pages/MerchantDashboard";
@@ -260,6 +265,11 @@ const App = () => (
                 <Route path="checkout" element={<MerchantCheckoutDashboard />} />
                 <Route path="checkout/sessions" element={<MerchantCheckoutSessions />} />
                 <Route path="checkout/session/:session_id" element={<MerchantCheckoutSessionDetail />} />
+                <Route path="checkout/settings" element={<MerchantCheckoutSettings />} />
+                <Route path="checkout/settings/login" element={<MerchantCheckoutSettingsLogin />} />
+                <Route path="checkout/settings/payment-order" element={<MerchantCheckoutSettingsPaymentOrder />} />
+                <Route path="checkout/settings/cod" element={<MerchantCheckoutSettingsCod />} />
+                <Route path="checkout/settings/prepaid-nudges" element={<MerchantCheckoutSettingsPrepaidNudges />} />
               </Route>
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
