@@ -89,7 +89,7 @@ export default function AdminWithdrawalDetails() {
           <AdminStatCard
             title="Amount"
             value={formatCurrency(withdrawal.amount)}
-            subtitle={`Net: ${formatCurrency(withdrawal.net_amount)} (Fee: ${formatCurrency(withdrawal.fee)})`}
+            subtitle={`Net: ${formatCurrency(withdrawal.net_amount)} | Fee: ${formatCurrency(withdrawal.fee)} | GST: ${formatCurrency(withdrawal.gst || 0)}`}
             icon={<IndianRupee className="h-4 w-4" />}
           />
           

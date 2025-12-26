@@ -42,8 +42,13 @@ export default function PaymentReview() {
     confirmPayment(orderId);
   };
 
-  const escrowFee = order ? Math.round(order.amount * 0.025 * 100) / 100 : 0; // 2.5% fee
-  const totalAmount = order ? order.amount + escrowFee : 0;
+  // Escrow fee: 1% platform fee + 18% GST on fee
+  const ESCROW_FEE_PERCENT = 1;
+  const GST_PERCENT = 18;
+  const platformFee = order ? order.amount * (ESCROW_FEE_PERCENT / 100) : 0;
+  const gstOnFee = platformFee * (GST_PERCENT / 100);
+  const totalEscrowFee = Math.round((platformFee + gstOnFee) * 100) / 100;
+  const totalAmount = order ? order.amount + totalEscrowFee : 0;
 
   if (isLoading) {
     return (
@@ -175,17 +180,21 @@ export default function PaymentReview() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Payment Amount</span>
-                    <span className="font-medium">₹{order.amount.toFixed(2)}</span>
+                    <span className="font-medium">₹{order.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Escrow Fee (2.5%)</span>
-                    <span className="font-medium">₹{escrowFee.toFixed(2)}</span>
+                    <span className="text-muted-foreground">Platform Fee ({ESCROW_FEE_PERCENT}%)</span>
+                    <span className="font-medium">₹{platformFee.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">GST on Fee ({GST_PERCENT}%)</span>
+                    <span className="font-medium">₹{gstOnFee.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between items-center">
                     <span className="font-semibold">Total</span>
                     <span className="text-xl font-bold text-primary">
-                      ₹{totalAmount.toFixed(2)}
+                      ₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>

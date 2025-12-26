@@ -38,6 +38,9 @@ export interface MerchantPayout {
   bank_account_id: string;
   amount: number;
   fee: number;
+  gst: number | null;
+  withdrawal_fee: number | null;
+  platform_fee: number | null;
   net_amount: number;
   status: string;
   notes: string | null;
