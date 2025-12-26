@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
@@ -66,12 +66,17 @@ export function useAdminPaymentLinks(filters?: PaymentLinkFilters) {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAdminAuth();
+  
+  // Store filters in a ref to avoid re-creating fetchLinks on every render
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
 
   const fetchLinks = useCallback(async () => {
     if (!user) return;
 
     try {
       setIsLoading(true);
+      const currentFilters = filtersRef.current;
       
       let query = supabase
         .from("payment_links")
@@ -79,27 +84,27 @@ export function useAdminPaymentLinks(filters?: PaymentLinkFilters) {
         .order("created_at", { ascending: false });
 
       // Apply filters
-      if (filters?.merchant_id) {
-        query = query.eq("merchant_id", filters.merchant_id);
+      if (currentFilters?.merchant_id) {
+        query = query.eq("merchant_id", currentFilters.merchant_id);
       }
-      if (filters?.status) {
-        query = query.eq("status", filters.status);
+      if (currentFilters?.status) {
+        query = query.eq("status", currentFilters.status);
       }
-      if (filters?.date_from) {
-        query = query.gte("created_at", filters.date_from);
+      if (currentFilters?.date_from) {
+        query = query.gte("created_at", currentFilters.date_from);
       }
-      if (filters?.date_to) {
-        query = query.lte("created_at", filters.date_to);
+      if (currentFilters?.date_to) {
+        query = query.lte("created_at", currentFilters.date_to);
       }
-      if (filters?.amount_min !== undefined) {
-        query = query.gte("amount", filters.amount_min);
+      if (currentFilters?.amount_min !== undefined) {
+        query = query.gte("amount", currentFilters.amount_min);
       }
-      if (filters?.amount_max !== undefined) {
-        query = query.lte("amount", filters.amount_max);
+      if (currentFilters?.amount_max !== undefined) {
+        query = query.lte("amount", currentFilters.amount_max);
       }
-      if (filters?.has_payments === true) {
+      if (currentFilters?.has_payments === true) {
         query = query.gt("total_payments", 0);
-      } else if (filters?.has_payments === false) {
+      } else if (currentFilters?.has_payments === false) {
         query = query.eq("total_payments", 0);
       }
 
@@ -130,8 +135,8 @@ export function useAdminPaymentLinks(filters?: PaymentLinkFilters) {
 
       // Apply search filter client-side
       let filteredLinks = typedLinks;
-      if (filters?.search) {
-        const searchLower = filters.search.toLowerCase();
+      if (currentFilters?.search) {
+        const searchLower = currentFilters.search.toLowerCase();
         filteredLinks = typedLinks.filter(l =>
           l.title.toLowerCase().includes(searchLower) ||
           l.link_code.toLowerCase().includes(searchLower) ||
@@ -164,7 +169,7 @@ export function useAdminPaymentLinks(filters?: PaymentLinkFilters) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, filters, toast]);
+  }, [user, toast]);
 
   const disableLink = useCallback(async (linkId: string, reason: string): Promise<boolean> => {
     if (!user) return false;
@@ -290,11 +295,27 @@ export function useAdminPaymentLinks(filters?: PaymentLinkFilters) {
     }
   }, [user, toast]);
 
-  // Set up realtime subscription
+  // Refetch when filters change
+  useEffect(() => {
+    if (user) {
+      fetchLinks();
+    }
+  }, [
+    user,
+    filters?.merchant_id,
+    filters?.status,
+    filters?.date_from,
+    filters?.date_to,
+    filters?.amount_min,
+    filters?.amount_max,
+    filters?.has_payments,
+    filters?.search,
+    fetchLinks,
+  ]);
+
+  // Set up realtime subscription (separate effect, no filter deps)
   useEffect(() => {
     if (!user) return;
-
-    fetchLinks();
 
     const channel = supabase
       .channel('admin-payment-links-changes')
