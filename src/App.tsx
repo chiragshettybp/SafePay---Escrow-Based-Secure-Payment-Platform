@@ -18,7 +18,9 @@ import ConfirmDelivery from "./pages/ConfirmDelivery";
 import ReportIssue from "./pages/ReportIssue";
 import NewPayment from "./pages/NewPayment";
 import PaymentReview from "./pages/PaymentReview";
+import PaymentPay from "./pages/PaymentPay";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentFailed from "./pages/PaymentFailed";
 import RaiseDispute from "./pages/RaiseDispute";
 import DisputeUpload from "./pages/DisputeUpload";
 import DisputeStatus from "./pages/DisputeStatus";
@@ -183,7 +185,9 @@ const App = () => (
               <Route path="/profile/kyc" element={<Kyc />} />
               <Route path="/payment/new" element={<NewPayment />} />
               <Route path="/payment/review/:orderId" element={<PaymentReview />} />
+              <Route path="/payment/pay/:orderId" element={<PaymentPay />} />
               <Route path="/payment/success/:orderId" element={<PaymentSuccess />} />
+              <Route path="/payment/failed/:orderId" element={<PaymentFailed />} />
               {/* Customer Settings Routes */}
               <Route path="/settings" element={<CustomerSettings />} />
               <Route path="/settings/profile" element={<CustomerSettingsProfile />} />
