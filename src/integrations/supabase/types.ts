@@ -1585,6 +1585,143 @@ export type Database = {
         }
         Relationships: []
       }
+      merchant_checkout_config: {
+        Row: {
+          created_at: string
+          id: string
+          login_autolink_by_phone: boolean
+          login_guest_checkout_enabled: boolean
+          login_guest_max_order_value: number
+          login_otp_cooldown_seconds: number
+          login_otp_enabled: boolean
+          login_otp_retry_limit: number
+          login_require_before_payment: boolean
+          login_returning_user_autologin: boolean
+          merchant_id: string
+          payment_cards_enabled: boolean
+          payment_emi_enabled: boolean
+          payment_methods_order: string[]
+          payment_netbanking_enabled: boolean
+          payment_reorder_by_device: boolean
+          payment_reorder_by_success_rate: boolean
+          payment_reorder_by_value: boolean
+          payment_upi_enabled: boolean
+          payment_wallets_enabled: boolean
+          prepaid_discount_enabled: boolean
+          prepaid_discount_type: string
+          prepaid_discount_value: number
+          prepaid_first_time_only: boolean
+          prepaid_message: string
+          prepaid_min_order_value: number
+          prepaid_nudges_enabled: boolean
+          prepaid_urgency_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          login_autolink_by_phone?: boolean
+          login_guest_checkout_enabled?: boolean
+          login_guest_max_order_value?: number
+          login_otp_cooldown_seconds?: number
+          login_otp_enabled?: boolean
+          login_otp_retry_limit?: number
+          login_require_before_payment?: boolean
+          login_returning_user_autologin?: boolean
+          merchant_id: string
+          payment_cards_enabled?: boolean
+          payment_emi_enabled?: boolean
+          payment_methods_order?: string[]
+          payment_netbanking_enabled?: boolean
+          payment_reorder_by_device?: boolean
+          payment_reorder_by_success_rate?: boolean
+          payment_reorder_by_value?: boolean
+          payment_upi_enabled?: boolean
+          payment_wallets_enabled?: boolean
+          prepaid_discount_enabled?: boolean
+          prepaid_discount_type?: string
+          prepaid_discount_value?: number
+          prepaid_first_time_only?: boolean
+          prepaid_message?: string
+          prepaid_min_order_value?: number
+          prepaid_nudges_enabled?: boolean
+          prepaid_urgency_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          login_autolink_by_phone?: boolean
+          login_guest_checkout_enabled?: boolean
+          login_guest_max_order_value?: number
+          login_otp_cooldown_seconds?: number
+          login_otp_enabled?: boolean
+          login_otp_retry_limit?: number
+          login_require_before_payment?: boolean
+          login_returning_user_autologin?: boolean
+          merchant_id?: string
+          payment_cards_enabled?: boolean
+          payment_emi_enabled?: boolean
+          payment_methods_order?: string[]
+          payment_netbanking_enabled?: boolean
+          payment_reorder_by_device?: boolean
+          payment_reorder_by_success_rate?: boolean
+          payment_reorder_by_value?: boolean
+          payment_upi_enabled?: boolean
+          payment_wallets_enabled?: boolean
+          prepaid_discount_enabled?: boolean
+          prepaid_discount_type?: string
+          prepaid_discount_value?: number
+          prepaid_first_time_only?: boolean
+          prepaid_message?: string
+          prepaid_min_order_value?: number
+          prepaid_nudges_enabled?: boolean
+          prepaid_urgency_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      merchant_checkout_config_audit: {
+        Row: {
+          change_type: string
+          changed_by: string
+          config_id: string
+          created_at: string
+          id: string
+          merchant_id: string
+          new_values: Json | null
+          previous_values: Json | null
+        }
+        Insert: {
+          change_type: string
+          changed_by: string
+          config_id: string
+          created_at?: string
+          id?: string
+          merchant_id: string
+          new_values?: Json | null
+          previous_values?: Json | null
+        }
+        Update: {
+          change_type?: string
+          changed_by?: string
+          config_id?: string
+          created_at?: string
+          id?: string
+          merchant_id?: string
+          new_values?: Json | null
+          previous_values?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_checkout_config_audit_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_checkout_config"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       merchant_evidence: {
         Row: {
           created_at: string
