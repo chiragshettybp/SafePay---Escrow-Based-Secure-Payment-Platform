@@ -53,9 +53,7 @@ export interface CheckoutSession {
   phone_number: string | null;
   email: string | null;
   is_guest: boolean;
-  otp_verified: boolean;
-  otp_sent_at: string | null;
-  otp_attempts: number;
+  phone_collected: boolean; // Replaces otp_verified
   shipping_address_id: string | null;
   shipping_name: string | null;
   shipping_address: ShippingAddress | null;
@@ -149,12 +147,13 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
         image_url: item?.image_url ?? undefined,
       }));
 
-      // Cast the session to our type
+      // Cast the session to our type (phone_collected is computed from phone_number)
       const typedSession: CheckoutSession = {
         ...session,
         cart_data: normalizedCart,
         shipping_address: normalizeJson<ShippingAddress | null>(session.shipping_address, null),
         merchants: session.merchants as CheckoutSession['merchants'],
+        phone_collected: !!session.phone_number, // Computed field
       };
 
       return {
@@ -231,81 +230,29 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
     },
   });
 
-  // Send OTP mutation
-  const sendOtp = useMutation({
+  // Collect phone number mutation (replaces OTP flow)
+  const collectPhone = useMutation({
     mutationFn: async (phoneNumber: string) => {
       if (!sessionId) throw new Error('No session');
 
-      const { data, error } = await supabase.functions.invoke('checkout-session', {
-        method: 'POST',
-        body: {
-          session_id: sessionId,
-          action: 'send_otp',
-          data: { phone_number: phoneNumber },
-        },
-        headers: { 'x-action': 'action' },
-      });
-
-      // Fallback: Update directly
-      const { error: updateError } = await supabase
-        .from('checkout_sessions')
-        .update({
-          phone_number: phoneNumber,
-          otp_sent_at: new Date().toISOString(),
-          otp_attempts: (session?.otp_attempts || 0) + 1,
-        })
-        .eq('id', sessionId);
-
-      if (updateError) throw updateError;
-
-      // Log event
-      await supabase.from('checkout_events').insert({
-        session_id: sessionId,
-        event_type: 'otp_sent',
-        event_data: { phone_number: phoneNumber.replace(/\d(?=\d{4})/g, '*') },
-        step: 'login',
-      });
-
-      return { message: 'OTP sent successfully' };
-    },
-    onSuccess: () => {
-      toast({
-        title: 'OTP Sent',
-        description: 'Please check your phone for the verification code',
-      });
-      refetchSession();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Failed to send OTP',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
-
-  // Verify OTP mutation
-  const verifyOtp = useMutation({
-    mutationFn: async (otp: string) => {
-      if (!sessionId) throw new Error('No session');
-
-      // For demo, accept "123456" or any 6-digit OTP
-      const isValid = otp === '123456' || /^\d{6}$/.test(otp);
-      if (!isValid) throw new Error('Invalid OTP');
+      // Validate phone format
+      if (!/^\+91\d{10}$/.test(phoneNumber)) {
+        throw new Error('Invalid phone number format');
+      }
 
       // Check if user exists with this phone
       const { data: existingUser } = await supabase
         .from('profiles')
         .select('id, full_name, phone')
-        .eq('phone', session?.phone_number)
+        .eq('phone', phoneNumber)
         .maybeSingle();
 
       // Fetch current user
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Update session
+      // Update session - mark phone as collected and move to address step
       const updateData: Record<string, unknown> = {
-        otp_verified: true,
+        phone_number: phoneNumber,
         current_step: 'address',
         user_id: existingUser?.id || user?.id || null,
       };
@@ -320,8 +267,8 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
       // Log event
       await supabase.from('checkout_events').insert({
         session_id: sessionId,
-        event_type: 'otp_verified',
-        event_data: { returning_user: !!existingUser },
+        event_type: 'phone_collected',
+        event_data: { phone_number: phoneNumber.replace(/\d(?=\d{4})/g, '*'), returning_user: !!existingUser },
         step: 'address',
         previous_step: 'login',
       });
@@ -330,14 +277,14 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
     },
     onSuccess: () => {
       toast({
-        title: 'Verified',
-        description: 'Phone number verified successfully',
+        title: 'Phone Number Saved',
+        description: 'Continuing to address',
       });
       refetchSession();
     },
     onError: (error: Error) => {
       toast({
-        title: 'Verification Failed',
+        title: 'Failed to save phone',
         description: error.message,
         variant: 'destructive',
       });
@@ -485,8 +432,9 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
     mutationFn: async (data?: { order_id?: string; payment_id?: string }) => {
       if (!sessionId || !session) throw new Error('No session');
 
-      if (!session.otp_verified) {
-        throw new Error('Phone verification required');
+      // Phone must be collected (no OTP verification required)
+      if (!session.phone_number) {
+        throw new Error('Phone number required');
       }
 
       if (!session.shipping_address) {
@@ -589,7 +537,7 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
   }, [session?.expires_at]);
 
   return {
-    session,
+    session: session ? { ...session, phone_collected: !!session.phone_number } : session,
     addresses,
     isLoading: isLoadingSession,
     isProcessing,
@@ -599,8 +547,7 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
     
     // Mutations
     createSession,
-    sendOtp,
-    verifyOtp,
+    collectPhone,
     updateAddress,
     selectPaymentMethod,
     completeCheckout,

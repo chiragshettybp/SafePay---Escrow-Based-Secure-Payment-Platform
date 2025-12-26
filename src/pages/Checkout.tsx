@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Phone, MapPin, CreditCard, CheckCircle, ChevronLeft, Clock, Shield, Truck, Loader2 } from 'lucide-react';
+import { Phone, MapPin, CreditCard, CheckCircle, ChevronLeft, Clock, Shield, Truck, Loader2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,6 @@ import { useCheckout, CheckoutStep, PaymentMethod, CustomerAddress } from '@/hoo
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { Seo } from '@/components/seo/Seo';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 // Step indicator component
 const StepIndicator = ({ 
@@ -90,8 +89,6 @@ export default function Checkout() {
 
   // Form states
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
   
   // Address form
   const [addressForm, setAddressForm] = useState({
@@ -115,8 +112,7 @@ export default function Checkout() {
     isLoading,
     isExpired,
     error,
-    sendOtp,
-    verifyOtp,
+    collectPhone,
     updateAddress,
     selectPaymentMethod,
     completeCheckout,
@@ -128,7 +124,7 @@ export default function Checkout() {
   const getCompletedSteps = (): CheckoutStep[] => {
     if (!session) return [];
     const completed: CheckoutStep[] = [];
-    if (session.otp_verified) completed.push('login');
+    if (session.phone_collected) completed.push('login');
     if (session.shipping_address) completed.push('address');
     if (session.selected_payment_method) completed.push('payment');
     if (session.status === 'completed') completed.push('confirmation');
@@ -160,25 +156,14 @@ export default function Checkout() {
     }
   }, [session?.phone_number, phoneNumber]);
 
-  // Handle OTP send
-  const handleSendOtp = async () => {
+  // Handle phone number collection and continue
+  const handlePhoneContinue = async () => {
     if (phoneNumber.length !== 10) {
       toast({ title: 'Invalid phone number', description: 'Please enter a valid 10-digit phone number', variant: 'destructive' });
       return;
     }
     
-    await sendOtp.mutateAsync(`+91${phoneNumber}`);
-    setOtpSent(true);
-  };
-
-  // Handle OTP verify
-  const handleVerifyOtp = async () => {
-    if (otp.length !== 6) {
-      toast({ title: 'Invalid OTP', description: 'Please enter the 6-digit OTP', variant: 'destructive' });
-      return;
-    }
-    
-    await verifyOtp.mutateAsync(otp);
+    await collectPhone.mutateAsync(`+91${phoneNumber}`);
   };
 
   // Handle address submit
@@ -372,7 +357,7 @@ export default function Checkout() {
           {/* Left: Steps */}
           <div className="lg:col-span-2 space-y-4">
             <AnimatePresence mode="wait">
-              {/* Step 1: Login */}
+              {/* Step 1: Phone Collection (No OTP) */}
               {currentStep === 'login' && (
                 <motion.div
                   key="login"
@@ -384,73 +369,47 @@ export default function Checkout() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Phone className="h-5 w-5" />
-                        Verify Phone Number
+                        Enter Phone Number
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {!otpSent ? (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="phone">Mobile Number</Label>
-                            <div className="flex gap-2">
-                              <div className="flex items-center px-3 bg-muted rounded-md border">
-                                <span className="text-sm">+91</span>
-                              </div>
-                              <Input
-                                id="phone"
-                                type="tel"
-                                placeholder="Enter 10-digit number"
-                                value={phoneNumber}
-                                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                                className="flex-1"
-                                maxLength={10}
-                              />
-                            </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Mobile Number</Label>
+                        <div className="flex gap-2">
+                          <div className="flex items-center px-3 bg-muted rounded-md border">
+                            <span className="text-sm">+91</span>
                           </div>
-                          <Button 
-                            className="w-full" 
-                            onClick={handleSendOtp}
-                            disabled={phoneNumber.length !== 10 || sendOtp.isPending}
-                          >
-                            {sendOtp.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                            Send OTP
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <div className="space-y-2">
-                            <Label>Enter OTP sent to +91{phoneNumber}</Label>
-                            <InputOTP maxLength={6} value={otp} onChange={setOtp}>
-                              <InputOTPGroup className="gap-2 justify-center w-full">
-                                <InputOTPSlot index={0} />
-                                <InputOTPSlot index={1} />
-                                <InputOTPSlot index={2} />
-                                <InputOTPSlot index={3} />
-                                <InputOTPSlot index={4} />
-                                <InputOTPSlot index={5} />
-                              </InputOTPGroup>
-                            </InputOTP>
-                            <p className="text-xs text-muted-foreground text-center mt-2">
-                              Demo: Use OTP <span className="font-mono">123456</span>
-                            </p>
-                          </div>
-                          <Button 
-                            className="w-full" 
-                            onClick={handleVerifyOtp}
-                            disabled={otp.length !== 6 || verifyOtp.isPending}
-                          >
-                            {verifyOtp.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                            Verify & Continue
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            className="w-full" 
-                            onClick={() => { setOtpSent(false); setOtp(''); }}
-                          >
-                            Change Number
-                          </Button>
-                        </>
-                      )}
+                          <Input
+                            id="phone"
+                            type="tel"
+                            inputMode="numeric"
+                            placeholder="Enter 10-digit number"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                            className="flex-1"
+                            maxLength={10}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Enter your phone number to continue
+                        </p>
+                      </div>
+                      <Button 
+                        className="w-full gap-2" 
+                        onClick={handlePhoneContinue}
+                        disabled={phoneNumber.length !== 10 || collectPhone.isPending}
+                      >
+                        {collectPhone.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                        Continue
+                      </Button>
+                      
+                      {/* Security note */}
+                      <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg">
+                        <Shield className="h-4 w-4 text-muted-foreground mt-0.5" />
+                        <p className="text-xs text-muted-foreground">
+                          Your phone number is used for order updates and support. We use industry-standard encryption.
+                        </p>
+                      </div>
                     </CardContent>
                   </Card>
                 </motion.div>
