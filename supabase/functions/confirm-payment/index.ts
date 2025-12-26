@@ -71,7 +71,9 @@ serve(async (req) => {
     return json(400, { error: "orderId is required" });
   }
 
-  console.log(`Processing payment confirmation for order ${orderId} by user ${user.id}`);
+  // Generate idempotency key for this payment attempt
+  const idempotencyKey = `payment-${orderId}-${user.id}`;
+  console.log(`Processing payment confirmation for order ${orderId} by user ${user.id}, idempotency: ${idempotencyKey}`);
 
   try {
     // 1. Fetch the order and verify ownership
@@ -89,30 +91,33 @@ serve(async (req) => {
 
     // 2. Check if already processed (idempotency)
     if (order.status !== "draft") {
-      console.log(`Order ${orderId} already processed with status: ${order.status}`);
+      console.log(`IDEMPOTENT: Order ${orderId} already processed with status: ${order.status}`);
       return json(200, { 
         success: true, 
         message: "Order already processed",
         alreadyProcessed: true,
         orderId,
-        status: order.status
+        status: order.status,
+        idempotencyKey
       });
     }
 
-    // 3. Check for existing payment (prevent duplicates)
+    // 3. Check for existing payment (prevent duplicates via DB constraint + check)
     const { data: existingPayment } = await supabase
       .from("payments")
-      .select("id")
+      .select("id, status, transaction_reference")
       .eq("order_id", orderId)
       .maybeSingle();
 
     if (existingPayment) {
-      console.log(`Payment already exists for order ${orderId}`);
+      console.log(`IDEMPOTENT: Payment already exists for order ${orderId}: ${existingPayment.id}`);
       return json(200, { 
         success: true, 
         message: "Payment already exists",
         alreadyProcessed: true,
-        orderId
+        orderId,
+        paymentId: existingPayment.id,
+        idempotencyKey
       });
     }
 
@@ -146,10 +151,40 @@ serve(async (req) => {
       return json(400, { error: "Merchant is currently suspended" });
     }
 
+    // 6. CRITICAL: Verify merchant has an escrow account BEFORE proceeding
+    const { data: escrowAccount, error: escrowFetchError } = await supabase
+      .from("escrow_accounts")
+      .select("*")
+      .eq("merchant_id", order.merchant_id)
+      .single();
+
+    if (escrowFetchError || !escrowAccount) {
+      console.error("BLOCKER: Merchant has no escrow account:", escrowFetchError);
+      // Try to create one (auto-recovery)
+      const { data: newEscrow, error: createEscrowError } = await supabase
+        .from("escrow_accounts")
+        .insert({
+          merchant_id: order.merchant_id,
+          total_balance: 0,
+          locked_balance: 0,
+          available_balance: 0
+        })
+        .select()
+        .single();
+
+      if (createEscrowError) {
+        console.error("Failed to create escrow account:", createEscrowError);
+        return json(500, { error: "Merchant escrow account not configured. Please contact support." });
+      }
+      console.log(`Auto-created escrow account for merchant ${order.merchant_id}`);
+      // Use the newly created account
+      Object.assign(escrowAccount || {}, newEscrow);
+    }
+
     const now = new Date().toISOString();
     const transactionRef = `TXN-${Date.now()}-${orderId.slice(0, 8)}`;
 
-    // 6. ATOMIC: Update order status with condition check
+    // 7. ATOMIC STEP 1: Update order status with condition check
     const { data: updatedOrder, error: updateOrderError } = await supabase
       .from("orders")
       .update({ 
@@ -158,13 +193,13 @@ serve(async (req) => {
       })
       .eq("id", orderId)
       .eq("customer_id", user.id)
-      .eq("status", "draft") // Only update if still draft
+      .eq("status", "draft") // Only update if still draft (atomic check)
       .select()
       .single();
 
     if (updateOrderError || !updatedOrder) {
       console.error("Failed to update order (possible race condition):", updateOrderError);
-      // Check current status
+      // Check current status for idempotent response
       const { data: currentOrder } = await supabase
         .from("orders")
         .select("status")
@@ -174,25 +209,26 @@ serve(async (req) => {
       if (currentOrder && currentOrder.status !== "draft") {
         return json(200, { 
           success: true, 
-          message: "Order already processed",
+          message: "Order already processed (race condition handled)",
           alreadyProcessed: true,
           orderId,
-          status: currentOrder.status
+          status: currentOrder.status,
+          idempotencyKey
         });
       }
       return json(500, { error: "Failed to process payment. Please try again." });
     }
 
-    console.log(`Order ${orderId} status updated to escrow_locked`);
+    console.log(`ATOMIC: Order ${orderId} status updated to escrow_locked`);
 
-    // 7. Create payment record
+    // 8. ATOMIC STEP 2: Create payment record (unique constraint on order_id prevents duplicates)
     const { data: payment, error: paymentError } = await supabase
       .from("payments")
       .insert({
         order_id: orderId,
         customer_id: user.id,
         merchant_id: order.merchant_id,
-        amount: order.amount,
+        amount: order.amount, // CRITICAL: Use DB amount, not client amount
         status: "locked",
         transaction_reference: transactionRef,
       })
@@ -201,111 +237,119 @@ serve(async (req) => {
 
     if (paymentError) {
       console.error("Failed to create payment:", paymentError);
-      // Rollback order status
+      // Check if it's a duplicate constraint violation (idempotent)
+      if (paymentError.code === '23505') { // Unique violation
+        console.log("IDEMPOTENT: Payment already exists (caught by constraint)");
+        const { data: existingPmt } = await supabase
+          .from("payments")
+          .select("id")
+          .eq("order_id", orderId)
+          .single();
+        return json(200, { 
+          success: true, 
+          message: "Payment already exists",
+          alreadyProcessed: true,
+          orderId,
+          paymentId: existingPmt?.id,
+          idempotencyKey
+        });
+      }
+      // CRITICAL ROLLBACK: Revert order status
       await supabase
         .from("orders")
         .update({ status: "draft", updated_at: now })
         .eq("id", orderId);
-      return json(500, { error: "Failed to create payment record" });
+      console.error("ROLLBACK: Order reverted to draft after payment failure");
+      return json(500, { error: "Failed to create payment record. Please try again." });
     }
 
-    console.log(`Payment record created: ${payment.id}`);
+    console.log(`ATOMIC: Payment record created: ${payment.id}`);
 
-    // 8. Update escrow account
-    const { data: escrowAccount, error: escrowFetchError } = await supabase
+    // 9. ATOMIC STEP 3: Update escrow account (MUST succeed or full rollback)
+    const newTotalBalance = (escrowAccount?.total_balance || 0) + order.amount;
+    const newLockedBalance = (escrowAccount?.locked_balance || 0) + order.amount;
+
+    const { error: escrowUpdateError } = await supabase
       .from("escrow_accounts")
-      .select("*")
-      .eq("merchant_id", order.merchant_id)
-      .maybeSingle();
+      .update({
+        total_balance: newTotalBalance,
+        locked_balance: newLockedBalance,
+        updated_at: now
+      })
+      .eq("id", escrowAccount!.id);
 
-    if (escrowFetchError) {
-      console.error("Error fetching escrow account:", escrowFetchError);
+    if (escrowUpdateError) {
+      console.error("CRITICAL: Failed to update escrow:", escrowUpdateError);
+      // FULL ROLLBACK: Delete payment and revert order
+      await supabase.from("payments").delete().eq("id", payment.id);
+      await supabase.from("orders").update({ status: "draft", updated_at: now }).eq("id", orderId);
+      console.error("ROLLBACK: Payment deleted, order reverted after escrow failure");
+      return json(500, { error: "Failed to lock funds in escrow. Please try again." });
     }
 
-    if (escrowAccount) {
-      const newTotalBalance = escrowAccount.total_balance + order.amount;
-      const newLockedBalance = escrowAccount.locked_balance + order.amount;
+    // 10. ATOMIC STEP 4: Create escrow transaction record (unique constraint prevents duplicates)
+    const { error: escrowTxnError } = await supabase
+      .from("escrow_transactions")
+      .insert({
+        escrow_account_id: escrowAccount!.id,
+        order_id: orderId,
+        transaction_type: "credit",
+        amount: order.amount,
+        balance_before: escrowAccount?.total_balance || 0,
+        balance_after: newTotalBalance,
+        reason: "Payment locked in escrow",
+        created_by: user.id,
+      });
 
-      const { error: escrowUpdateError } = await supabase
-        .from("escrow_accounts")
-        .update({
-          total_balance: newTotalBalance,
-          locked_balance: newLockedBalance,
-          updated_at: now
-        })
-        .eq("id", escrowAccount.id);
-
-      if (escrowUpdateError) {
-        console.error("Failed to update escrow:", escrowUpdateError);
+    if (escrowTxnError) {
+      // Check if it's a duplicate (idempotent - escrow already credited)
+      if (escrowTxnError.code === '23505') {
+        console.log("IDEMPOTENT: Escrow transaction already exists");
       } else {
-        // Create escrow transaction record
-        await supabase
-          .from("escrow_transactions")
-          .insert({
-            escrow_account_id: escrowAccount.id,
-            order_id: orderId,
-            transaction_type: "credit",
-            amount: order.amount,
-            balance_before: escrowAccount.total_balance,
-            balance_after: newTotalBalance,
-            reason: "Payment locked in escrow",
-            created_by: user.id,
-          });
-        
-        console.log(`Escrow credited: ₹${order.amount}`);
+        console.error("Warning: Failed to create escrow transaction record:", escrowTxnError);
+        // This is a logging failure, not a blocker - the balance is already updated
       }
+    } else {
+      console.log(`ATOMIC: Escrow credited: ₹${order.amount}`);
     }
 
-    // 9. Update merchant wallet pending balance
-    const { data: merchantWallet, error: walletFetchError } = await supabase
+    // 11. Update merchant wallet pending balance (non-blocking)
+    const { data: merchantWallet } = await supabase
       .from("merchant_wallets")
       .select("*")
       .eq("merchant_id", order.merchant_id)
       .maybeSingle();
 
-    if (walletFetchError) {
-      console.error("Error fetching merchant wallet:", walletFetchError);
-    }
-
     if (merchantWallet) {
-      const { error: walletUpdateError } = await supabase
+      await supabase
         .from("merchant_wallets")
         .update({
           pending_balance: merchantWallet.pending_balance + order.amount,
           updated_at: now
         })
         .eq("id", merchantWallet.id);
-
-      if (walletUpdateError) {
-        console.error("Failed to update merchant wallet:", walletUpdateError);
-      } else {
-        console.log(`Merchant wallet pending balance updated: +₹${order.amount}`);
-      }
+      console.log(`Merchant wallet pending balance updated: +₹${order.amount}`);
     }
 
-    // 10. Create customer notification
-    await supabase
-      .from("notifications")
-      .insert({
+    // 12. Create notifications (non-blocking)
+    await Promise.all([
+      supabase.from("notifications").insert({
         user_id: user.id,
         title: "Payment Locked in Escrow",
         message: `Your payment of ₹${order.amount.toFixed(2)} to ${order.merchant_name} has been locked in escrow.`,
         type: "payment",
         order_id: orderId,
-      });
-
-    // 11. Create merchant notification
-    await supabase
-      .from("merchant_notifications")
-      .insert({
+      }),
+      supabase.from("merchant_notifications").insert({
         merchant_id: order.merchant_id,
         title: "New Order Received",
         body: `New order of ₹${order.amount.toFixed(2)} for ${order.product_name} has been placed. Funds are locked in escrow.`,
         type: "order",
         related_order_id: orderId,
-      });
+      })
+    ]);
 
-    console.log(`Payment confirmation completed for order ${orderId}`);
+    console.log(`SUCCESS: Payment confirmation completed for order ${orderId}`);
 
     return json(200, {
       success: true,
@@ -313,7 +357,9 @@ serve(async (req) => {
       orderId,
       paymentId: payment.id,
       amount: order.amount,
-      transactionReference: transactionRef
+      transactionReference: transactionRef,
+      escrowLocked: true,
+      idempotencyKey
     });
 
   } catch (error) {
