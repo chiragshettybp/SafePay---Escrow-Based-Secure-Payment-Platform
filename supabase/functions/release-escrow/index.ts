@@ -9,6 +9,7 @@ interface ReleaseEscrowRequest {
   orderId: string;
   reason: "delivery_confirmed" | "dispute_withdrawn" | "dispute_resolved" | "merchant_won" | "close_dispute_confirm_delivery";
   disputeId?: string;
+  idempotencyKey?: string; // Client-provided idempotency key
 }
 
 Deno.serve(async (req) => {
@@ -41,7 +42,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { orderId, reason, disputeId } = await req.json() as ReleaseEscrowRequest;
+    const { orderId, reason, disputeId, idempotencyKey: clientIdempotencyKey } = await req.json() as ReleaseEscrowRequest;
 
     if (!orderId || !reason) {
       return new Response(
@@ -50,9 +51,34 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Processing escrow release for order ${orderId}, reason: ${reason}`);
+    // Generate idempotency key (use client-provided or generate)
+    const idempotencyKey = clientIdempotencyKey || `release-${orderId}-${reason}-${Date.now()}`;
+    
+    console.log(`Processing escrow release for order ${orderId}, reason: ${reason}, idempotencyKey: ${idempotencyKey}`);
 
-    // Fetch the order
+    // CRITICAL: Check if this exact operation was already processed (idempotency)
+    const { data: existingResolution } = await supabase
+      .from("escrow_resolution_log")
+      .select("*")
+      .eq("order_id", orderId)
+      .eq("resolution_type", "released")
+      .maybeSingle();
+
+    if (existingResolution) {
+      console.log(`Idempotent return: Order ${orderId} was already released at ${existingResolution.created_at}`);
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Escrow already released",
+          alreadyReleased: true,
+          resolvedAt: existingResolution.created_at,
+          idempotencyKey: existingResolution.idempotency_key
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Fetch the order with row-level locking check via status
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .select("*")
@@ -76,14 +102,26 @@ Deno.serve(async (req) => {
       );
     }
 
+    // CRITICAL: Check if escrow is already finalized (mutual exclusivity check)
+    if (order.escrow_resolution_type === 'refunded') {
+      console.error("MUTUAL_EXCLUSIVITY_VIOLATION: Cannot release - order was already refunded");
+      return new Response(
+        JSON.stringify({ 
+          error: "Cannot release escrow - order was already refunded. Mutual exclusivity violation." 
+        }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Check if escrow is already released (order is completed or refunded)
     if (order.status === "completed" || order.status === "refunded") {
-      console.log("Escrow already released for this order");
+      console.log("Escrow already finalized for this order");
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: "Escrow already released",
-          alreadyReleased: true 
+          message: order.status === "completed" ? "Escrow already released" : "Order was refunded",
+          alreadyReleased: order.status === "completed",
+          alreadyRefunded: order.status === "refunded"
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -119,7 +157,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // FIX GAP 5: Check if merchant is banned/suspended
+    // Check if merchant is banned/suspended
     const { data: merchant } = await supabase
       .from("merchants")
       .select("status, business_name")
@@ -153,11 +191,22 @@ Deno.serve(async (req) => {
       console.log("No payment record found, proceeding with order update only");
     }
 
-    // BB-ESC-01 FIX: Generate idempotency key based on order and action
-    const idempotencyKey = `release-${orderId}-${reason}`;
-    
-    // Start transaction-like operations with atomic locking
+    // CRITICAL: Check if payment is already finalized
+    if (payment?.is_final === true) {
+      console.log("Payment already finalized");
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Payment already finalized",
+          alreadyReleased: payment.status === "released"
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Start atomic transaction-like operations
     const now = new Date().toISOString();
+    const previousOrderStatus = order.status;
     
     // 1. Atomically update order status with row-level locking
     // Using SELECT FOR UPDATE semantics via atomic update condition
@@ -336,7 +385,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 6. Create order event
+    // 6. Log to escrow_resolution_log (immutable audit trail)
+    await supabase.from("escrow_resolution_log").insert({
+      order_id: orderId,
+      escrow_account_id: escrowAccount?.id || null,
+      resolution_type: "released",
+      previous_order_status: previousOrderStatus,
+      new_order_status: "completed",
+      amount: order.amount,
+      approval_source: "customer",
+      admin_id: null,
+      reason: `Customer confirmed: ${reason.replace(/_/g, " ")}`,
+      idempotency_key: idempotencyKey,
+    });
+
+    // 7. Create order event
     await supabase.from("order_events").insert({
       order_id: orderId,
       event_type: "escrow_released",
@@ -347,11 +410,12 @@ Deno.serve(async (req) => {
         disputeId, 
         amount: order.amount,
         escrow_debited: !!escrowAccount,
-        merchant_credited: true
+        merchant_credited: true,
+        idempotency_key: idempotencyKey
       }
     });
 
-    // 7. Notify merchant via merchant_notifications table
+    // 8. Notify merchant via merchant_notifications table
     await supabase.from("merchant_notifications").insert({
       merchant_id: order.merchant_id,
       title: "Payment Released",
@@ -361,7 +425,7 @@ Deno.serve(async (req) => {
       priority: "high",
     });
 
-    // 8. Notify customer
+    // 9. Notify customer
     await supabase.from("notifications").insert({
       user_id: order.customer_id,
       title: "Order Completed",
@@ -370,7 +434,7 @@ Deno.serve(async (req) => {
       order_id: orderId,
     });
 
-    console.log(`Successfully released escrow for order ${orderId}`);
+    console.log(`Successfully released escrow for order ${orderId}, idempotencyKey: ${idempotencyKey}`);
 
     return new Response(
       JSON.stringify({ 
@@ -380,7 +444,9 @@ Deno.serve(async (req) => {
         amount: order.amount,
         merchantId: order.merchant_id,
         escrowDebited: !!escrowAccount,
-        merchantCredited: true
+        merchantCredited: true,
+        idempotencyKey,
+        resolutionType: "released"
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

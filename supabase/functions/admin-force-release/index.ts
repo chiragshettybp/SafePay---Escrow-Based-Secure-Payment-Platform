@@ -71,7 +71,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Admin ${adminUser.email} initiating force release for payment ${paymentId}`);
+    const idempotencyKey = `admin-force-release-${paymentId}-${Date.now()}`;
+    console.log(`Admin ${adminUser.email} initiating force release for payment ${paymentId}, idempotencyKey: ${idempotencyKey}`);
 
     // Fetch the payment with order details
     const { data: payment, error: paymentError } = await supabase
@@ -88,8 +89,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // CRITICAL: Check if payment is already finalized
+    if (payment.is_final === true) {
+      console.log("Payment already finalized, returning idempotent success");
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: `Payment already ${payment.status}`,
+          alreadyFinalized: true
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Check if payment can be released
-    const releasableStatuses = ["locked", "pending", "in_escrow"];
+    const releasableStatuses = ["locked", "pending", "in_escrow", "escrow"];
     if (!releasableStatuses.includes(payment.status)) {
       return new Response(
         JSON.stringify({ error: `Cannot release payment with status: ${payment.status}` }),
@@ -102,6 +116,14 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Associated order not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // CRITICAL: Check for mutual exclusivity violation
+    if (order.escrow_resolution_type === 'refunded') {
+      return new Response(
+        JSON.stringify({ error: "MUTUAL_EXCLUSIVITY_VIOLATION: Cannot release - order was already refunded" }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -256,7 +278,21 @@ Deno.serve(async (req) => {
       }
     });
 
-    // 5. Create order event
+    // 5. Log to escrow_resolution_log (immutable audit trail)
+    await supabase.from("escrow_resolution_log").insert({
+      order_id: order.id,
+      escrow_account_id: escrowAccount?.id || null,
+      resolution_type: "force_released",
+      previous_order_status: order.status,
+      new_order_status: "completed",
+      amount: payment.amount,
+      approval_source: "admin",
+      admin_id: user.id,
+      reason: reason,
+      idempotency_key: idempotencyKey,
+    });
+
+    // 6. Create order event
     await supabase.from("order_events").insert({
       order_id: order.id,
       event_type: "admin_force_release",
@@ -267,7 +303,8 @@ Deno.serve(async (req) => {
         admin_email: adminUser.email, 
         reason, 
         amount: payment.amount,
-        escrow_debited: !!escrowAccount
+        escrow_debited: !!escrowAccount,
+        idempotency_key: idempotencyKey
       }
     });
 

@@ -617,6 +617,69 @@ export type Database = {
         }
         Relationships: []
       }
+      escrow_resolution_log: {
+        Row: {
+          admin_id: string | null
+          amount: number
+          approval_source: string
+          created_at: string
+          escrow_account_id: string | null
+          id: string
+          idempotency_key: string
+          ip_address: string | null
+          new_order_status: string
+          order_id: string
+          previous_order_status: string
+          reason: string
+          resolution_type: string
+        }
+        Insert: {
+          admin_id?: string | null
+          amount: number
+          approval_source: string
+          created_at?: string
+          escrow_account_id?: string | null
+          id?: string
+          idempotency_key: string
+          ip_address?: string | null
+          new_order_status: string
+          order_id: string
+          previous_order_status: string
+          reason: string
+          resolution_type: string
+        }
+        Update: {
+          admin_id?: string | null
+          amount?: number
+          approval_source?: string
+          created_at?: string
+          escrow_account_id?: string | null
+          id?: string
+          idempotency_key?: string
+          ip_address?: string | null
+          new_order_status?: string
+          order_id?: string
+          previous_order_status?: string
+          reason?: string
+          resolution_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escrow_resolution_log_escrow_account_id_fkey"
+            columns: ["escrow_account_id"]
+            isOneToOne: false
+            referencedRelation: "escrow_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escrow_resolution_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       escrow_transactions: {
         Row: {
           amount: number
@@ -1482,6 +1545,9 @@ export type Database = {
           created_at: string
           customer_id: string
           delivered_at: string | null
+          escrow_finalized_at: string | null
+          escrow_finalized_by: string | null
+          escrow_resolution_type: string | null
           expected_delivery_date: string | null
           id: string
           merchant_id: string
@@ -1497,6 +1563,9 @@ export type Database = {
           created_at?: string
           customer_id: string
           delivered_at?: string | null
+          escrow_finalized_at?: string | null
+          escrow_finalized_by?: string | null
+          escrow_resolution_type?: string | null
           expected_delivery_date?: string | null
           id?: string
           merchant_id: string
@@ -1512,6 +1581,9 @@ export type Database = {
           created_at?: string
           customer_id?: string
           delivered_at?: string | null
+          escrow_finalized_at?: string | null
+          escrow_finalized_by?: string | null
+          escrow_resolution_type?: string | null
           expected_delivery_date?: string | null
           id?: string
           merchant_id?: string
@@ -1529,6 +1601,7 @@ export type Database = {
           created_at: string
           customer_id: string
           id: string
+          is_final: boolean | null
           merchant_id: string
           order_id: string
           status: string
@@ -1540,6 +1613,7 @@ export type Database = {
           created_at?: string
           customer_id: string
           id?: string
+          is_final?: boolean | null
           merchant_id: string
           order_id: string
           status?: string
@@ -1551,6 +1625,7 @@ export type Database = {
           created_at?: string
           customer_id?: string
           id?: string
+          is_final?: boolean | null
           merchant_id?: string
           order_id?: string
           status?: string
