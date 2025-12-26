@@ -185,133 +185,36 @@ export function usePaymentFlow() {
     });
   };
 
-  // Confirm payment and lock escrow
+  // Confirm payment and lock escrow - now uses atomic server-side edge function
   const confirmPayment = useMutation({
     mutationFn: async (orderId: string) => {
       if (!user?.id) throw new Error("Not authenticated");
 
-      // Get the order details first
-      const { data: order, error: fetchError } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('id', orderId)
-        .eq('customer_id', user.id)
-        .single();
+      // Get current session for auth header
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Session expired. Please log in again.");
 
-      if (fetchError) throw fetchError;
-      if (!order) throw new Error("Order not found");
+      // Call atomic edge function
+      const response = await fetch(
+        `https://sgpefhfmcykwtfqfwzcq.supabase.co/functions/v1/confirm-payment`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNncGVmaGZtY3lrd3RmcWZ3emNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3NjI2NzUsImV4cCI6MjA4MDMzODY3NX0.qYiFr5kI2UK4uLyw57lvvX-pZsYdiYo1x0E7U9FsSEQ',
+          },
+          body: JSON.stringify({ orderId }),
+        }
+      );
 
-      // Check if already processed to prevent duplicates
-      if (order.status !== 'draft') {
-        throw new Error("Order has already been processed");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Payment confirmation failed');
       }
 
-      // Check if payment already exists for this order
-      const { data: existingPayment } = await supabase
-        .from('payments')
-        .select('id')
-        .eq('order_id', orderId)
-        .maybeSingle();
-
-      if (existingPayment) {
-        throw new Error("Payment already exists for this order");
-      }
-
-      // Update order status to escrow_locked
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ status: 'escrow_locked' })
-        .eq('id', orderId)
-        .eq('customer_id', user.id)
-        .eq('status', 'draft'); // Only update if still draft (prevents race conditions)
-
-      if (updateError) throw updateError;
-
-      // Create payment record
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          order_id: orderId,
-          customer_id: user.id,
-          merchant_id: order.merchant_id,
-          amount: order.amount,
-          status: 'locked',
-          transaction_reference: `TXN-${Date.now()}-${orderId.slice(0, 8)}`,
-        });
-
-      if (paymentError) throw paymentError;
-
-      // Update merchant's escrow account - credit the escrow
-      const { data: escrowAccount } = await supabase
-        .from('escrow_accounts')
-        .select('*')
-        .eq('merchant_id', order.merchant_id)
-        .maybeSingle();
-
-      if (escrowAccount) {
-        // Update escrow balance
-        await supabase
-          .from('escrow_accounts')
-          .update({
-            total_balance: escrowAccount.total_balance + order.amount,
-            locked_balance: escrowAccount.locked_balance + order.amount,
-          })
-          .eq('id', escrowAccount.id);
-
-        // Create escrow transaction record
-        await supabase
-          .from('escrow_transactions')
-          .insert({
-            escrow_account_id: escrowAccount.id,
-            order_id: orderId,
-            transaction_type: 'credit',
-            amount: order.amount,
-            balance_before: escrowAccount.total_balance,
-            balance_after: escrowAccount.total_balance + order.amount,
-            reason: 'Payment locked in escrow',
-            created_by: user.id,
-          });
-      }
-
-      // Also update merchant_wallets.pending_balance for UI display
-      const { data: merchantWallet } = await supabase
-        .from('merchant_wallets')
-        .select('*')
-        .eq('merchant_id', order.merchant_id)
-        .maybeSingle();
-
-      if (merchantWallet) {
-        await supabase
-          .from('merchant_wallets')
-          .update({
-            pending_balance: merchantWallet.pending_balance + order.amount,
-          })
-          .eq('id', merchantWallet.id);
-      }
-
-      // Create notification for customer
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: user.id,
-          title: 'Payment Locked in Escrow',
-          message: `Your payment of ₹${order.amount.toFixed(2)} to ${order.merchant_name} has been locked in escrow.`,
-          type: 'payment',
-          order_id: orderId,
-        });
-
-      // Create notification for merchant
-      await supabase
-        .from('merchant_notifications')
-        .insert({
-          merchant_id: order.merchant_id,
-          title: 'New Order Received',
-          body: `New order of ₹${order.amount.toFixed(2)} for ${order.product_name} has been placed. Funds are locked in escrow.`,
-          type: 'order',
-          related_order_id: orderId,
-        });
-
-      return { orderId, order };
+      return { orderId, ...data };
     },
     onSuccess: ({ orderId }) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
