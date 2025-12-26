@@ -127,11 +127,33 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
         addresses = (userAddresses || []) as CustomerAddress[];
       }
 
+      // Normalize JSON fields (some legacy flows stored JSON as string)
+      const normalizeJson = <T,>(value: unknown, fallback: T): T => {
+        if (value == null) return fallback;
+        if (typeof value === 'string') {
+          try {
+            return JSON.parse(value) as T;
+          } catch {
+            return fallback;
+          }
+        }
+        return value as T;
+      };
+
+      const rawCart = normalizeJson<unknown>(session.cart_data, []);
+      const cartArray = Array.isArray(rawCart) ? rawCart : [];
+      const normalizedCart: CartItem[] = cartArray.map((item: any) => ({
+        product_name: item?.product_name ?? item?.name ?? 'Item',
+        quantity: Number(item?.quantity ?? 1),
+        price: Number(item?.price ?? 0),
+        image_url: item?.image_url ?? undefined,
+      }));
+
       // Cast the session to our type
       const typedSession: CheckoutSession = {
         ...session,
-        cart_data: (session.cart_data || []) as unknown as CartItem[],
-        shipping_address: session.shipping_address as unknown as ShippingAddress | null,
+        cart_data: normalizedCart,
+        shipping_address: normalizeJson<ShippingAddress | null>(session.shipping_address, null),
         merchants: session.merchants as CheckoutSession['merchants'],
       };
 
