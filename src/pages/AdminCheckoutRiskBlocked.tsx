@@ -189,7 +189,6 @@ export default function AdminCheckoutRiskBlocked() {
       <div className="p-4 sm:p-6 space-y-6">
         <AdminPageHeader
           title="Blocked Entities"
-          backHref="/admin/checkout/risk"
           actions={
             <Button onClick={() => setBlockDialog(true)}>
               <Plus className="h-4 w-4 mr-2" />
