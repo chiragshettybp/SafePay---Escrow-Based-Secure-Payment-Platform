@@ -178,6 +178,11 @@ import MerchantPaymentLinkDetails from "./pages/MerchantPaymentLinkDetails";
 import MerchantCheckoutReports from "./pages/MerchantCheckoutReports";
 import PublicMerchantCheckout from "./pages/PublicMerchantCheckout";
 import PublicPaymentLinkCheckout from "./pages/PublicPaymentLinkCheckout";
+import PublicCheckoutSuccess from "./pages/PublicCheckoutSuccess";
+import PublicCheckoutFailed from "./pages/PublicCheckoutFailed";
+import PublicCheckoutExpired from "./pages/PublicCheckoutExpired";
+import PublicPaymentReceipt from "./pages/PublicPaymentReceipt";
+import MerchantPaymentLinkPayments from "./pages/MerchantPaymentLinkPayments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -302,10 +307,15 @@ const App = () => (
                 <Route path="checkout/payment-links" element={<MerchantPaymentLinks />} />
                 <Route path="checkout/payment-links/create" element={<MerchantPaymentLinkCreate />} />
                 <Route path="checkout/payment-links/:linkId" element={<MerchantPaymentLinkDetails />} />
+                <Route path="checkout/payment-links/:linkId/payments" element={<MerchantPaymentLinkPayments />} />
               </Route>
               {/* Public Payment Routes */}
               <Route path="/pay/:merchantSlug" element={<PublicMerchantCheckout />} />
               <Route path="/pay/:merchantSlug/:linkCode" element={<PublicPaymentLinkCheckout />} />
+              <Route path="/pay/:merchantSlug/success" element={<PublicCheckoutSuccess />} />
+              <Route path="/pay/:merchantSlug/failed" element={<PublicCheckoutFailed />} />
+              <Route path="/pay/:merchantSlug/expired" element={<PublicCheckoutExpired />} />
+              <Route path="/pay/receipt/:paymentId" element={<PublicPaymentReceipt />} />
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/reset-password" element={<AdminResetPassword />} />
