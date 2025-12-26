@@ -497,6 +497,87 @@ export type Database = {
         }
         Relationships: []
       }
+      blocked_entities: {
+        Row: {
+          admin_notes: string | null
+          block_reason: string
+          blocked_at: string
+          created_by: string | null
+          entity_identifier: string
+          entity_identifier_masked: string | null
+          entity_type: string
+          expires_at: string | null
+          id: string
+          is_permanent: boolean
+          is_whitelisted: boolean
+          metadata: Json | null
+          risk_score: number | null
+          rule_id: string | null
+          rule_name: string | null
+          session_id: string | null
+          unblock_reason: string | null
+          unblocked_at: string | null
+          unblocked_by: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          block_reason: string
+          blocked_at?: string
+          created_by?: string | null
+          entity_identifier: string
+          entity_identifier_masked?: string | null
+          entity_type: string
+          expires_at?: string | null
+          id?: string
+          is_permanent?: boolean
+          is_whitelisted?: boolean
+          metadata?: Json | null
+          risk_score?: number | null
+          rule_id?: string | null
+          rule_name?: string | null
+          session_id?: string | null
+          unblock_reason?: string | null
+          unblocked_at?: string | null
+          unblocked_by?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          block_reason?: string
+          blocked_at?: string
+          created_by?: string | null
+          entity_identifier?: string
+          entity_identifier_masked?: string | null
+          entity_type?: string
+          expires_at?: string | null
+          id?: string
+          is_permanent?: boolean
+          is_whitelisted?: boolean
+          metadata?: Json | null
+          risk_score?: number | null
+          rule_id?: string | null
+          rule_name?: string | null
+          session_id?: string | null
+          unblock_reason?: string | null
+          unblocked_at?: string | null
+          unblocked_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blocked_entities_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "risk_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blocked_entities_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "checkout_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checkout_attempts: {
         Row: {
           amount: number
@@ -3280,6 +3361,196 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      risk_admin_actions: {
+        Row: {
+          action_type: string
+          admin_id: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          new_state: Json | null
+          previous_state: Json | null
+          reason: string | null
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_state?: Json | null
+          previous_state?: Json | null
+          reason?: string | null
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_state?: Json | null
+          previous_state?: Json | null
+          reason?: string | null
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: []
+      }
+      risk_evaluations: {
+        Row: {
+          decision: string
+          decision_reason: string | null
+          evaluated_at: string
+          id: string
+          metadata: Json | null
+          risk_score: number
+          rules_triggered: Json
+          session_id: string
+          signals: Json
+        }
+        Insert: {
+          decision?: string
+          decision_reason?: string | null
+          evaluated_at?: string
+          id?: string
+          metadata?: Json | null
+          risk_score?: number
+          rules_triggered?: Json
+          session_id: string
+          signals?: Json
+        }
+        Update: {
+          decision?: string
+          decision_reason?: string | null
+          evaluated_at?: string
+          id?: string
+          metadata?: Json | null
+          risk_score?: number
+          rules_triggered?: Json
+          session_id?: string
+          signals?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_evaluations_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "checkout_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      risk_rule_versions: {
+        Row: {
+          change_reason: string | null
+          changed_at: string
+          changed_by: string
+          id: string
+          new_state: Json
+          previous_state: Json
+          rule_id: string
+          version: number
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_at?: string
+          changed_by: string
+          id?: string
+          new_state: Json
+          previous_state: Json
+          rule_id: string
+          version: number
+        }
+        Update: {
+          change_reason?: string | null
+          changed_at?: string
+          changed_by?: string
+          id?: string
+          new_state?: Json
+          previous_state?: Json
+          rule_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_rule_versions_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "risk_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      risk_rules: {
+        Row: {
+          action: string
+          conditions: Json
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          last_triggered_at: string | null
+          name: string
+          priority: number
+          rule_type: string
+          scope: string
+          scope_id: string | null
+          severity: string
+          threshold_value: number | null
+          time_window_minutes: number | null
+          trigger_count: number
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          action?: string
+          conditions?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_triggered_at?: string | null
+          name: string
+          priority?: number
+          rule_type: string
+          scope?: string
+          scope_id?: string | null
+          severity?: string
+          threshold_value?: number | null
+          time_window_minutes?: number | null
+          trigger_count?: number
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          action?: string
+          conditions?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_triggered_at?: string | null
+          name?: string
+          priority?: number
+          rule_type?: string
+          scope?: string
+          scope_id?: string | null
+          severity?: string
+          threshold_value?: number | null
+          time_window_minutes?: number | null
+          trigger_count?: number
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
       }
       shipment_actions_log: {
         Row: {
