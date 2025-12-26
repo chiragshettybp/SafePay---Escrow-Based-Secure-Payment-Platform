@@ -150,7 +150,8 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    // Use global scope to invalidate all admin sessions on all devices
+    await supabase.auth.signOut({ scope: 'global' });
     setUser(null);
     setSession(null);
   };

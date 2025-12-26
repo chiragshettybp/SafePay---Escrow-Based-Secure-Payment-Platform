@@ -62,23 +62,11 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
       if (fetchError) throw fetchError;
       if (existing) return;
 
-      // Fallback only: in normal flow, the merchant profile is created server-side.
-      const businessName = u.email.split("@")[0] ?? "Merchant";
-
-      const { error } = await merchantSupabase.from("merchants").insert({
-        user_id: u.id,
-        business_name: businessName,
-        email: u.email,
-        phone: null,
-        category: null,
-        gst_number: null,
-        address: null,
-        status: "active",
-      });
-
-      if (error) throw error;
+      // Merchant profile must be created via the merchant-signup edge function
+      // This fallback is only for edge cases - merchants should always sign up properly
+      console.warn("Merchant profile missing - user should re-register via merchant signup");
     } catch (error) {
-      console.error("Error ensuring merchant profile:", error);
+      console.error("Error checking merchant profile:", error);
     }
   };
 
@@ -223,7 +211,8 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await merchantSupabase.auth.signOut();
+    // Use global scope to invalidate sessions on all devices for security
+    await merchantSupabase.auth.signOut({ scope: 'global' });
     setUser(null);
     setSession(null);
     setMerchant(null);
