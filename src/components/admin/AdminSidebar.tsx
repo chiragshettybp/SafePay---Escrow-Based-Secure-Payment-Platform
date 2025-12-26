@@ -84,6 +84,7 @@ export function AdminSidebar({ isCollapsed = false, onToggle, onClose, alerts }:
         { title: "Sessions", href: "/admin/checkout/sessions", icon: ShoppingCart },
         { title: "Gateways", href: "/admin/checkout/gateways", icon: Zap },
         { title: "Risk & Fraud", href: "/admin/checkout/risk", icon: Shield },
+        { title: "Settings", href: "/admin/checkout/settings", icon: Settings },
       ],
     },
     {
