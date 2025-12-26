@@ -102,9 +102,12 @@ export function usePaymentLinks() {
     }
 
     try {
+      // Generate a unique link code
+      const linkCode = `PLINK_${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      
       const { data: newLink, error } = await supabase
         .from("payment_links")
-        .insert({
+        .insert([{
           merchant_id: merchant.id,
           title: data.title,
           description: data.description || null,
@@ -112,7 +115,8 @@ export function usePaymentLinks() {
           expires_at: data.expires_at || null,
           success_redirect_url: data.success_redirect_url || null,
           cancel_redirect_url: data.cancel_redirect_url || null,
-        })
+          link_code: linkCode,
+        }])
         .select()
         .single();
 
