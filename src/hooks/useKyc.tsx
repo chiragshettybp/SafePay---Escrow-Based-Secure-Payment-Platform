@@ -20,6 +20,8 @@ interface KycRecord {
   status: string;
   rejection_reason: string | null;
   reviewed_at: string | null;
+  verified_at: string | null;
+  submission_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +38,16 @@ interface UpdateKycData {
   selfie_url?: string;
   address_proof_url?: string;
   status?: string;
+}
+
+// Simple hash function for document number (SHA-256 would be ideal in production)
+async function hashDocumentNumber(docNumber: string): Promise<string> {
+  const normalized = docNumber.toUpperCase().replace(/\s/g, '');
+  const encoder = new TextEncoder();
+  const data = encoder.encode(normalized);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 export function useKyc() {
@@ -71,33 +83,60 @@ export function useKyc() {
     mutationFn: async (data: UpdateKycData) => {
       if (!user?.id) throw new Error("Not authenticated");
 
+      // Hash document number if provided
+      let dataWithHash = { ...data };
+      if (data.id_number) {
+        const docHash = await hashDocumentNumber(data.id_number);
+        (dataWithHash as Record<string, unknown>).document_number_hash = docHash;
+      }
+
       // Check if record exists
       const { data: existing } = await supabase
         .from("kyc_records")
-        .select("id")
+        .select("id, status, submission_count")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (existing) {
+        // Check if re-upload is allowed
+        if (existing.status === 'rejected' && (existing.submission_count || 0) >= 5) {
+          throw new Error("Maximum re-upload attempts reached. Please contact support.");
+        }
+
         // Update existing
         const { data: updated, error } = await supabase
           .from("kyc_records")
-          .update(data)
+          .update(dataWithHash)
           .eq("user_id", user.id)
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          // Check for document reuse error
+          if (error.message?.includes('already registered')) {
+            throw new Error("This document is already registered with another account.");
+          }
+          throw error;
+        }
         return updated;
       } else {
         // Create new
         const { data: created, error } = await supabase
           .from("kyc_records")
-          .insert({ user_id: user.id, ...data })
+          .insert({ 
+            user_id: user.id, 
+            ...dataWithHash,
+            submission_count: 1
+          })
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          if (error.message?.includes('already registered')) {
+            throw new Error("This document is already registered with another account.");
+          }
+          throw error;
+        }
         return created;
       }
     },
@@ -113,7 +152,7 @@ export function useKyc() {
     },
   });
 
-  // Upload KYC document
+  // Upload KYC document - with history tracking
   const uploadDocument = useMutation({
     mutationFn: async ({
       file,
@@ -124,15 +163,35 @@ export function useKyc() {
     }) => {
       if (!user?.id) throw new Error("Not authenticated");
 
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${user.id}/${type}.${fileExt}`;
+      // Get current KYC record for submission count
+      const { data: currentKyc } = await supabase
+        .from("kyc_records")
+        .select("id, submission_count")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-      // Upload to storage
+      const submissionNumber = (currentKyc?.submission_count || 0) + 1;
+      const fileExt = file.name.split(".").pop();
+      // Use unique filename with submission number to preserve history
+      const fileName = `${user.id}/${type}_v${submissionNumber}_${Date.now()}.${fileExt}`;
+
+      // Upload to storage (NO upsert - create new file each time)
       const { error: uploadError } = await supabase.storage
         .from("kyc-documents")
-        .upload(fileName, file, { upsert: true });
+        .upload(fileName, file, { upsert: false });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        // If file exists, it's a duplicate - try with different timestamp
+        if (uploadError.message?.includes('already exists')) {
+          const retryFileName = `${user.id}/${type}_v${submissionNumber}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.${fileExt}`;
+          const { error: retryError } = await supabase.storage
+            .from("kyc-documents")
+            .upload(retryFileName, file, { upsert: false });
+          if (retryError) throw retryError;
+        } else {
+          throw uploadError;
+        }
+      }
 
       // Get signed URL for private bucket
       const { data: urlData, error: urlError } = await supabase.storage
@@ -140,6 +199,20 @@ export function useKyc() {
         .createSignedUrl(fileName, 3600 * 24 * 365); // 1 year
 
       if (urlError) throw urlError;
+
+      // Log document upload to history
+      if (currentKyc?.id) {
+        await supabase.from("kyc_document_history").insert({
+          kyc_id: currentKyc.id,
+          kyc_type: "customer",
+          user_id: user.id,
+          document_type: type,
+          file_url: urlData.signedUrl,
+          file_name: file.name,
+          file_size: file.size,
+          submission_number: submissionNumber,
+        });
+      }
 
       return { url: urlData.signedUrl, type };
     },
@@ -161,14 +234,31 @@ export function useKyc() {
     },
   });
 
-  // Submit KYC for review
+  // Submit KYC for review - increments submission count
   const submitKyc = useMutation({
     mutationFn: async () => {
       if (!user?.id) throw new Error("Not authenticated");
 
+      // Get current record to check submission count
+      const { data: current, error: fetchError } = await supabase
+        .from("kyc_records")
+        .select("submission_count, status")
+        .eq("user_id", user.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Check re-upload limit
+      if ((current?.submission_count || 0) >= 5) {
+        throw new Error("Maximum submission attempts (5) reached. Please contact support.");
+      }
+
       const { data, error } = await supabase
         .from("kyc_records")
-        .update({ status: "submitted" })
+        .update({ 
+          status: "submitted",
+          submission_count: (current?.submission_count || 0) + 1
+        })
         .eq("user_id", user.id)
         .select()
         .single();

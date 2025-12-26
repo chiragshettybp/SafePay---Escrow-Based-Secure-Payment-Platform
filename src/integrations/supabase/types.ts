@@ -770,6 +770,141 @@ export type Database = {
         }
         Relationships: []
       }
+      kyc_actions_log: {
+        Row: {
+          action_type: string
+          admin_id: string | null
+          created_at: string
+          document_hash: string | null
+          document_type: string | null
+          id: string
+          ip_address: string | null
+          kyc_id: string
+          kyc_type: string
+          metadata: Json | null
+          new_status: string | null
+          previous_status: string | null
+          reason: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          admin_id?: string | null
+          created_at?: string
+          document_hash?: string | null
+          document_type?: string | null
+          id?: string
+          ip_address?: string | null
+          kyc_id: string
+          kyc_type: string
+          metadata?: Json | null
+          new_status?: string | null
+          previous_status?: string | null
+          reason?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string | null
+          created_at?: string
+          document_hash?: string | null
+          document_type?: string | null
+          id?: string
+          ip_address?: string | null
+          kyc_id?: string
+          kyc_type?: string
+          metadata?: Json | null
+          new_status?: string | null
+          previous_status?: string | null
+          reason?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      kyc_document_history: {
+        Row: {
+          created_at: string
+          document_type: string
+          file_hash: string | null
+          file_name: string | null
+          file_size: number | null
+          file_url: string
+          id: string
+          kyc_id: string
+          kyc_type: string
+          replaced_by: string | null
+          submission_number: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_type: string
+          file_hash?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          file_url: string
+          id?: string
+          kyc_id: string
+          kyc_type: string
+          replaced_by?: string | null
+          submission_number: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          document_type?: string
+          file_hash?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          kyc_id?: string
+          kyc_type?: string
+          replaced_by?: string | null
+          submission_number?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      kyc_document_reuse_attempts: {
+        Row: {
+          attempted_by: string
+          created_at: string
+          document_hash: string
+          document_type: string
+          id: string
+          ip_address: string | null
+          original_kyc_id: string
+          original_user_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          attempted_by: string
+          created_at?: string
+          document_hash: string
+          document_type: string
+          id?: string
+          ip_address?: string | null
+          original_kyc_id: string
+          original_user_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          attempted_by?: string
+          created_at?: string
+          document_hash?: string
+          document_type?: string
+          id?: string
+          ip_address?: string | null
+          original_kyc_id?: string
+          original_user_id?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       kyc_records: {
         Row: {
           address: string | null
@@ -777,19 +912,23 @@ export type Database = {
           country: string | null
           created_at: string
           date_of_birth: string | null
+          document_number_hash: string | null
           full_legal_name: string | null
           id: string
           id_back_url: string | null
           id_front_url: string | null
           id_number: string | null
+          last_rejection_id: string | null
           pincode: string | null
           rejection_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           selfie_url: string | null
           status: string
+          submission_count: number | null
           updated_at: string
           user_id: string
+          verified_at: string | null
         }
         Insert: {
           address?: string | null
@@ -797,19 +936,23 @@ export type Database = {
           country?: string | null
           created_at?: string
           date_of_birth?: string | null
+          document_number_hash?: string | null
           full_legal_name?: string | null
           id?: string
           id_back_url?: string | null
           id_front_url?: string | null
           id_number?: string | null
+          last_rejection_id?: string | null
           pincode?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           selfie_url?: string | null
           status?: string
+          submission_count?: number | null
           updated_at?: string
           user_id: string
+          verified_at?: string | null
         }
         Update: {
           address?: string | null
@@ -817,19 +960,23 @@ export type Database = {
           country?: string | null
           created_at?: string
           date_of_birth?: string | null
+          document_number_hash?: string | null
           full_legal_name?: string | null
           id?: string
           id_back_url?: string | null
           id_front_url?: string | null
           id_number?: string | null
+          last_rejection_id?: string | null
           pincode?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           selfie_url?: string | null
           status?: string
+          submission_count?: number | null
           updated_at?: string
           user_id?: string
+          verified_at?: string | null
         }
         Relationships: []
       }
@@ -973,57 +1120,72 @@ export type Database = {
           business_type: string | null
           created_at: string
           gst_number: string | null
+          gst_number_hash: string | null
           id: string
+          last_rejection_id: string | null
           legal_business_name: string | null
           merchant_id: string
           owner_dob: string | null
           owner_name: string | null
           owner_phone: string | null
           pan_number: string | null
+          pan_number_hash: string | null
           registered_address: string | null
           rejection_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: string
+          submission_count: number | null
           updated_at: string
+          verified_at: string | null
         }
         Insert: {
           additional_notes?: string | null
           business_type?: string | null
           created_at?: string
           gst_number?: string | null
+          gst_number_hash?: string | null
           id?: string
+          last_rejection_id?: string | null
           legal_business_name?: string | null
           merchant_id: string
           owner_dob?: string | null
           owner_name?: string | null
           owner_phone?: string | null
           pan_number?: string | null
+          pan_number_hash?: string | null
           registered_address?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
+          submission_count?: number | null
           updated_at?: string
+          verified_at?: string | null
         }
         Update: {
           additional_notes?: string | null
           business_type?: string | null
           created_at?: string
           gst_number?: string | null
+          gst_number_hash?: string | null
           id?: string
+          last_rejection_id?: string | null
           legal_business_name?: string | null
           merchant_id?: string
           owner_dob?: string | null
           owner_name?: string | null
           owner_phone?: string | null
           pan_number?: string | null
+          pan_number_hash?: string | null
           registered_address?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
+          submission_count?: number | null
           updated_at?: string
+          verified_at?: string | null
         }
         Relationships: []
       }
@@ -2755,6 +2917,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_kyc_document_uniqueness: {
+        Args: {
+          p_document_hash: string
+          p_document_type: string
+          p_user_id: string
+        }
+        Returns: {
+          is_unique: boolean
+          original_kyc_id: string
+          original_user_id: string
+        }[]
+      }
+      check_kyc_reupload_limit: {
+        Args: { p_kyc_type: string; p_user_id: string }
+        Returns: boolean
+      }
       check_wallet_ledger_consistency: {
         Args: { p_customer_id: string }
         Returns: {
