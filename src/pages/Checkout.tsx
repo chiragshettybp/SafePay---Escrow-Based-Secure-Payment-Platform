@@ -114,6 +114,7 @@ export default function Checkout() {
     addresses,
     isLoading,
     isExpired,
+    error,
     sendOtp,
     verifyOtp,
     updateAddress,
@@ -248,6 +249,24 @@ export default function Checkout() {
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
           <p className="mt-4 text-muted-foreground">Loading checkout...</p>
         </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <Clock className="h-12 w-12 mx-auto text-destructive mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Checkout Unavailable</h2>
+            <p className="text-muted-foreground mb-6">
+              Unable to load checkout session. Please try again.
+            </p>
+            <Button onClick={() => navigate('/')}>Return to Home</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
