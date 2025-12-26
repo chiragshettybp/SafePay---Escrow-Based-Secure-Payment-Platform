@@ -38,6 +38,7 @@ export interface CheckoutSession {
   cart_total: number;
   selected_payment_method: string | null;
   payment_attempts: number;
+  otp_attempts: number;
   last_payment_error: string | null;
   created_at: string;
   updated_at: string;
