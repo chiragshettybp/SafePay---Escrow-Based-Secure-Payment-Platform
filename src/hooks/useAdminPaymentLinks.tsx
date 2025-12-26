@@ -364,23 +364,23 @@ export function useAdminPaymentLinkDetails(linkId: string | undefined) {
         merchant: merchantData,
       });
 
-      // Fetch payments for this link
-      const paymentsResult = await supabase
+      // Fetch payments for this link using simple query
+      const paymentsQuery = supabase
         .from("payments")
-        .select("id, order_id, amount, status, payment_method, gateway_payment_id, created_at, updated_at")
-        .eq("payment_link_id", linkId)
-        .order("created_at", { ascending: false });
-
+        .select("*")
+        .eq("payment_link_id", linkId);
+      
+      const paymentsResult = await paymentsQuery;
       setPayments((paymentsResult.data || []) as any[]);
 
       // Fetch checkout sessions for this link
-      const { data: sessionsData } = await supabase
+      const sessionsQuery = supabase
         .from("checkout_sessions")
         .select("*")
-        .eq("payment_link_id", linkId)
-        .order("created_at", { ascending: false });
-
-      setSessions(sessionsData || []);
+        .eq("payment_link_id", linkId);
+      
+      const sessionsResult = await sessionsQuery;
+      setSessions((sessionsResult.data || []) as any[]);
     } catch (error: unknown) {
       console.error("Error fetching payment link details:", error);
       toast({
