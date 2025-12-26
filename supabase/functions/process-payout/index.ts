@@ -176,27 +176,7 @@ serve(async (req) => {
     const transactionId = `TXN${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
     const now = new Date().toISOString();
 
-    // 6. ATOMIC: Deduct from wallet with balance check
-    const { data: updatedWallet, error: updateWalletError } = await supabase
-      .from("merchant_wallets")
-      .update({
-        available_balance: wallet.available_balance - amount,
-        pending_balance: wallet.pending_balance + amount,
-        updated_at: now
-      })
-      .eq("id", wallet.id)
-      .gte("available_balance", amount) // Atomic balance check
-      .select()
-      .single();
-
-    if (updateWalletError || !updatedWallet) {
-      console.error("Failed to update wallet (possible race condition):", updateWalletError);
-      return json(400, { error: "Balance changed during processing. Please try again." });
-    }
-
-    console.log(`Wallet updated: available ${wallet.available_balance} -> ${updatedWallet.available_balance}`);
-
-    // 7. Create payout record
+    // 6. Create payout record FIRST
     const { data: payout, error: payoutError } = await supabase
       .from("merchant_payouts")
       .insert({
@@ -214,18 +194,57 @@ serve(async (req) => {
 
     if (payoutError) {
       console.error("Failed to create payout:", payoutError);
-      // Rollback wallet update
-      await supabase
-        .from("merchant_wallets")
-        .update({
-          available_balance: wallet.available_balance,
-          pending_balance: wallet.pending_balance,
-          updated_at: now
-        })
-        .eq("id", wallet.id);
-      
       return json(500, { error: "Failed to create payout record" });
     }
+
+    // 7. Create merchant wallet ledger entry (LEDGER-FIRST APPROACH)
+    // This will auto-sync the wallet balance via database trigger
+    const { error: ledgerError } = await supabase
+      .from("merchant_wallet_transactions")
+      .insert({
+        merchant_id: user.id,
+        transaction_type: "withdrawal",
+        amount: amount,
+        balance_before: wallet.available_balance,
+        balance_after: wallet.available_balance - amount,
+        status: "pending", // Pending until bank confirms
+        reference_type: "payout",
+        reference_id: payout.id,
+        reason: `Withdrawal to ${bankAccount.bank_name} ••••${bankAccount.account_number.slice(-4)}`,
+        created_by: user.id,
+      });
+
+    if (ledgerError) {
+      console.error("Failed to create ledger entry:", ledgerError);
+      // Rollback payout record
+      await supabase
+        .from("merchant_payouts")
+        .delete()
+        .eq("id", payout.id);
+      
+      return json(500, { error: "Failed to create ledger entry" });
+    }
+
+    // Also create fee ledger entry
+    if (fee > 0) {
+      await supabase
+        .from("merchant_wallet_transactions")
+        .insert({
+          merchant_id: user.id,
+          transaction_type: "fee",
+          amount: fee,
+          balance_before: wallet.available_balance - amount,
+          balance_after: wallet.available_balance - amount, // Fee doesn't change balance - it's deducted from payout
+          status: "success",
+          reference_type: "payout",
+          reference_id: payout.id,
+          reason: `Withdrawal fee (${PAYOUT_FEE_PERCENT}%)`,
+          created_by: user.id,
+        });
+    }
+
+    console.log(`LEDGER: Withdrawal entry created: -₹${amount}, fee: ₹${fee}`);
+    console.log(`Wallet will sync via trigger: available ${wallet.available_balance} -> ${wallet.available_balance - amount}`)
 
     console.log(`Payout created: ${payout.id}, amount: ₹${amount}, net: ₹${netAmount}`);
 

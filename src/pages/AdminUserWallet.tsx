@@ -144,20 +144,8 @@ export default function AdminUserWallet() {
 
         if (error) throw error;
       } else if (wallet) {
-        // Credit or debit
-        const newBalance = actionType === 'credit' 
-          ? wallet.balance + amountValue 
-          : Math.max(0, wallet.balance - amountValue);
-
-        // Update wallet balance
-        const { error: walletError } = await supabase
-          .from('wallets')
-          .update({ balance: newBalance })
-          .eq('id', wallet.id);
-
-        if (walletError) throw walletError;
-
-        // Create transaction record
+        // LEDGER-FIRST APPROACH: Create transaction first, wallet syncs via trigger
+        // Create ledger entry - balance will be auto-synced via database trigger
         const { error: txError } = await supabase
           .from('wallet_transactions')
           .insert({
@@ -167,10 +155,13 @@ export default function AdminUserWallet() {
             amount: amountValue,
             description: reason,
             reference_type: 'admin_adjustment',
-            status: 'completed',
+            status: 'success', // Must be 'success' not 'completed' for ledger computation
           });
 
         if (txError) throw txError;
+
+        // Note: Wallet balance is now auto-synced via database trigger (sync_wallet_balance_from_ledger)
+        // No direct balance update needed - this ensures ledger is source of truth
       }
 
       // Log to verification history

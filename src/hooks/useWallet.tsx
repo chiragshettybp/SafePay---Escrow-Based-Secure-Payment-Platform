@@ -125,7 +125,8 @@ export function useWallet() {
     enabled: !!user?.id,
   });
 
-  // Credit wallet from refund
+  // Credit wallet from refund - LEDGER-FIRST APPROACH
+  // Wallet balance will be auto-synced via database trigger
   const creditFromRefund = useMutation({
     mutationFn: async ({
       refundId,
@@ -138,7 +139,7 @@ export function useWallet() {
     }) => {
       if (!user?.id || !wallet?.id) throw new Error("Wallet not available");
 
-      // Create wallet transaction
+      // Create wallet transaction (ledger entry) - balance syncs via trigger
       const { error: txError } = await supabase
         .from("wallet_transactions")
         .insert({
@@ -154,16 +155,8 @@ export function useWallet() {
 
       if (txError) throw txError;
 
-      // Update wallet balance
-      const { error: walletError } = await supabase
-        .from("wallets")
-        .update({ 
-          balance: wallet.balance + amount,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", wallet.id);
-
-      if (walletError) throw walletError;
+      // Note: Wallet balance is now auto-synced via database trigger (sync_wallet_balance_from_ledger)
+      // No direct balance update needed - this ensures ledger is source of truth
 
       return { success: true };
     },
@@ -184,7 +177,8 @@ export function useWallet() {
     },
   });
 
-  // Withdraw to bank account - BB-WAL-01/02 FIX: Atomic balance check and deduction
+  // Withdraw to bank account - LEDGER-FIRST APPROACH
+  // Wallet balance will be auto-synced via database trigger
   const withdrawToBank = useMutation({
     mutationFn: async ({
       bankAccountId,
@@ -197,7 +191,7 @@ export function useWallet() {
       
       if (amount <= 0) throw new Error("Amount must be greater than 0");
 
-      // BB-WAL-01 FIX: Check for pending withdrawals first
+      // Check for pending withdrawals first
       const { data: pendingWithdrawals, error: pendingError } = await supabase
         .from("wallet_transactions")
         .select("id, amount")
@@ -212,7 +206,7 @@ export function useWallet() {
         throw new Error(`You have ${pendingWithdrawals.length} pending withdrawal(s) totaling ₹${pendingTotal.toFixed(2)}. Please wait for them to complete.`);
       }
 
-      // BB-WAL-02 FIX: Re-fetch wallet balance atomically
+      // Compute current balance from ledger for accurate check
       const { data: freshWallet, error: freshWalletError } = await supabase
         .from("wallets")
         .select("*")
@@ -240,23 +234,8 @@ export function useWallet() {
         throw new Error("Bank account must be verified for withdrawals");
       }
 
-      // BB-WAL-01 FIX: Atomic wallet deduction with balance check
-      const { data: updatedWallet, error: walletError } = await supabase
-        .from("wallets")
-        .update({ 
-          balance: freshWallet.balance - amount,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", freshWallet.id)
-        .gte("balance", amount) // Atomic check
-        .select()
-        .single();
-
-      if (walletError || !updatedWallet) {
-        throw new Error("Balance changed during processing. Please try again.");
-      }
-
-      // Create withdrawal transaction after successful balance deduction
+      // LEDGER-FIRST: Create withdrawal transaction (ledger entry)
+      // Balance will be auto-synced via database trigger
       const { data: transaction, error: txError } = await supabase
         .from("wallet_transactions")
         .insert({
@@ -278,16 +257,11 @@ export function useWallet() {
         .single();
 
       if (txError) {
-        // Rollback wallet balance on transaction creation failure
-        await supabase
-          .from("wallets")
-          .update({ 
-            balance: freshWallet.balance,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", freshWallet.id);
-        throw txError;
+        throw new Error("Failed to create withdrawal transaction");
       }
+
+      // Note: Wallet balance is now auto-synced via database trigger (sync_wallet_balance_from_ledger)
+      // The trigger computes: balance = SUM(credits) - SUM(debits including pending withdrawals)
 
       return transaction;
     },

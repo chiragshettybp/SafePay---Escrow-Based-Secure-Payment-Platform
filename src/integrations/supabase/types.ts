@@ -1312,6 +1312,51 @@ export type Database = {
           },
         ]
       }
+      merchant_wallet_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at: string
+          created_by: string | null
+          id: string
+          merchant_id: string
+          reason: string | null
+          reference_id: string | null
+          reference_type: string | null
+          status: string
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          merchant_id: string
+          reason?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          status?: string
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          balance_before?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          merchant_id?: string
+          reason?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          status?: string
+          transaction_type?: string
+        }
+        Relationships: []
+      }
       merchant_wallets: {
         Row: {
           available_balance: number
@@ -2590,6 +2635,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_wallet_ledger_consistency: {
+        Args: { p_customer_id: string }
+        Returns: {
+          discrepancy: number
+          is_consistent: boolean
+          ledger_balance: number
+          wallet_balance: number
+        }[]
+      }
+      compute_merchant_wallet_balances: {
+        Args: { p_merchant_id: string }
+        Returns: {
+          available_balance: number
+          pending_balance: number
+          total_paid_out: number
+        }[]
+      }
+      compute_wallet_balance: {
+        Args: { p_customer_id: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
