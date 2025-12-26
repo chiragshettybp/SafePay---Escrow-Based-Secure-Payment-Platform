@@ -7,12 +7,15 @@ import {
   TrendingUp, 
   XCircle, 
   CreditCard, 
-  Banknote,
   Clock,
   AlertTriangle,
   ChevronRight,
   Calendar,
-  Loader2
+  Loader2,
+  Settings,
+  UserCheck,
+  ArrowUpDown,
+  Gift
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -245,6 +248,44 @@ export default function MerchantCheckoutDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Checkout Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Checkout Settings
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <SettingsCard
+                title="Login & Identification"
+                description="OTP, guest checkout, auto-login"
+                icon={UserCheck}
+                onClick={() => navigate('/merchant/checkout/settings/login')}
+              />
+              <SettingsCard
+                title="Payment Method Order"
+                description="Reorder & prioritize payment methods"
+                icon={ArrowUpDown}
+                onClick={() => navigate('/merchant/checkout/settings/payment-order')}
+              />
+              <SettingsCard
+                title="Prepaid Nudges"
+                description="Conversion incentives & messaging"
+                icon={Gift}
+                onClick={() => navigate('/merchant/checkout/settings/prepaid-nudges')}
+              />
+              <SettingsCard
+                title="All Settings"
+                description="View complete checkout configuration"
+                icon={Settings}
+                onClick={() => navigate('/merchant/checkout/settings')}
+              />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </MerchantLayout>
   );
@@ -346,6 +387,34 @@ function AlertCard({
           <ChevronRight className="h-3 w-3 ml-1" />
         </Button>
       )}
+    </div>
+  );
+}
+
+// Settings Card Component
+function SettingsCard({
+  title,
+  description,
+  icon: Icon,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      className="p-4 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors"
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-3 mb-2">
+        <div className="p-2 rounded-lg bg-primary/10">
+          <Icon className="h-5 w-5 text-primary" />
+        </div>
+        <h3 className="font-medium">{title}</h3>
+      </div>
+      <p className="text-sm text-muted-foreground">{description}</p>
     </div>
   );
 }
