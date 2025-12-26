@@ -11,13 +11,13 @@ import { usePaymentFlow } from "@/hooks/usePaymentFlow";
 import { 
   ArrowLeft, 
   Edit2, 
-  Lock, 
+  CreditCard, 
   Loader2, 
   Store, 
-  DollarSign,
   FileText,
   Info,
-  Shield
+  Shield,
+  Lock
 } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
@@ -25,10 +25,11 @@ import { format } from "date-fns";
 export default function PaymentReview() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
-  const { useDraftOrder, confirmPayment, isConfirmingPayment, deleteDraft } = usePaymentFlow();
+  const { useDraftOrder, deleteDraft } = usePaymentFlow();
   const { data: order, isLoading, error } = useDraftOrder(orderId || "");
   
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const handleEdit = () => {
     if (orderId) {
@@ -37,9 +38,11 @@ export default function PaymentReview() {
     navigate("/payment/new");
   };
 
-  const handleConfirm = () => {
+  // Redirect to Razorpay payment page instead of direct confirm
+  const handleProceedToPay = () => {
     if (!orderId || !agreedToTerms) return;
-    confirmPayment(orderId);
+    setIsRedirecting(true);
+    navigate(`/payment/pay/${orderId}`);
   };
 
   // Escrow fee: 1% platform fee + 18% GST on fee
@@ -226,23 +229,23 @@ export default function PaymentReview() {
                   </Label>
                 </div>
 
-                {/* Confirm Button (Desktop) */}
+                {/* Proceed to Pay Button (Desktop) */}
                 <div className="hidden sm:block pt-2">
                   <Button
                     className="w-full"
                     size="lg"
-                    disabled={!agreedToTerms || isConfirmingPayment}
-                    onClick={handleConfirm}
+                    disabled={!agreedToTerms || isRedirecting}
+                    onClick={handleProceedToPay}
                   >
-                    {isConfirmingPayment ? (
+                    {isRedirecting ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Processing...
+                        Redirecting...
                       </>
                     ) : (
                       <>
-                        <Lock className="h-4 w-4 mr-2" />
-                        Confirm & Lock Escrow
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Proceed to Pay
                       </>
                     )}
                   </Button>
@@ -260,18 +263,18 @@ export default function PaymentReview() {
             <Button
               className="w-full"
               size="lg"
-              disabled={!agreedToTerms || isConfirmingPayment}
-              onClick={handleConfirm}
+              disabled={!agreedToTerms || isRedirecting}
+              onClick={handleProceedToPay}
             >
-              {isConfirmingPayment ? (
+              {isRedirecting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Processing...
+                  Redirecting...
                 </>
               ) : (
                 <>
-                  <Lock className="h-4 w-4 mr-2" />
-                  Confirm & Lock Escrow
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Proceed to Pay
                 </>
               )}
             </Button>

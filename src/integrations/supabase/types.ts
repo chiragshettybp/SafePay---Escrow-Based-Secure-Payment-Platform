@@ -1957,37 +1957,58 @@ export type Database = {
           amount: number
           created_at: string
           customer_id: string
+          gateway_failure_reason: string | null
+          gateway_status: string | null
           id: string
           is_final: boolean | null
           merchant_id: string
           order_id: string
+          payment_gateway: string | null
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          razorpay_signature: string | null
           status: string
           transaction_reference: string | null
           updated_at: string
+          verified_at: string | null
         }
         Insert: {
           amount: number
           created_at?: string
           customer_id: string
+          gateway_failure_reason?: string | null
+          gateway_status?: string | null
           id?: string
           is_final?: boolean | null
           merchant_id: string
           order_id: string
+          payment_gateway?: string | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          razorpay_signature?: string | null
           status?: string
           transaction_reference?: string | null
           updated_at?: string
+          verified_at?: string | null
         }
         Update: {
           amount?: number
           created_at?: string
           customer_id?: string
+          gateway_failure_reason?: string | null
+          gateway_status?: string | null
           id?: string
           is_final?: boolean | null
           merchant_id?: string
           order_id?: string
+          payment_gateway?: string | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          razorpay_signature?: string | null
           status?: string
           transaction_reference?: string | null
           updated_at?: string
+          verified_at?: string | null
         }
         Relationships: [
           {

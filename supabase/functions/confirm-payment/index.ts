@@ -102,18 +102,42 @@ serve(async (req) => {
       });
     }
 
-    // 3. Check for existing payment (prevent duplicates via DB constraint + check)
+    // 3. CRITICAL: Check for existing payment and verify gateway status
     const { data: existingPayment } = await supabase
       .from("payments")
-      .select("id, status, transaction_reference")
+      .select("id, status, transaction_reference, gateway_status, razorpay_payment_id, verified_at")
       .eq("order_id", orderId)
       .maybeSingle();
 
-    if (existingPayment) {
-      console.log(`IDEMPOTENT: Payment already exists for order ${orderId}: ${existingPayment.id}`);
+    // 3a. CRITICAL SECURITY CHECK: Payment MUST exist with verified gateway_status
+    if (!existingPayment) {
+      console.error(`SECURITY BLOCK: No payment record exists for order ${orderId}. Razorpay payment required first.`);
+      return json(400, { error: "Payment not initiated. Please complete payment through Razorpay first." });
+    }
+
+    // 3b. CRITICAL: Gateway status MUST be 'verified' before escrow can be locked
+    if (existingPayment.gateway_status !== "verified") {
+      console.error(`SECURITY BLOCK: Payment gateway not verified for order ${orderId}. Status: ${existingPayment.gateway_status}`);
+      return json(400, { 
+        error: `Payment not verified. Current status: ${existingPayment.gateway_status}. Complete Razorpay payment first.`,
+        gateway_status: existingPayment.gateway_status
+      });
+    }
+
+    // 3c. Verify Razorpay payment ID exists (additional security)
+    if (!existingPayment.razorpay_payment_id) {
+      console.error(`SECURITY BLOCK: No Razorpay payment ID for order ${orderId}`);
+      return json(400, { error: "Invalid payment state. Razorpay payment ID missing." });
+    }
+
+    console.log(`Payment verified: ${existingPayment.id}, Razorpay: ${existingPayment.razorpay_payment_id}`);
+
+    // 3d. If payment status is already 'locked', return idempotent response
+    if (existingPayment.status === "locked" || existingPayment.status === "escrow") {
+      console.log(`IDEMPOTENT: Escrow already locked for order ${orderId}`);
       return json(200, { 
         success: true, 
-        message: "Payment already exists",
+        message: "Payment already locked in escrow",
         alreadyProcessed: true,
         orderId,
         paymentId: existingPayment.id,
@@ -221,49 +245,31 @@ serve(async (req) => {
 
     console.log(`ATOMIC: Order ${orderId} status updated to escrow_locked`);
 
-    // 8. ATOMIC STEP 2: Create payment record (unique constraint on order_id prevents duplicates)
-    const { data: payment, error: paymentError } = await supabase
+    // 8. ATOMIC STEP 2: Update existing payment record to locked status
+    // Payment already exists from initiate-razorpay-payment, just update status
+    const { error: paymentUpdateError } = await supabase
       .from("payments")
-      .insert({
-        order_id: orderId,
-        customer_id: user.id,
-        merchant_id: order.merchant_id,
-        amount: order.amount, // CRITICAL: Use DB amount, not client amount
+      .update({
         status: "locked",
-        transaction_reference: transactionRef,
+        transaction_reference: existingPayment.transaction_reference || transactionRef,
+        updated_at: now,
       })
-      .select()
-      .single();
+      .eq("id", existingPayment.id)
+      .eq("gateway_status", "verified"); // Extra safety check
 
-    if (paymentError) {
-      console.error("Failed to create payment:", paymentError);
-      // Check if it's a duplicate constraint violation (idempotent)
-      if (paymentError.code === '23505') { // Unique violation
-        console.log("IDEMPOTENT: Payment already exists (caught by constraint)");
-        const { data: existingPmt } = await supabase
-          .from("payments")
-          .select("id")
-          .eq("order_id", orderId)
-          .single();
-        return json(200, { 
-          success: true, 
-          message: "Payment already exists",
-          alreadyProcessed: true,
-          orderId,
-          paymentId: existingPmt?.id,
-          idempotencyKey
-        });
-      }
+    if (paymentUpdateError) {
+      console.error("Failed to update payment to locked:", paymentUpdateError);
       // CRITICAL ROLLBACK: Revert order status
       await supabase
         .from("orders")
         .update({ status: "draft", updated_at: now })
         .eq("id", orderId);
-      console.error("ROLLBACK: Order reverted to draft after payment failure");
-      return json(500, { error: "Failed to create payment record. Please try again." });
+      console.error("ROLLBACK: Order reverted to draft after payment update failure");
+      return json(500, { error: "Failed to lock payment. Please try again." });
     }
 
-    console.log(`ATOMIC: Payment record created: ${payment.id}`);
+    const payment = existingPayment;
+    console.log(`ATOMIC: Payment ${payment.id} updated to locked status`);
 
     // 9. ATOMIC STEP 3: Update escrow account (MUST succeed or full rollback)
     const newTotalBalance = (escrowAccount?.total_balance || 0) + order.amount;
