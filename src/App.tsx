@@ -60,6 +60,10 @@ import MerchantCheckoutSettingsLogin from "./pages/MerchantCheckoutSettingsLogin
 import MerchantCheckoutSettingsPaymentOrder from "./pages/MerchantCheckoutSettingsPaymentOrder";
 import MerchantCheckoutSettingsCod from "./pages/MerchantCheckoutSettingsCod";
 import MerchantCheckoutSettingsPrepaidNudges from "./pages/MerchantCheckoutSettingsPrepaidNudges";
+import MerchantCheckoutIntegration from "./pages/MerchantCheckoutIntegration";
+import MerchantCheckoutIntegrationApiKeys from "./pages/MerchantCheckoutIntegrationApiKeys";
+import MerchantCheckoutIntegrationWebhooks from "./pages/MerchantCheckoutIntegrationWebhooks";
+import MerchantCheckoutIntegrationTest from "./pages/MerchantCheckoutIntegrationTest";
 import MerchantLogin from "./pages/MerchantLogin";
 import MerchantSignup from "./pages/MerchantSignup";
 import MerchantDashboard from "./pages/MerchantDashboard";
@@ -270,6 +274,10 @@ const App = () => (
                 <Route path="checkout/settings/payment-order" element={<MerchantCheckoutSettingsPaymentOrder />} />
                 <Route path="checkout/settings/cod" element={<MerchantCheckoutSettingsCod />} />
                 <Route path="checkout/settings/prepaid-nudges" element={<MerchantCheckoutSettingsPrepaidNudges />} />
+                <Route path="checkout/integration" element={<MerchantCheckoutIntegration />} />
+                <Route path="checkout/integration/api-keys" element={<MerchantCheckoutIntegrationApiKeys />} />
+                <Route path="checkout/integration/webhooks" element={<MerchantCheckoutIntegrationWebhooks />} />
+                <Route path="checkout/integration/test" element={<MerchantCheckoutIntegrationTest />} />
               </Route>
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
