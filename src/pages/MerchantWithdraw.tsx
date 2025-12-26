@@ -38,7 +38,8 @@ export default function MerchantWithdraw() {
     createPayout,
     isCreatingPayout,
     MINIMUM_WITHDRAWAL,
-    PAYOUT_FEE_PERCENT,
+    WITHDRAWAL_FEE_PERCENT,
+    GST_PERCENT,
   } = useMerchantWallet();
 
   const [amount, setAmount] = useState("");
@@ -50,8 +51,10 @@ export default function MerchantWithdraw() {
   const selectedAccount = bankAccounts.find(ba => ba.id === selectedAccountId);
   
   const parsedAmount = parseFloat(amount) || 0;
-  const fee = parsedAmount * (PAYOUT_FEE_PERCENT / 100);
-  const netAmount = parsedAmount - fee;
+  const withdrawalFee = parsedAmount * (WITHDRAWAL_FEE_PERCENT / 100);
+  const gstOnFee = withdrawalFee * (GST_PERCENT / 100);
+  const totalFee = withdrawalFee + gstOnFee;
+  const netAmount = parsedAmount - totalFee;
 
   const isLoading = isLoadingWallet || isLoadingBankAccounts;
 
@@ -296,12 +299,14 @@ export default function MerchantWithdraw() {
                     <span className="text-muted-foreground">Withdrawal Amount</span>
                     <span>₹{parsedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
-                  {PAYOUT_FEE_PERCENT > 0 && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Processing Fee ({PAYOUT_FEE_PERCENT}%)</span>
-                      <span>-₹{fee.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Processing Fee ({WITHDRAWAL_FEE_PERCENT}%)</span>
+                    <span>-₹{withdrawalFee.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">GST on Fee ({GST_PERCENT}%)</span>
+                    <span>-₹{gstOnFee.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
                   <div className="pt-2 border-t flex items-center justify-between font-semibold">
                     <span>You'll Receive</span>
                     <span className="text-green-500">₹{netAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
