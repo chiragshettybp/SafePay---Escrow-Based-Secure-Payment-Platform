@@ -51,6 +51,7 @@ import Checkout from "./pages/Checkout";
 import CheckoutExpired from "./pages/CheckoutExpired";
 import CheckoutFailed from "./pages/CheckoutFailed";
 import CheckoutAddressEdit from "./pages/CheckoutAddressEdit";
+import CheckoutLogin from "./pages/CheckoutLogin";
 import MerchantLogin from "./pages/MerchantLogin";
 import MerchantSignup from "./pages/MerchantSignup";
 import MerchantDashboard from "./pages/MerchantDashboard";
@@ -167,6 +168,7 @@ const App = () => (
               <Route path="/checkout/:session_id/expired" element={<CheckoutExpired />} />
               <Route path="/checkout/:session_id/failed" element={<CheckoutFailed />} />
               <Route path="/checkout/:session_id/address/edit" element={<CheckoutAddressEdit />} />
+              <Route path="/checkout/login" element={<CheckoutLogin />} />
               <Route path="/customer-login" element={<CustomerLogin />} />
               <Route path="/customer-signup" element={<CustomerSignup />} />
               <Route path="/customer-verify" element={<CustomerVerify />} />
