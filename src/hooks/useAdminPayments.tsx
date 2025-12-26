@@ -13,6 +13,15 @@ export interface AdminPayment {
   transaction_reference: string | null;
   created_at: string;
   updated_at: string;
+  // Razorpay fields
+  payment_gateway: string | null;
+  razorpay_order_id: string | null;
+  razorpay_payment_id: string | null;
+  razorpay_signature: string | null;
+  gateway_status: string | null;
+  gateway_failure_reason: string | null;
+  verified_at: string | null;
+  is_final: boolean | null;
   orders?: {
     id: string;
     product_name: string;
@@ -75,6 +84,15 @@ export interface PaymentDetails extends AdminPayment {
     id: string;
     status: string;
     reason: string;
+    created_at: string;
+  }>;
+  refunds: Array<{
+    id: string;
+    amount: number;
+    status: string;
+    reason: string;
+    refund_type: string | null;
+    razorpay_refund_id: string | null;
     created_at: string;
   }>;
 }
@@ -166,7 +184,7 @@ export function useAdminPayments(filters?: PaymentFilters) {
         if (paymentError) throw paymentError;
 
         // Fetch related data in parallel
-        const [orderResult, customerResult, merchantResult, eventsResult, disputesResult] = await Promise.all([
+        const [orderResult, customerResult, merchantResult, eventsResult, disputesResult, refundsResult] = await Promise.all([
           supabase
             .from("orders")
             .select("*")
@@ -191,6 +209,10 @@ export function useAdminPayments(filters?: PaymentFilters) {
             .from("disputes")
             .select("id, status, reason, created_at")
             .eq("order_id", payment.order_id),
+          supabase
+            .from("refunds")
+            .select("id, amount, status, reason, refund_type, razorpay_refund_id, created_at")
+            .eq("payment_id", paymentId),
         ]);
 
         return {
@@ -206,6 +228,7 @@ export function useAdminPayments(filters?: PaymentFilters) {
           },
           events: eventsResult.data || [],
           disputes: disputesResult.data || [],
+          refunds: refundsResult.data || [],
         } as PaymentDetails;
       },
       enabled: !!paymentId,
