@@ -175,6 +175,9 @@ import AdminCheckoutSettingsOtp from "./pages/AdminCheckoutSettingsOtp";
 import AdminPaymentLinks from "./pages/AdminPaymentLinks";
 import AdminPaymentLinkDetails from "./pages/AdminPaymentLinkDetails";
 import AdminPublicLinks from "./pages/AdminPublicLinks";
+import AdminCheckoutKillSwitch from "./pages/AdminCheckoutKillSwitch";
+import AdminCheckoutIncidents from "./pages/AdminCheckoutIncidents";
+import AdminCheckoutIncidentDetails from "./pages/AdminCheckoutIncidentDetails";
 import MerchantPaymentLinks from "./pages/MerchantPaymentLinks";
 import MerchantPaymentLinkCreate from "./pages/MerchantPaymentLinkCreate";
 import MerchantPaymentLinkDetails from "./pages/MerchantPaymentLinkDetails";
@@ -392,6 +395,10 @@ const App = () => (
               <Route path="/admin/checkout/settings" element={<AdminProtectedRoute><AdminCheckoutSettings /></AdminProtectedRoute>} />
               <Route path="/admin/checkout/settings/cod" element={<AdminProtectedRoute><AdminCheckoutSettingsCod /></AdminProtectedRoute>} />
               <Route path="/admin/checkout/settings/otp" element={<AdminProtectedRoute><AdminCheckoutSettingsOtp /></AdminProtectedRoute>} />
+              {/* Admin Kill-Switch Routes */}
+              <Route path="/admin/checkout/kill-switch" element={<AdminProtectedRoute><AdminCheckoutKillSwitch /></AdminProtectedRoute>} />
+              <Route path="/admin/checkout/incidents" element={<AdminProtectedRoute><AdminCheckoutIncidents /></AdminProtectedRoute>} />
+              <Route path="/admin/checkout/incidents/:incident_id" element={<AdminProtectedRoute><AdminCheckoutIncidentDetails /></AdminProtectedRoute>} />
               {/* Admin Payment Links Routes */}
               <Route path="/admin/checkout/payment-links" element={<AdminProtectedRoute><AdminPaymentLinks /></AdminProtectedRoute>} />
               <Route path="/admin/checkout/payment-links/:linkId" element={<AdminProtectedRoute><AdminPaymentLinkDetails /></AdminProtectedRoute>} />

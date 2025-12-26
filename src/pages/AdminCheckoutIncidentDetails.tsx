@@ -75,8 +75,8 @@ export default function AdminCheckoutIncidentDetails() {
       <div className="space-y-6">
         <AdminPageHeader
           title={`Incident: Level ${incident.level}`}
-          description={config.name}
-          backLink="/admin/checkout/incidents"
+          subtitle={config.name}
+          backUrl="/admin/checkout/incidents"
         />
 
         {/* Status Banner */}

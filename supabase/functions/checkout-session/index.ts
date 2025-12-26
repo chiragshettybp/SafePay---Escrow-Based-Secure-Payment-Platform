@@ -111,6 +111,36 @@ Deno.serve(async (req) => {
       
       console.log(`[Checkout] Creating session for merchant: ${body.merchant_id}`);
       
+      // CHECK PLATFORM KILL-SWITCH FLAGS FIRST
+      const { data: platformFlags } = await supabase
+        .from("platform_flags")
+        .select("key, value");
+      
+      const getFlag = (key: string): unknown => {
+        const flag = platformFlags?.find(f => f.key === key);
+        if (!flag) return null;
+        try {
+          return JSON.parse(String(flag.value));
+        } catch {
+          return flag.value;
+        }
+      };
+      
+      const isCheckoutLocked = getFlag("checkout_locked") === true;
+      const activeLevel = Number(getFlag("active_incident_level")) || 0;
+      
+      // Level 2+ blocks new checkout sessions
+      if (isCheckoutLocked || activeLevel >= 2) {
+        console.log(`[Checkout] BLOCKED - Platform kill-switch active (Level ${activeLevel})`);
+        return json(503, { 
+          error: "Checkout temporarily unavailable",
+          code: "PLATFORM_MAINTENANCE",
+          message: "We're performing maintenance. Please try again shortly.",
+          kill_switch_active: true,
+          level: activeLevel
+        });
+      }
+      
       // Validate merchant exists and is active
       const { data: merchant, error: merchantError } = await supabase
         .from("merchants")
@@ -134,6 +164,9 @@ Deno.serve(async (req) => {
       const taxAmount = body.tax_amount || 0;
       const finalAmount = cartTotal - discountAmount + shippingAmount + taxAmount;
       
+      // Check for degradation warning (Level 1)
+      const showDegradationWarning = getFlag("degradation_warning") === true || activeLevel === 1;
+      
       // Create session
       const { data: session, error: createError } = await supabase
         .from("checkout_sessions")
@@ -151,6 +184,7 @@ Deno.serve(async (req) => {
           otp_verified: !!userId,
           ip_address: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip"),
           user_agent: req.headers.get("user-agent"),
+          metadata: showDegradationWarning ? { degradation_warning: true } : {},
         })
         .select()
         .single();
@@ -172,7 +206,10 @@ Deno.serve(async (req) => {
       
       console.log(`[Checkout] Session created: ${session.id}`);
       
-      return json(201, { session });
+      return json(201, { 
+        session,
+        degradation_warning: showDegradationWarning 
+      });
     }
     
     // POST /checkout-session/action - Perform action on session
