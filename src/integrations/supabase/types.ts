@@ -872,6 +872,42 @@ export type Database = {
           },
         ]
       }
+      checkout_settings_audit: {
+        Row: {
+          admin_id: string
+          change_reason: string | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          new_value: Json | null
+          previous_value: Json | null
+          setting_key: string | null
+          setting_table: string
+        }
+        Insert: {
+          admin_id: string
+          change_reason?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_value?: Json | null
+          previous_value?: Json | null
+          setting_key?: string | null
+          setting_table: string
+        }
+        Update: {
+          admin_id?: string
+          change_reason?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_value?: Json | null
+          previous_value?: Json | null
+          setting_key?: string | null
+          setting_table?: string
+        }
+        Relationships: []
+      }
       customer_addresses: {
         Row: {
           address_line1: string
@@ -2971,6 +3007,63 @@ export type Database = {
         }
         Relationships: []
       }
+      otp_settings: {
+        Row: {
+          block_ip_after_abuse: boolean
+          block_phone_after_failures: boolean
+          cooldown_between_sends_seconds: number
+          id: string
+          lockout_duration_minutes: number
+          max_otp_requests_per_phone_hourly: number
+          max_retries_per_otp: number
+          otp_enabled: boolean
+          otp_expiry_seconds: number
+          otp_length: number
+          require_otp_before_payment: boolean
+          sms_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+          voice_enabled: boolean
+          whatsapp_enabled: boolean
+        }
+        Insert: {
+          block_ip_after_abuse?: boolean
+          block_phone_after_failures?: boolean
+          cooldown_between_sends_seconds?: number
+          id?: string
+          lockout_duration_minutes?: number
+          max_otp_requests_per_phone_hourly?: number
+          max_retries_per_otp?: number
+          otp_enabled?: boolean
+          otp_expiry_seconds?: number
+          otp_length?: number
+          require_otp_before_payment?: boolean
+          sms_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          voice_enabled?: boolean
+          whatsapp_enabled?: boolean
+        }
+        Update: {
+          block_ip_after_abuse?: boolean
+          block_phone_after_failures?: boolean
+          cooldown_between_sends_seconds?: number
+          id?: string
+          lockout_duration_minutes?: number
+          max_otp_requests_per_phone_hourly?: number
+          max_retries_per_otp?: number
+          otp_enabled?: boolean
+          otp_expiry_seconds?: number
+          otp_length?: number
+          require_otp_before_payment?: boolean
+          sms_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          voice_enabled?: boolean
+          whatsapp_enabled?: boolean
+        }
+        Relationships: []
+      }
       payment_gateways: {
         Row: {
           config: Json | null
@@ -3191,6 +3284,39 @@ export type Database = {
           prepaid_available?: boolean
           state?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      platform_checkout_settings: {
+        Row: {
+          description: string | null
+          id: string
+          is_locked: boolean
+          setting_key: string
+          setting_type: string
+          setting_value: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          is_locked?: boolean
+          setting_key: string
+          setting_type?: string
+          setting_value: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          is_locked?: boolean
+          setting_key?: string
+          setting_type?: string
+          setting_value?: string
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
