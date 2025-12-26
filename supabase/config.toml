@@ -78,8 +78,5 @@ verify_jwt = true
 [functions.verify-razorpay-payment]
 verify_jwt = true
 
-[functions.razorpay-webhook]
-verify_jwt = false
-
 [functions.initiate-refund]
 verify_jwt = true
