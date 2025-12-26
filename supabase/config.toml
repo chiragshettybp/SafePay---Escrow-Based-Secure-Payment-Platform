@@ -98,3 +98,6 @@ verify_jwt = false
 
 [functions.webhook-dispatcher]
 verify_jwt = false
+
+[functions.admin-killswitch]
+verify_jwt = true
