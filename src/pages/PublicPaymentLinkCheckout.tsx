@@ -62,12 +62,13 @@ export default function PublicPaymentLinkCheckout() {
           payment_link_id: paymentLink.id,
           cart_total: paymentLink.amount,
           final_amount: paymentLink.amount,
-          cart_data: JSON.stringify([{
-            id: paymentLink.id,
-            name: paymentLink.title,
-            price: paymentLink.amount,
-            quantity: 1,
-          }]),
+          cart_data: [
+            {
+              product_name: paymentLink.title,
+              quantity: 1,
+              price: paymentLink.amount,
+            },
+          ],
           status: 'active',
           current_step: 'login',
           expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
@@ -79,6 +80,7 @@ export default function PublicPaymentLinkCheckout() {
           },
         })
         .select()
+        .single();
         .single();
 
       if (sessionError) {

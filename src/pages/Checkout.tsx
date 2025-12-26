@@ -707,10 +707,15 @@ export default function Checkout() {
               <CardContent className="space-y-4">
                 {/* Cart Items */}
                 <div className="space-y-3 max-h-48 overflow-y-auto">
-                  {(session.cart_data || []).map((item, index) => (
+                  {(Array.isArray(session.cart_data) ? session.cart_data : []).map((item, index) => (
                     <div key={index} className="flex gap-3">
                       {item.image_url ? (
-                        <img src={item.image_url} alt="" className="w-12 h-12 rounded object-cover" />
+                        <img
+                          src={item.image_url}
+                          alt={`${item.product_name} product image`}
+                          className="w-12 h-12 rounded object-cover"
+                          loading="lazy"
+                        />
                       ) : (
                         <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
                           <span className="text-xs text-muted-foreground">IMG</span>
