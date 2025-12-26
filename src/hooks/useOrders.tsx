@@ -128,29 +128,45 @@ export function useOrders(statusFilter?: OrderStatus | null) {
     },
   });
 
-  // Request refund mutation
+  // Request refund mutation - This should navigate to dispute flow, not directly update status
+  // Direct status updates are blocked by RLS policy - must go through proper dispute creation
   const requestRefund = useMutation({
     mutationFn: async (orderId: string) => {
-      const { error } = await supabase
+      if (!user?.id) throw new Error("Not authenticated");
+      
+      // Verify order ownership and valid status for dispute
+      const { data: order, error: orderError } = await supabase
         .from('orders')
-        .update({ status: 'disputed' as OrderStatus })
+        .select('id, status, customer_id')
         .eq('id', orderId)
-        .eq('customer_id', user?.id);
+        .eq('customer_id', user.id)
+        .single();
 
-      if (error) throw error;
+      if (orderError || !order) {
+        throw new Error("Order not found");
+      }
+
+      // Only allow disputes on orders that are in escrow or delivered
+      const disputeableStatuses = ['escrow_locked', 'in_progress', 'delivered'];
+      if (!disputeableStatuses.includes(order.status)) {
+        throw new Error(`Cannot dispute an order with status: ${order.status}`);
+      }
+
+      return { orderId, shouldNavigate: true };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['order-metrics'] });
+    onSuccess: ({ orderId }) => {
+      // Navigate to dispute creation page instead of directly updating status
+      // The dispute creation will handle the status update server-side
       toast({
-        title: "Refund Requested",
-        description: "Your refund request has been submitted.",
+        title: "Opening Dispute Form",
+        description: "Please provide details about your issue.",
       });
+      // Note: Navigation should be handled by the calling component
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: "Failed to request refund. Please try again.",
+        description: error.message || "Failed to initiate dispute. Please try again.",
         variant: "destructive",
       });
     },
