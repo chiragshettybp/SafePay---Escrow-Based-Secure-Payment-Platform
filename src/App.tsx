@@ -47,6 +47,10 @@ import CustomerSupportCreate from "./pages/CustomerSupportCreate";
 import CustomerSupportTickets from "./pages/CustomerSupportTickets";
 import CustomerSupportTicketDetails from "./pages/CustomerSupportTicketDetails";
 import CustomerSupportFaq from "./pages/CustomerSupportFaq";
+import Checkout from "./pages/Checkout";
+import CheckoutExpired from "./pages/CheckoutExpired";
+import CheckoutFailed from "./pages/CheckoutFailed";
+import CheckoutAddressEdit from "./pages/CheckoutAddressEdit";
 import MerchantLogin from "./pages/MerchantLogin";
 import MerchantSignup from "./pages/MerchantSignup";
 import MerchantDashboard from "./pages/MerchantDashboard";
@@ -157,6 +161,12 @@ const App = () => (
           <AdminAuthProvider>
             <Routes>
               <Route path="/" element={<Index />} />
+              {/* Checkout Routes */}
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/checkout/:session_id" element={<Checkout />} />
+              <Route path="/checkout/:session_id/expired" element={<CheckoutExpired />} />
+              <Route path="/checkout/:session_id/failed" element={<CheckoutFailed />} />
+              <Route path="/checkout/:session_id/address/edit" element={<CheckoutAddressEdit />} />
               <Route path="/customer-login" element={<CustomerLogin />} />
               <Route path="/customer-signup" element={<CustomerSignup />} />
               <Route path="/customer-verify" element={<CustomerVerify />} />
