@@ -81,7 +81,6 @@ export default function PublicPaymentLinkCheckout() {
         })
         .select()
         .single();
-        .single();
 
       if (sessionError) {
         // Handle specific error cases
