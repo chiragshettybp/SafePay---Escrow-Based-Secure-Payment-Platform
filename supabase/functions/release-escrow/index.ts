@@ -147,13 +147,38 @@ Deno.serve(async (req) => {
         .in("status", ["open", "under_review"]);
 
       if (openDisputes && openDisputes.length > 0) {
-        console.error("Cannot release escrow while dispute is open");
+        console.error("DISPUTE_BLOCKS_RELEASE: Cannot release escrow while dispute is open");
         return new Response(
           JSON.stringify({ 
-            error: "Cannot release escrow while a dispute is open. Please close the dispute first or use 'Close Dispute & Confirm Delivery'." 
+            error: "Cannot release escrow while a dispute is open. Please close the dispute first or use 'Close Dispute & Confirm Delivery'.",
+            blockingDispute: openDisputes[0].id
           }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
+      }
+    }
+
+    // If we have a disputeId, we MUST close the dispute first before proceeding
+    // This ensures atomic dispute closure + escrow release
+    if (disputeId) {
+      // First update the dispute to closed (this triggers the unfreeze logic)
+      const { error: closeDisputeError } = await supabase
+        .from("disputes")
+        .update({ 
+          status: "closed",
+          final_decision: reason === "dispute_withdrawn" 
+            ? "Customer withdrew dispute" 
+            : reason === "close_dispute_confirm_delivery"
+            ? "Customer confirmed delivery"
+            : "Resolved in merchant favor",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", disputeId)
+        .in("status", ["open", "under_review"]); // Only close if actually open
+
+      if (closeDisputeError) {
+        console.error("Failed to close dispute:", closeDisputeError);
+        // Continue anyway - the dispute might already be closed
       }
     }
 

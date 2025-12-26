@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { disputeId, decision, reason, partialAmount } = await req.json() as DisputeDecisionRequest;
+    const { disputeId, decision, reason, partialAmount, idempotencyKey: clientIdempotencyKey } = await req.json() as DisputeDecisionRequest & { idempotencyKey?: string };
 
     if (!disputeId || !decision || !reason) {
       return new Response(
@@ -79,7 +79,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Admin ${adminUser.email} making decision on dispute ${disputeId}: ${decision}`);
+    // Generate idempotency key
+    const idempotencyKey = clientIdempotencyKey || `admin-dispute-${disputeId}-${decision}-${Date.now()}`;
+
+    console.log(`Admin ${adminUser.email} making decision on dispute ${disputeId}: ${decision}, idempotencyKey: ${idempotencyKey}`);
+
+    // CRITICAL: Idempotency check - has this resolution already been processed?
+    const { data: existingResolution } = await supabase
+      .from("escrow_resolution_log")
+      .select("*")
+      .eq("order_id", disputeId) // We'll also check by actual order_id below
+      .maybeSingle();
 
     // Fetch dispute with order and payment
     const { data: dispute, error: disputeError } = await supabase
@@ -99,6 +109,19 @@ Deno.serve(async (req) => {
     // Check dispute is actionable
     const actionableStatuses = ["open", "under_review"];
     if (!actionableStatuses.includes(dispute.status)) {
+      // Idempotent return if already resolved
+      if (dispute.status === "resolved" || dispute.status === "closed") {
+        console.log(`Idempotent return: Dispute ${disputeId} already ${dispute.status}`);
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: `Dispute already ${dispute.status}`,
+            alreadyResolved: true,
+            finalDecision: dispute.final_decision
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       return new Response(
         JSON.stringify({ error: `Cannot modify dispute with status: ${dispute.status}` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -113,12 +136,38 @@ Deno.serve(async (req) => {
       );
     }
 
+    // CRITICAL: Check if order escrow is already finalized (mutual exclusivity)
+    if (order.escrow_resolution_type) {
+      console.log(`Idempotent return: Order ${order.id} escrow already finalized as ${order.escrow_resolution_type}`);
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: `Order escrow already finalized as ${order.escrow_resolution_type}`,
+          alreadyResolved: true
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Fetch payment
     const { data: payment } = await supabase
       .from("payments")
       .select("*")
       .eq("order_id", order.id)
       .single();
+
+    // CRITICAL: Check if payment is already finalized
+    if (payment?.is_final === true) {
+      console.log(`Idempotent return: Payment for order ${order.id} already finalized`);
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Payment already finalized",
+          alreadyResolved: true
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Fetch escrow account for balance updates
     const { data: escrowAccount } = await supabase
@@ -233,10 +282,17 @@ Deno.serve(async (req) => {
             .eq("id", payment.id);
         }
 
-        // Update order to completed
+        // Update order to completed with admin finalization marker
         await supabase
           .from("orders")
-          .update({ status: "completed", completed_at: now, updated_at: now })
+          .update({ 
+            status: "completed", 
+            completed_at: now, 
+            updated_at: now,
+            escrow_resolution_type: "released",
+            escrow_finalized_at: now,
+            escrow_finalized_by: user.id
+          })
           .eq("id", order.id);
 
         // FIX GAP 2: Debit escrow and credit merchant wallet
@@ -298,10 +354,16 @@ Deno.serve(async (req) => {
             .eq("id", payment.id);
         }
 
-        // Update order to refunded
+        // Update order to refunded with admin finalization marker
         await supabase
           .from("orders")
-          .update({ status: "refunded", updated_at: now })
+          .update({ 
+            status: "refunded", 
+            updated_at: now,
+            escrow_resolution_type: "refunded",
+            escrow_finalized_at: now,
+            escrow_finalized_by: user.id
+          })
           .eq("id", order.id);
 
         // Create refund record
@@ -362,10 +424,17 @@ Deno.serve(async (req) => {
             .eq("id", payment.id);
         }
 
-        // Update order to completed (partial resolution)
+        // Update order to completed (partial resolution) with admin finalization marker
         await supabase
           .from("orders")
-          .update({ status: "completed", completed_at: now, updated_at: now })
+          .update({ 
+            status: "completed", 
+            completed_at: now, 
+            updated_at: now,
+            escrow_resolution_type: "partial_refund",
+            escrow_finalized_at: now,
+            escrow_finalized_by: user.id
+          })
           .eq("id", order.id);
 
         // Create refund record for partial amount
@@ -492,6 +561,34 @@ Deno.serve(async (req) => {
       }
     });
 
+    // Log to escrow_resolution_log for audit trail (if funds were moved)
+    if (decision !== "resolve_no_funds") {
+      const resolutionType = decision === "refund_customer" ? "refunded" 
+        : decision === "partial_refund" ? "partial_refund" 
+        : "released";
+      
+      await supabase.from("escrow_resolution_log").insert({
+        order_id: order.id,
+        escrow_account_id: escrowAccount?.id || null,
+        resolution_type: resolutionType,
+        previous_order_status: order.status,
+        new_order_status: decision === "refund_customer" ? "refunded" : "completed",
+        amount: order.amount,
+        approval_source: "admin",
+        admin_id: user.id,
+        reason: `Admin dispute decision: ${reason}`,
+        idempotency_key: idempotencyKey,
+      });
+    }
+
+    // Mark payment as final to prevent any further modifications
+    if (payment && decision !== "resolve_no_funds") {
+      await supabase
+        .from("payments")
+        .update({ is_final: true, updated_at: now })
+        .eq("id", payment.id);
+    }
+
     // Create order event
     await supabase.from("order_events").insert({
       order_id: order.id,
@@ -505,7 +602,8 @@ Deno.serve(async (req) => {
         reason,
         refund_amount: refundAmount,
         merchant_amount: merchantAmount,
-        escrow_debited: !!escrowAccount && decision !== "resolve_no_funds"
+        escrow_debited: !!escrowAccount && decision !== "resolve_no_funds",
+        idempotency_key: idempotencyKey
       }
     });
 
