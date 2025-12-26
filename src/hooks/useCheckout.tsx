@@ -445,17 +445,30 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
         throw new Error('Payment method required');
       }
 
-      // Create order
+      // For online payments, create order in 'pending' status (to avoid draft audit logging issue)
+      // For COD, create order in 'in_progress' status
+      // The order status will be updated to 'in_progress' after successful payment verification
+      const orderStatus = session.selected_payment_method === 'cod' ? 'in_progress' : 'pending';
+
+      // Create order - for guest checkout, use a dummy customer_id placeholder
+      // The customer_id constraint requires a valid UUID, so we must have one
+      const currentUser = (await supabase.auth.getUser()).data.user;
+      const effectiveCustomerId = session.user_id || currentUser?.id;
+      
+      if (!effectiveCustomerId) {
+        throw new Error('User must be logged in to complete checkout');
+      }
+
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
-          customer_id: session.user_id,
+          customer_id: effectiveCustomerId,
           merchant_id: session.merchant_id,
           merchant_name: session.merchants?.business_name || 'Merchant',
           product_name: session.cart_data?.[0]?.product_name || 'Order',
           product_description: session.cart_data?.map(i => `${i.product_name} x${i.quantity}`).join(', '),
           amount: session.final_amount,
-          status: session.selected_payment_method === 'cod' ? 'in_progress' : 'draft',
+          status: orderStatus,
         })
         .select()
         .single();
@@ -466,10 +479,10 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
       const { error: updateError } = await supabase
         .from('checkout_sessions')
         .update({
-          status: 'completed',
-          current_step: 'confirmation',
+          status: session.selected_payment_method === 'cod' ? 'completed' : 'active',
+          current_step: session.selected_payment_method === 'cod' ? 'confirmation' : 'payment',
           order_id: order.id,
-          completed_at: new Date().toISOString(),
+          completed_at: session.selected_payment_method === 'cod' ? new Date().toISOString() : null,
         })
         .eq('id', sessionId);
 
@@ -478,9 +491,9 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
       // Log event
       await supabase.from('checkout_events').insert({
         session_id: sessionId,
-        event_type: 'checkout_completed',
+        event_type: session.selected_payment_method === 'cod' ? 'checkout_completed' : 'order_created',
         event_data: { order_id: order.id, payment_method: session.selected_payment_method },
-        step: 'confirmation',
+        step: session.selected_payment_method === 'cod' ? 'confirmation' : 'payment',
         previous_step: 'payment',
       });
 
