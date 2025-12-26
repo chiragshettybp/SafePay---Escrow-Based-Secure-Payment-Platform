@@ -73,8 +73,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    const idempotencyKey = `admin-force-refund-${paymentId}-${Date.now()}`;
-    console.log(`Admin ${adminUser.email} initiating force refund for payment ${paymentId}, idempotencyKey: ${idempotencyKey}`);
+    // Generate proper idempotency key (UUID-based for uniqueness)
+    const idempotencyKey = `admin-force-refund-${paymentId}-${crypto.randomUUID()}`;
+    const ipAddress = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown";
+    
+    console.log(`Admin ${adminUser.email} initiating force refund for payment ${paymentId}, idempotencyKey: ${idempotencyKey}, IP: ${ipAddress}`);
 
     // Fetch the payment with order details
     const { data: payment, error: paymentError } = await supabase
@@ -326,7 +329,7 @@ Deno.serve(async (req) => {
       console.log(`LEDGER: Created wallet and credited ₹${actualRefundAmount} via ledger`);
     }
 
-    // FIX GAP 3: Log admin financial action
+    // FIX GAP 3: Log admin financial action with IP address
     await supabase.from("admin_financial_actions_log").insert({
       admin_id: user.id,
       action_type: "force_refund",
@@ -334,15 +337,39 @@ Deno.serve(async (req) => {
       target_id: paymentId,
       amount: actualRefundAmount,
       reason: reason,
+      ip_address: ipAddress,
       metadata: {
         admin_email: adminUser.email,
         order_id: order.id,
         customer_id: order.customer_id,
         refund_type: refundType,
         high_value: actualRefundAmount > highValueThreshold,
-        escrow_debited: !!escrowAccount
+        escrow_debited: !!escrowAccount,
+        idempotency_key: idempotencyKey
       }
     });
+
+    // Create high-value alert if applicable
+    if (actualRefundAmount > highValueThreshold) {
+      await supabase.from("admin_alerts").insert({
+        alert_type: "high_value_action",
+        severity: "high",
+        title: "High Value Force Refund Executed",
+        description: `Admin ${adminUser.email} force refunded ₹${actualRefundAmount} for payment ${paymentId}`,
+        related_entity_type: "payment",
+        related_entity_id: paymentId,
+        triggered_by: user.id,
+        triggered_by_type: "admin",
+        ip_address: ipAddress,
+        metadata: {
+          amount: actualRefundAmount,
+          threshold: highValueThreshold,
+          order_id: order.id,
+          refund_type: refundType,
+          reason: reason
+        }
+      });
+    }
 
     // 6. Log to escrow_resolution_log (immutable audit trail)
     await supabase.from("escrow_resolution_log").insert({
@@ -413,6 +440,29 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Error in admin force refund:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    
+    // Log financial failure alert
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const alertSupabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      await alertSupabase.from("admin_alerts").insert({
+        alert_type: "financial_failure",
+        severity: "critical",
+        title: "Force Refund Failed",
+        description: `Force refund operation failed: ${errorMessage}`,
+        related_entity_type: "payment",
+        triggered_by_type: "system",
+        metadata: {
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined
+        }
+      });
+    } catch (alertError) {
+      console.error("Failed to create failure alert:", alertError);
+    }
+    
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

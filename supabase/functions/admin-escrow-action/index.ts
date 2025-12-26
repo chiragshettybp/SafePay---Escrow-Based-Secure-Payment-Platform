@@ -585,6 +585,28 @@ serve(async (req) => {
   } catch (error) {
     console.error("Admin escrow action error:", error);
     const message = error instanceof Error ? error.message : "Internal server error";
+    
+    // Log financial failure alert
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const alertSupabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      await alertSupabase.from("admin_alerts").insert({
+        alert_type: "financial_failure",
+        severity: "high",
+        title: "Escrow/Withdrawal Action Failed",
+        description: `Admin escrow or withdrawal action failed: ${message}`,
+        triggered_by_type: "system",
+        metadata: {
+          error: message,
+          stack: error instanceof Error ? error.stack : undefined
+        }
+      });
+    } catch (alertError) {
+      console.error("Failed to create failure alert:", alertError);
+    }
+    
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

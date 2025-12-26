@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_type: string
+          created_at: string
+          description: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          related_entity_id: string | null
+          related_entity_type: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          title: string
+          triggered_by: string | null
+          triggered_by_type: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type: string
+          created_at?: string
+          description: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          title: string
+          triggered_by?: string | null
+          triggered_by_type?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type?: string
+          created_at?: string
+          description?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          title?: string
+          triggered_by?: string | null
+          triggered_by_type?: string | null
+        }
+        Relationships: []
+      }
       admin_financial_actions_log: {
         Row: {
           action_type: string
@@ -250,6 +310,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      admin_pending_approvals: {
+        Row: {
+          action_type: string
+          amount: number | null
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          initiated_at: string
+          initiated_by: string
+          ip_address: string | null
+          metadata: Json | null
+          reason: string
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
+          status: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          action_type: string
+          amount?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          initiated_at?: string
+          initiated_by: string
+          ip_address?: string | null
+          metadata?: Json | null
+          reason: string
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          status?: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          action_type?: string
+          amount?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          initiated_at?: string
+          initiated_by?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          reason?: string
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          status?: string
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: []
       }
       admin_users: {
         Row: {
@@ -2964,6 +3087,18 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      log_financial_failure: {
+        Args: {
+          p_action_type: string
+          p_admin_id?: string
+          p_amount?: number
+          p_error_message: string
+          p_metadata?: Json
+          p_target_id: string
+          p_target_type: string
+        }
+        Returns: string
       }
     }
     Enums: {
