@@ -96,7 +96,7 @@ serve(async (req) => {
 
   const userId = created.user.id;
 
-  // 2) Create merchant profile (auto-approved)
+  // 2) Create merchant profile (pending verification - must be approved by admin)
   const { error: merchantError } = await admin.from("merchants").insert({
     user_id: userId,
     email,
@@ -105,7 +105,7 @@ serve(async (req) => {
     category: payload.category ?? null,
     gst_number: payload.gstNumber ?? null,
     address: payload.address ?? null,
-    status: "active",
+    status: "pending_verification", // Requires admin approval before becoming active
   });
 
   if (merchantError) {

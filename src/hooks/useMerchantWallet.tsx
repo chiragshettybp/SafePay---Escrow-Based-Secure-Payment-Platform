@@ -316,7 +316,7 @@ export function useMerchantWallet() {
     },
   });
 
-  // Create payout (withdrawal) - BB-WAL-01/02 FIX: Atomic balance check and deduction
+  // Create payout (withdrawal) - now uses atomic server-side edge function
   const createPayout = useMutation({
     mutationFn: async (data: CreatePayoutData) => {
       if (!user?.id) throw new Error("Not authenticated");
@@ -326,115 +326,40 @@ export function useMerchantWallet() {
         throw new Error(`Minimum withdrawal is ₹${MINIMUM_WITHDRAWAL}`);
       }
 
-      // BB-WAL-01 FIX: Check for any pending payouts to prevent double withdrawal
-      const { data: pendingPayouts, error: pendingError } = await merchantSupabase
-        .from("merchant_payouts")
-        .select("id, amount, status")
-        .eq("merchant_id", user.id)
-        .eq("status", "processing");
-
-      if (pendingError) throw pendingError;
-
-      if (pendingPayouts && pendingPayouts.length > 0) {
-        const pendingTotal = pendingPayouts.reduce((sum, p) => sum + p.amount, 0);
-        throw new Error(`You have ${pendingPayouts.length} pending payout(s) totaling ₹${pendingTotal.toFixed(2)}. Please wait for them to complete.`);
-      }
-
-      // BB-WAL-02 FIX: Re-fetch wallet balance atomically to prevent race condition
-      const { data: freshWallet, error: freshWalletError } = await merchantSupabase
-        .from("merchant_wallets")
-        .select("*")
-        .eq("merchant_id", user.id)
-        .single();
-
-      if (freshWalletError || !freshWallet) {
-        throw new Error("Failed to verify wallet balance");
-      }
-
-      if (data.amount > freshWallet.available_balance) {
-        throw new Error(`Insufficient balance. Available: ₹${freshWallet.available_balance.toFixed(2)}`);
-      }
-
       const bankAccount = bankAccounts?.find(ba => ba.id === data.bank_account_id);
       if (!bankAccount?.is_verified) {
         throw new Error("Bank account must be verified for withdrawals");
       }
 
-      const fee = data.amount * (PAYOUT_FEE_PERCENT / 100);
-      const netAmount = data.amount - fee;
+      // Get current session for auth header
+      const { data: { session } } = await merchantSupabase.auth.getSession();
+      if (!session) throw new Error("Session expired. Please log in again.");
 
-      // BB-WAL-01 FIX: Atomic wallet update with balance check condition
-      const { data: updatedWallet, error: walletError } = await merchantSupabase
-        .from("merchant_wallets")
-        .update({
-          available_balance: freshWallet.available_balance - data.amount,
-          pending_balance: freshWallet.pending_balance + data.amount,
-        })
-        .eq("id", freshWallet.id)
-        .gte("available_balance", data.amount) // Atomic check
-        .select()
-        .single();
-
-      if (walletError || !updatedWallet) {
-        throw new Error("Balance changed during processing. Please try again.");
-      }
-
-      // Create payout record after successful balance deduction
-      const { data: payout, error: payoutError } = await merchantSupabase
-        .from("merchant_payouts")
-        .insert({
-          merchant_id: user.id,
-          bank_account_id: data.bank_account_id,
-          amount: data.amount,
-          fee,
-          net_amount: netAmount,
-          notes: data.notes,
-          status: "processing",
-          transaction_id: `TXN${Date.now()}${Math.random().toString(36).slice(2, 8)}`,
-        })
-        .select()
-        .single();
-
-      if (payoutError) {
-        // Rollback wallet update on payout creation failure
-        await merchantSupabase
-          .from("merchant_wallets")
-          .update({
-            available_balance: freshWallet.available_balance,
-            pending_balance: freshWallet.pending_balance,
-          })
-          .eq("id", freshWallet.id);
-        throw payoutError;
-      }
-
-      // Simulate async payout processing (in production, this would be a webhook)
-      setTimeout(async () => {
-        const { data: currentWallet } = await merchantSupabase
-          .from("merchant_wallets")
-          .select("*")
-          .eq("id", freshWallet.id)
-          .single();
-
-        if (currentWallet) {
-          await merchantSupabase
-            .from("merchant_wallets")
-            .update({
-              pending_balance: Math.max(0, currentWallet.pending_balance - data.amount),
-              total_paid_out: currentWallet.total_paid_out + netAmount,
-            })
-            .eq("id", freshWallet.id);
+      // Call atomic edge function
+      const response = await fetch(
+        `https://sgpefhfmcykwtfqfwzcq.supabase.co/functions/v1/process-payout`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNncGVmaGZtY3lrd3RmcWZ3emNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3NjI2NzUsImV4cCI6MjA4MDMzODY3NX0.qYiFr5kI2UK4uLyw57lvvX-pZsYdiYo1x0E7U9FsSEQ',
+          },
+          body: JSON.stringify({
+            amount: data.amount,
+            bank_account_id: data.bank_account_id,
+            notes: data.notes,
+          }),
         }
+      );
 
-        await merchantSupabase
-          .from("merchant_payouts")
-          .update({ 
-            status: "completed",
-            processed_at: new Date().toISOString()
-          })
-          .eq("id", payout.id);
-      }, 10000);
+      const result = await response.json();
 
-      return payout as MerchantPayout;
+      if (!response.ok) {
+        throw new Error(result.error || 'Withdrawal failed');
+      }
+
+      return result as MerchantPayout;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["merchant-wallet"] });

@@ -59,3 +59,9 @@ verify_jwt = false
 
 [functions.auto-escalate-disputes]
 verify_jwt = false
+
+[functions.confirm-payment]
+verify_jwt = true
+
+[functions.process-payout]
+verify_jwt = true
