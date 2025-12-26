@@ -172,6 +172,9 @@ import AdminCheckoutRiskBlocked from "./pages/AdminCheckoutRiskBlocked";
 import AdminCheckoutSettings from "./pages/AdminCheckoutSettings";
 import AdminCheckoutSettingsCod from "./pages/AdminCheckoutSettingsCod";
 import AdminCheckoutSettingsOtp from "./pages/AdminCheckoutSettingsOtp";
+import AdminPaymentLinks from "./pages/AdminPaymentLinks";
+import AdminPaymentLinkDetails from "./pages/AdminPaymentLinkDetails";
+import AdminPublicLinks from "./pages/AdminPublicLinks";
 import MerchantPaymentLinks from "./pages/MerchantPaymentLinks";
 import MerchantPaymentLinkCreate from "./pages/MerchantPaymentLinkCreate";
 import MerchantPaymentLinkDetails from "./pages/MerchantPaymentLinkDetails";
@@ -389,6 +392,10 @@ const App = () => (
               <Route path="/admin/checkout/settings" element={<AdminProtectedRoute><AdminCheckoutSettings /></AdminProtectedRoute>} />
               <Route path="/admin/checkout/settings/cod" element={<AdminProtectedRoute><AdminCheckoutSettingsCod /></AdminProtectedRoute>} />
               <Route path="/admin/checkout/settings/otp" element={<AdminProtectedRoute><AdminCheckoutSettingsOtp /></AdminProtectedRoute>} />
+              {/* Admin Payment Links Routes */}
+              <Route path="/admin/checkout/payment-links" element={<AdminProtectedRoute><AdminPaymentLinks /></AdminProtectedRoute>} />
+              <Route path="/admin/checkout/payment-links/:linkId" element={<AdminProtectedRoute><AdminPaymentLinkDetails /></AdminProtectedRoute>} />
+              <Route path="/admin/checkout/public-links" element={<AdminProtectedRoute><AdminPublicLinks /></AdminProtectedRoute>} />
               {/* Admin User Verification & Profile Routes */}
               <Route path="/admin/users/:user_id/profile" element={<AdminProtectedRoute><AdminUserProfile /></AdminProtectedRoute>} />
               <Route path="/admin/users/:user_id/controls" element={<AdminProtectedRoute><AdminUserControls /></AdminProtectedRoute>} />

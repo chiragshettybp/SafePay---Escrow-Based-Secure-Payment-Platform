@@ -21,6 +21,8 @@ import {
   ArrowDownToLine,
   CreditCard,
   Zap,
+  LinkIcon,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -82,6 +84,8 @@ export function AdminSidebar({ isCollapsed = false, onToggle, onClose, alerts }:
       items: [
         { title: "Overview", href: "/admin/checkout", icon: CreditCard },
         { title: "Sessions", href: "/admin/checkout/sessions", icon: ShoppingCart },
+        { title: "Payment Links", href: "/admin/checkout/payment-links", icon: LinkIcon },
+        { title: "Public Traffic", href: "/admin/checkout/public-links", icon: Globe },
         { title: "Gateways", href: "/admin/checkout/gateways", icon: Zap },
         { title: "Risk & Fraud", href: "/admin/checkout/risk", icon: Shield },
         { title: "Settings", href: "/admin/checkout/settings", icon: Settings },
