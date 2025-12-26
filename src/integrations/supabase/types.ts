@@ -756,6 +756,7 @@ export type Database = {
           otp_verified: boolean
           payment_attempts: number
           payment_id: string | null
+          payment_link_id: string | null
           phone_number: string | null
           selected_payment_method:
             | Database["public"]["Enums"]["checkout_payment_method"]
@@ -798,6 +799,7 @@ export type Database = {
           otp_verified?: boolean
           payment_attempts?: number
           payment_id?: string | null
+          payment_link_id?: string | null
           phone_number?: string | null
           selected_payment_method?:
             | Database["public"]["Enums"]["checkout_payment_method"]
@@ -840,6 +842,7 @@ export type Database = {
           otp_verified?: boolean
           payment_attempts?: number
           payment_id?: string | null
+          payment_link_id?: string | null
           phone_number?: string | null
           selected_payment_method?:
             | Database["public"]["Enums"]["checkout_payment_method"]
@@ -868,6 +871,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkout_sessions_payment_link_id_fkey"
+            columns: ["payment_link_id"]
+            isOneToOne: false
+            referencedRelation: "payment_links"
             referencedColumns: ["id"]
           },
         ]
@@ -2798,6 +2808,7 @@ export type Database = {
           id: string
           logo_url: string | null
           phone: string | null
+          slug: string | null
           status: string
           updated_at: string
           user_id: string
@@ -2812,6 +2823,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           phone?: string | null
+          slug?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -2826,6 +2838,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           phone?: string | null
+          slug?: string | null
           status?: string
           updated_at?: string
           user_id?: string
@@ -3177,6 +3190,112 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      payment_link_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          merchant_id: string
+          new_state: Json | null
+          payment_link_id: string
+          previous_state: Json | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          merchant_id: string
+          new_state?: Json | null
+          payment_link_id: string
+          previous_state?: Json | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          merchant_id?: string
+          new_state?: Json | null
+          payment_link_id?: string
+          previous_state?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_link_audit_log_payment_link_id_fkey"
+            columns: ["payment_link_id"]
+            isOneToOne: false
+            referencedRelation: "payment_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_links: {
+        Row: {
+          amount: number
+          cancel_redirect_url: string | null
+          created_at: string
+          currency: string
+          description: string | null
+          expires_at: string | null
+          id: string
+          link_code: string
+          merchant_id: string
+          metadata: Json | null
+          status: string
+          success_redirect_url: string | null
+          title: string
+          total_collected: number
+          total_payments: number
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          cancel_redirect_url?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          link_code: string
+          merchant_id: string
+          metadata?: Json | null
+          status?: string
+          success_redirect_url?: string | null
+          title: string
+          total_collected?: number
+          total_payments?: number
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          cancel_redirect_url?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          link_code?: string
+          merchant_id?: string
+          metadata?: Json | null
+          status?: string
+          success_redirect_url?: string | null
+          title?: string
+          total_collected?: number
+          total_payments?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_links_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_webhook_logs: {
         Row: {
