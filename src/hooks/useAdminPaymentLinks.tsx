@@ -367,11 +367,11 @@ export function useAdminPaymentLinkDetails(linkId: string | undefined) {
       // Fetch payments for this link
       const { data: paymentsData } = await supabase
         .from("payments")
-        .select("*")
+        .select("id, order_id, amount, status, payment_method, gateway_payment_id, created_at, updated_at")
         .eq("payment_link_id", linkId)
         .order("created_at", { ascending: false });
 
-      setPayments(paymentsData || []);
+      setPayments((paymentsData as PaymentData[]) || []);
 
       // Fetch checkout sessions for this link
       const { data: sessionsData } = await supabase
