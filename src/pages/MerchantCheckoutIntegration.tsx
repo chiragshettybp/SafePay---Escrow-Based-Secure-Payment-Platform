@@ -91,8 +91,8 @@ export default function MerchantCheckoutIntegration() {
                   </p>
                 </div>
               </div>
-              <Badge variant={integrationStatus.environment === 'live' ? 'default' : 'secondary'}>
-                {integrationStatus.environment === 'live' ? 'Live' : 'Test'} Mode
+              <Badge variant={integrationStatus.liveMode ? 'default' : 'secondary'}>
+                {integrationStatus.liveMode ? 'Live' : 'Test'} Mode
               </Badge>
             </div>
 
@@ -108,7 +108,7 @@ export default function MerchantCheckoutIntegration() {
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
               <div className="text-center p-3 bg-muted/50 rounded-lg">
-                <p className="text-2xl font-bold">{integrationStatus.apiKeysCount}</p>
+                <p className="text-2xl font-bold">{integrationStatus.testKeysCount + integrationStatus.liveKeysCount}</p>
                 <p className="text-xs text-muted-foreground">Active API Keys</p>
               </div>
               <div className="text-center p-3 bg-muted/50 rounded-lg">

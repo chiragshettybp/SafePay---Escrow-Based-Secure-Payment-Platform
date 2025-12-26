@@ -61,10 +61,9 @@ export default function MerchantCheckoutIntegrationTest() {
 
   const handleRunTest = async () => {
     setIsRunning(true);
-    const testId = await runIntegrationTest('full');
-    if (testId) {
-      const test = integrationTests.find(t => t.id === testId);
-      if (test) setCurrentTest(test);
+    const test = await runIntegrationTest();
+    if (test) {
+      setCurrentTest(test);
     } else {
       setIsRunning(false);
     }
@@ -342,7 +341,7 @@ export default function MerchantCheckoutIntegrationTest() {
                         <Clock className="h-5 w-5 text-muted-foreground" />
                       )}
                       <div>
-                        <p className="font-medium text-sm capitalize">{test.test_type} Test</p>
+                        <p className="font-medium text-sm capitalize">Integration Test</p>
                         <p className="text-xs text-muted-foreground">
                           {format(new Date(test.started_at), 'MMM d, yyyy HH:mm')}
                         </p>

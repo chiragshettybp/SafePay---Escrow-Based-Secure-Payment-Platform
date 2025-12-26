@@ -5,7 +5,6 @@ import {
   Plus, 
   Trash2, 
   Edit,
-  RefreshCw,
   CheckCircle,
   XCircle,
   Clock,
@@ -48,7 +47,7 @@ import {
 import { MerchantLayout } from '@/components/merchant/MerchantLayout';
 import { Seo } from '@/components/seo/Seo';
 import { useMerchantAuth } from '@/hooks/useMerchantAuth';
-import { useMerchantIntegration, Webhook as WebhookType } from '@/hooks/useMerchantIntegration';
+import { useMerchantIntegration, Webhook as WebhookType, WebhookDelivery } from '@/hooks/useMerchantIntegration';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
@@ -58,13 +57,13 @@ export default function MerchantCheckoutIntegrationWebhooks() {
   const { merchant } = useMerchantAuth();
   const { 
     webhooks, 
-    webhookLogs,
+    webhookDeliveries,
     isLoading, 
     supportedEvents,
     createWebhook, 
     updateWebhook, 
     deleteWebhook,
-    fetchWebhookLogs 
+    fetchWebhookDeliveries 
   } = useMerchantIntegration(merchant?.id);
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -72,16 +71,15 @@ export default function MerchantCheckoutIntegrationWebhooks() {
   const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
   const [expandedWebhook, setExpandedWebhook] = useState<string | null>(null);
   
-  const [newWebhookName, setNewWebhookName] = useState('');
   const [newWebhookUrl, setNewWebhookUrl] = useState('');
   const [newWebhookEvents, setNewWebhookEvents] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleCreateWebhook = async () => {
-    if (!newWebhookName.trim() || !newWebhookUrl.trim()) {
+    if (!newWebhookUrl.trim()) {
       toast({
         title: 'Error',
-        description: 'Please fill in all required fields',
+        description: 'Please enter a webhook URL',
         variant: 'destructive',
       });
       return;
@@ -97,12 +95,11 @@ export default function MerchantCheckoutIntegrationWebhooks() {
     }
 
     setIsSaving(true);
-    const success = await createWebhook(newWebhookName.trim(), newWebhookUrl.trim(), newWebhookEvents);
+    const success = await createWebhook(newWebhookUrl.trim(), newWebhookEvents);
     setIsSaving(false);
 
     if (success) {
       setShowCreateDialog(false);
-      setNewWebhookName('');
       setNewWebhookUrl('');
       setNewWebhookEvents([]);
     }
@@ -113,7 +110,6 @@ export default function MerchantCheckoutIntegrationWebhooks() {
 
     setIsSaving(true);
     await updateWebhook(showEditDialog.id, {
-      name: showEditDialog.name,
       url: showEditDialog.url,
       events: showEditDialog.events,
       is_active: showEditDialog.is_active,
@@ -150,8 +146,13 @@ export default function MerchantCheckoutIntegrationWebhooks() {
       setExpandedWebhook(null);
     } else {
       setExpandedWebhook(webhookId);
-      fetchWebhookLogs(webhookId);
+      fetchWebhookDeliveries(webhookId);
     }
+  };
+
+  // Get deliveries for a specific webhook
+  const getWebhookDeliveries = (webhookId: string) => {
+    return webhookDeliveries.filter(d => d.endpoint_id === webhookId).slice(0, 5);
   };
 
   if (isLoading) {
@@ -222,7 +223,7 @@ export default function MerchantCheckoutIntegrationWebhooks() {
                     key={webhook.id}
                     webhook={webhook}
                     isExpanded={expandedWebhook === webhook.id}
-                    logs={expandedWebhook === webhook.id ? webhookLogs : []}
+                    logs={getWebhookDeliveries(webhook.id)}
                     onToggleExpand={() => handleExpandWebhook(webhook.id)}
                     onEdit={() => setShowEditDialog(webhook)}
                     onDelete={() => setShowDeleteDialog(webhook.id)}
@@ -254,16 +255,6 @@ export default function MerchantCheckoutIntegrationWebhooks() {
             </DialogHeader>
 
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="webhookName">Name</Label>
-                <Input
-                  id="webhookName"
-                  placeholder="e.g., Order Notification"
-                  value={newWebhookName}
-                  onChange={(e) => setNewWebhookName(e.target.value)}
-                />
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="webhookUrl">Endpoint URL</Label>
                 <Input
@@ -318,15 +309,6 @@ export default function MerchantCheckoutIntegrationWebhooks() {
 
             {showEditDialog && (
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="editWebhookName">Name</Label>
-                  <Input
-                    id="editWebhookName"
-                    value={showEditDialog.name}
-                    onChange={(e) => setShowEditDialog({ ...showEditDialog, name: e.target.value })}
-                  />
-                </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="editWebhookUrl">Endpoint URL</Label>
                   <Input
@@ -413,7 +395,7 @@ function WebhookCard({
 }: {
   webhook: WebhookType;
   isExpanded: boolean;
-  logs: { id: string; event_type: string; response_code: number | null; success: boolean; created_at: string }[];
+  logs: WebhookDelivery[];
   onToggleExpand: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -423,11 +405,11 @@ function WebhookCard({
     if (!webhook.is_active) {
       return <Badge variant="secondary">Disabled</Badge>;
     }
-    if (webhook.failure_count > 3) {
-      return <Badge variant="destructive">Failing</Badge>;
-    }
-    if (webhook.last_response_code && webhook.last_response_code >= 200 && webhook.last_response_code < 300) {
+    if (webhook.last_status && webhook.last_status >= 200 && webhook.last_status < 300) {
       return <Badge variant="default" className="bg-green-600">Healthy</Badge>;
+    }
+    if (webhook.last_status && webhook.last_status >= 400) {
+      return <Badge variant="destructive">Failing</Badge>;
     }
     return <Badge variant="secondary">Pending</Badge>;
   };
@@ -439,12 +421,8 @@ function WebhookCard({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1 flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium">{webhook.name}</span>
+                <span className="font-medium truncate">{webhook.url}</span>
                 {getStatusBadge()}
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">{webhook.url}</span>
               </div>
               <div className="flex flex-wrap gap-1 mt-2">
                 {webhook.events.slice(0, 3).map((event) => (
@@ -482,7 +460,7 @@ function WebhookCard({
           {webhook.last_triggered_at && (
             <p className="text-xs text-muted-foreground mt-2">
               Last triggered: {format(new Date(webhook.last_triggered_at), 'MMM d, yyyy HH:mm')}
-              {webhook.last_response_code && ` • Response: ${webhook.last_response_code}`}
+              {webhook.last_status && ` • Response: ${webhook.last_status}`}
             </p>
           )}
         </div>
@@ -492,26 +470,33 @@ function WebhookCard({
             <h4 className="text-sm font-medium mb-3">Recent Deliveries</h4>
             {logs.length > 0 ? (
               <div className="space-y-2">
-                {logs.slice(0, 5).map((log) => (
+                {logs.map((log) => (
                   <div key={log.id} className="flex items-center justify-between text-sm p-2 bg-background rounded">
                     <div className="flex items-center gap-2">
-                      {log.success ? (
+                      {log.status === 'success' ? (
                         <CheckCircle className="h-4 w-4 text-green-600" />
-                      ) : (
+                      ) : log.status === 'failed' ? (
                         <XCircle className="h-4 w-4 text-red-600" />
+                      ) : (
+                        <Clock className="h-4 w-4 text-muted-foreground" />
                       )}
                       <span className="font-mono text-xs">{log.event_type}</span>
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
-                      <span>{log.response_code || '-'}</span>
-                      <span>•</span>
-                      <span>{format(new Date(log.created_at), 'HH:mm:ss')}</span>
+                      {log.response_code && (
+                        <Badge variant={log.response_code < 400 ? 'default' : 'destructive'} className="text-xs">
+                          {log.response_code}
+                        </Badge>
+                      )}
+                      <span className="text-xs">
+                        {format(new Date(log.created_at), 'HH:mm:ss')}
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No delivery logs yet</p>
+              <p className="text-sm text-muted-foreground">No deliveries yet</p>
             )}
           </div>
         </CollapsibleContent>
