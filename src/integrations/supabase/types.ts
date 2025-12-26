@@ -701,6 +701,56 @@ export type Database = {
           },
         ]
       }
+      draft_audit_logs: {
+        Row: {
+          action_type: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          new_state: Json | null
+          order_id: string
+          performed_by: string
+          performed_by_role: string
+          previous_state: Json | null
+          reason: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_state?: Json | null
+          order_id: string
+          performed_by: string
+          performed_by_role: string
+          previous_state?: Json | null
+          reason?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_state?: Json | null
+          order_id?: string
+          performed_by?: string
+          performed_by_role?: string
+          previous_state?: Json | null
+          reason?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draft_audit_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       escrow_accounts: {
         Row: {
           available_balance: number
@@ -1893,6 +1943,22 @@ export type Database = {
           created_at: string
           customer_id: string
           delivered_at: string | null
+          draft_cancelled_at: string | null
+          draft_cancelled_by: string | null
+          draft_cancelled_reason: string | null
+          draft_change_request_reason: string | null
+          draft_change_requested_at: string | null
+          draft_change_requested_by: string | null
+          draft_deleted_at: string | null
+          draft_deleted_by: string | null
+          draft_expires_at: string | null
+          draft_metadata: Json | null
+          draft_rejected_at: string | null
+          draft_rejected_by: string | null
+          draft_rejection_reason: string | null
+          draft_status: string | null
+          draft_submitted_at: string | null
+          draft_version: number | null
           escrow_finalized_at: string | null
           escrow_finalized_by: string | null
           escrow_resolution_type: string | null
@@ -1914,6 +1980,22 @@ export type Database = {
           created_at?: string
           customer_id: string
           delivered_at?: string | null
+          draft_cancelled_at?: string | null
+          draft_cancelled_by?: string | null
+          draft_cancelled_reason?: string | null
+          draft_change_request_reason?: string | null
+          draft_change_requested_at?: string | null
+          draft_change_requested_by?: string | null
+          draft_deleted_at?: string | null
+          draft_deleted_by?: string | null
+          draft_expires_at?: string | null
+          draft_metadata?: Json | null
+          draft_rejected_at?: string | null
+          draft_rejected_by?: string | null
+          draft_rejection_reason?: string | null
+          draft_status?: string | null
+          draft_submitted_at?: string | null
+          draft_version?: number | null
           escrow_finalized_at?: string | null
           escrow_finalized_by?: string | null
           escrow_resolution_type?: string | null
@@ -1935,6 +2017,22 @@ export type Database = {
           created_at?: string
           customer_id?: string
           delivered_at?: string | null
+          draft_cancelled_at?: string | null
+          draft_cancelled_by?: string | null
+          draft_cancelled_reason?: string | null
+          draft_change_request_reason?: string | null
+          draft_change_requested_at?: string | null
+          draft_change_requested_by?: string | null
+          draft_deleted_at?: string | null
+          draft_deleted_by?: string | null
+          draft_expires_at?: string | null
+          draft_metadata?: Json | null
+          draft_rejected_at?: string | null
+          draft_rejected_by?: string | null
+          draft_rejection_reason?: string | null
+          draft_status?: string | null
+          draft_submitted_at?: string | null
+          draft_version?: number | null
           escrow_finalized_at?: string | null
           escrow_finalized_by?: string | null
           escrow_resolution_type?: string | null
@@ -3176,6 +3274,7 @@ export type Database = {
           reason: string
         }[]
       }
+      can_restore_draft: { Args: { p_order_id: string }; Returns: boolean }
       check_all_wallet_consistency: {
         Args: never
         Returns: {
@@ -3259,12 +3358,25 @@ export type Database = {
           withdrawal_fee: number
         }[]
       }
+      expire_old_drafts: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      log_draft_action: {
+        Args: {
+          p_action_type: string
+          p_new_state?: Json
+          p_order_id: string
+          p_performed_by: string
+          p_performed_by_role: string
+          p_previous_state?: Json
+          p_reason?: string
+        }
+        Returns: string
       }
       log_financial_failure: {
         Args: {
