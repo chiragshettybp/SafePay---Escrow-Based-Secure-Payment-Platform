@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { merchantSupabase } from '@/integrations/supabase/merchantClient';
 import { useEffect, useState } from 'react';
 
 export interface CheckoutMetrics {
@@ -92,7 +92,7 @@ export function useMerchantCheckout({ merchantId, dateRange }: UseMerchantChecko
   const { data: sessions, isLoading: sessionsLoading, refetch: refetchSessions } = useQuery({
     queryKey: ['merchant-checkout-sessions', merchantId, dateRange],
     queryFn: async () => {
-      let query = supabase
+      let query = merchantSupabase
         .from('checkout_sessions')
         .select('*')
         .order('created_at', { ascending: false });
@@ -122,7 +122,7 @@ export function useMerchantCheckout({ merchantId, dateRange }: UseMerchantChecko
       const sessionIds = sessions?.map(s => s.id) || [];
       if (sessionIds.length === 0) return [];
 
-      const { data, error } = await supabase
+      const { data, error } = await merchantSupabase
         .from('checkout_events')
         .select('*')
         .in('session_id', sessionIds.slice(0, 100))
@@ -159,7 +159,7 @@ export function useMerchantCheckout({ merchantId, dateRange }: UseMerchantChecko
   useEffect(() => {
     if (!merchantId) return;
 
-    const channel = supabase
+    const channel = merchantSupabase
       .channel('merchant-checkout-updates')
       .on(
         'postgres_changes',
@@ -179,7 +179,7 @@ export function useMerchantCheckout({ merchantId, dateRange }: UseMerchantChecko
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      merchantSupabase.removeChannel(channel);
     };
   }, [merchantId, refetchSessions]);
 
@@ -288,7 +288,7 @@ export function useMerchantCheckoutSession(sessionId: string | undefined) {
     queryFn: async () => {
       if (!sessionId) return null;
       
-      const { data, error } = await supabase
+      const { data, error } = await merchantSupabase
         .from('checkout_sessions')
         .select('*')
         .eq('id', sessionId)
@@ -305,7 +305,7 @@ export function useMerchantCheckoutSession(sessionId: string | undefined) {
     queryFn: async () => {
       if (!sessionId) return [];
       
-      const { data, error } = await supabase
+      const { data, error } = await merchantSupabase
         .from('checkout_events')
         .select('*')
         .eq('session_id', sessionId)
@@ -322,7 +322,7 @@ export function useMerchantCheckoutSession(sessionId: string | undefined) {
     queryFn: async () => {
       if (!sessionId) return [];
       
-      const { data, error } = await supabase
+      const { data, error } = await merchantSupabase
         .from('checkout_attempts')
         .select('*')
         .eq('session_id', sessionId)
@@ -339,7 +339,7 @@ export function useMerchantCheckoutSession(sessionId: string | undefined) {
     queryFn: async () => {
       if (!sessionId) return [];
       
-      const { data, error } = await supabase
+      const { data, error } = await merchantSupabase
         .from('checkout_risk_flags')
         .select('*')
         .eq('session_id', sessionId);
@@ -354,7 +354,7 @@ export function useMerchantCheckoutSession(sessionId: string | undefined) {
   useEffect(() => {
     if (!sessionId) return;
 
-    const channel = supabase
+    const channel = merchantSupabase
       .channel(`session-${sessionId}`)
       .on(
         'postgres_changes',
@@ -371,7 +371,7 @@ export function useMerchantCheckoutSession(sessionId: string | undefined) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      merchantSupabase.removeChannel(channel);
     };
   }, [sessionId, refetch]);
 
