@@ -364,7 +364,7 @@ export function useAdminGateways() {
         gateway_id: gatewayId,
         override_type: overrideType,
         reason,
-        config,
+        config: config as unknown as import('@/integrations/supabase/types').Json,
         expires_at: expiresAt,
         created_by: userId,
       }]);

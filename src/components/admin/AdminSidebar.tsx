@@ -19,6 +19,8 @@ import {
   Truck,
   Vault,
   ArrowDownToLine,
+  CreditCard,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -73,6 +75,14 @@ export function AdminSidebar({ isCollapsed = false, onToggle, onClose, alerts }:
         { title: "Shipments", href: "/admin/shipments", icon: Truck },
         { title: "Payments", href: "/admin/payments", icon: Wallet },
         { title: "Payouts", href: "/admin/payouts", icon: Wallet, badge: alerts?.pendingWithdrawals },
+      ],
+    },
+    {
+      title: "Checkout",
+      items: [
+        { title: "Overview", href: "/admin/checkout", icon: CreditCard },
+        { title: "Sessions", href: "/admin/checkout/sessions", icon: ShoppingCart },
+        { title: "Gateways", href: "/admin/checkout/gateways", icon: Zap },
       ],
     },
     {
