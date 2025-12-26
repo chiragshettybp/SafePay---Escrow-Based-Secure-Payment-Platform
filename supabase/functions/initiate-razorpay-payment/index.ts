@@ -94,9 +94,9 @@ serve(async (req) => {
       return json(404, { error: "Order not found" });
     }
 
-    // 2. Validate order is in draft status
-    if (order.status !== "draft") {
-      console.log(`Order ${orderId} is not in draft status: ${order.status}`);
+    // 2. Validate order is in draft or pending status (pending = checkout flow, draft = legacy)
+    if (order.status !== "draft" && order.status !== "pending") {
+      console.log(`Order ${orderId} is not in valid status for payment: ${order.status}`);
       return json(400, { error: `Order already processed with status: ${order.status}` });
     }
 
