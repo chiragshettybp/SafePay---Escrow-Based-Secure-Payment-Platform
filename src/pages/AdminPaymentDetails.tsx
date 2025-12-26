@@ -19,6 +19,9 @@ import {
   Wallet,
   FileText,
   RefreshCw,
+  CreditCard,
+  Shield,
+  Ban,
 } from "lucide-react";
 import { Seo } from "@/components/seo/Seo";
 
@@ -32,6 +35,13 @@ const statusColors: Record<string, string> = {
   disputed: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
 };
 
+const gatewayStatusColors: Record<string, string> = {
+  created: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
+  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+  verified: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  failed: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+};
+
 const eventIcons: Record<string, React.ReactNode> = {
   order_created: <ShoppingCart className="h-4 w-4" />,
   status_change: <RefreshCw className="h-4 w-4" />,
@@ -39,6 +49,7 @@ const eventIcons: Record<string, React.ReactNode> = {
   admin_force_release: <CheckCircle className="h-4 w-4 text-green-500" />,
   admin_force_refund: <XCircle className="h-4 w-4 text-red-500" />,
   dispute_opened: <AlertTriangle className="h-4 w-4 text-orange-500" />,
+  payment_verified: <Shield className="h-4 w-4 text-green-500" />,
 };
 
 export default function AdminPaymentDetails() {
@@ -166,7 +177,7 @@ export default function AdminPaymentDetails() {
                     </Link>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
+                    <p className="text-sm text-muted-foreground">Payment Status</p>
                     <Badge className={statusColors[payment.status]}>
                       {payment.status.replace(/_/g, " ")}
                     </Badge>
@@ -200,6 +211,77 @@ export default function AdminPaymentDetails() {
                     <span>₹{payment.amount.toLocaleString()}</span>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Razorpay Payment Details */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Razorpay Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Gateway</p>
+                    <p className="font-medium capitalize">{payment.payment_gateway || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Gateway Status</p>
+                    {payment.gateway_status ? (
+                      <Badge className={gatewayStatusColors[payment.gateway_status] || "bg-gray-100"}>
+                        {payment.gateway_status}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">N/A</span>
+                    )}
+                  </div>
+                </div>
+
+                {payment.razorpay_order_id && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Razorpay Order ID</p>
+                    <p className="font-mono text-sm">{payment.razorpay_order_id}</p>
+                  </div>
+                )}
+
+                {payment.razorpay_payment_id && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Razorpay Payment ID</p>
+                    <p className="font-mono text-sm">{payment.razorpay_payment_id}</p>
+                  </div>
+                )}
+
+                {payment.verified_at && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Verified At</p>
+                    <p className="text-sm flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-green-500" />
+                      {format(new Date(payment.verified_at), "MMM d, yyyy h:mm a")}
+                    </p>
+                  </div>
+                )}
+
+                {payment.gateway_failure_reason && (
+                  <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                    <div className="flex items-start gap-2">
+                      <Ban className="h-4 w-4 text-red-500 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-red-700 dark:text-red-400">Failure Reason</p>
+                        <p className="text-sm text-red-600 dark:text-red-300">{payment.gateway_failure_reason}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {payment.transaction_reference && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Transaction Reference</p>
+                    <p className="font-mono text-sm">{payment.transaction_reference}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -366,9 +448,10 @@ export default function AdminPaymentDetails() {
                 <CardContent>
                   <div className="space-y-4">
                     {payment.disputes.map((dispute) => (
-                      <div
+                      <Link
                         key={dispute.id}
-                        className="p-4 border rounded-lg space-y-2"
+                        to={`/admin/disputes/${dispute.id}`}
+                        className="block p-4 border rounded-lg space-y-2 hover:bg-muted/50 transition-colors"
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-mono text-sm">
@@ -381,7 +464,55 @@ export default function AdminPaymentDetails() {
                           Opened{" "}
                           {format(new Date(dispute.created_at), "MMM d, yyyy")}
                         </p>
-                      </div>
+                      </Link>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Refunds */}
+            {payment.refunds && payment.refunds.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <RefreshCw className="h-5 w-5 text-purple-500" />
+                    Refunds
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {payment.refunds.map((refund) => (
+                      <Link
+                        key={refund.id}
+                        to={`/admin/refunds/${refund.id}`}
+                        className="block p-4 border rounded-lg space-y-2 hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-sm">
+                            #{refund.id.slice(0, 8)}
+                          </span>
+                          <Badge 
+                            variant={refund.status === "success" ? "default" : refund.status === "failed" ? "destructive" : "outline"}
+                          >
+                            {refund.status}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-muted-foreground capitalize">
+                            {refund.refund_type || "Full"} Refund
+                          </span>
+                          <span className="font-medium">₹{refund.amount.toLocaleString()}</span>
+                        </div>
+                        {refund.razorpay_refund_id && (
+                          <p className="text-xs font-mono text-muted-foreground">
+                            RZP: {refund.razorpay_refund_id}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(refund.created_at), "MMM d, yyyy")}
+                        </p>
+                      </Link>
                     ))}
                   </div>
                 </CardContent>
