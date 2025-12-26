@@ -66,7 +66,8 @@ export interface CreatePayoutData {
 }
 
 const MINIMUM_WITHDRAWAL = 100; // ₹100 minimum
-const PAYOUT_FEE_PERCENT = 2; // 2% fee on all payouts
+const WITHDRAWAL_FEE_PERCENT = 2.5; // 2.5% fee on withdrawals
+const GST_PERCENT = 18; // 18% GST on fees
 
 export function useMerchantWallet() {
   const { user } = useMerchantAuth();
@@ -396,6 +397,7 @@ export function useMerchantWallet() {
     createPayout: createPayout.mutateAsync,
     isCreatingPayout: createPayout.isPending,
     MINIMUM_WITHDRAWAL,
-    PAYOUT_FEE_PERCENT,
+    WITHDRAWAL_FEE_PERCENT,
+    GST_PERCENT,
   };
 }
