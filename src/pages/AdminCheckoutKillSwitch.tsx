@@ -118,8 +118,8 @@ export default function AdminCheckoutKillSwitch() {
       <div className="space-y-6">
         <AdminPageHeader
           title="Kill-Switch Control"
-          description="Emergency platform controls for checkout system"
-          backLink="/admin/checkout"
+          subtitle="Emergency platform controls for checkout system"
+          backUrl="/admin/checkout"
         />
 
         {/* Current Platform Status */}

@@ -31,8 +31,8 @@ export default function AdminCheckoutIncidents() {
       <div className="space-y-6">
         <AdminPageHeader
           title="Incident History"
-          description="Audit trail of all kill-switch escalations"
-          backLink="/admin/checkout/kill-switch"
+          subtitle="Audit trail of all kill-switch escalations"
+          backUrl="/admin/checkout/kill-switch"
         />
 
         <Card>
