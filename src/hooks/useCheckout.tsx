@@ -369,7 +369,7 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
         .from('checkout_sessions')
         .update({
           shipping_name: data.full_name,
-          shipping_address: shippingAddress as unknown as Record<string, unknown>,
+          shipping_address: JSON.parse(JSON.stringify(shippingAddress)),
           shipping_pincode: data.pincode,
           delivery_estimate: deliveryEstimate,
           cod_available: codAvailable,
