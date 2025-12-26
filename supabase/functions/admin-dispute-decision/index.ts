@@ -79,10 +79,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate idempotency key
-    const idempotencyKey = clientIdempotencyKey || `admin-dispute-${disputeId}-${decision}-${Date.now()}`;
+    // Generate proper idempotency key (UUID-based for uniqueness)
+    const idempotencyKey = clientIdempotencyKey || `admin-dispute-${disputeId}-${decision}-${crypto.randomUUID()}`;
+    const ipAddress = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown";
 
-    console.log(`Admin ${adminUser.email} making decision on dispute ${disputeId}: ${decision}, idempotencyKey: ${idempotencyKey}`);
+    console.log(`Admin ${adminUser.email} making decision on dispute ${disputeId}: ${decision}, idempotencyKey: ${idempotencyKey}, IP: ${ipAddress}`);
 
     // CRITICAL: Idempotency check - has this resolution already been processed?
     const { data: existingResolution } = await supabase
@@ -543,23 +544,56 @@ Deno.serve(async (req) => {
       created_by: adminUser.email,
     });
 
-    // FIX GAP 3: Log admin financial action
+    // FIX GAP 3: Log admin financial action with IP address
+    const actionAmount = refundAmount || merchantAmount || 0;
     await supabase.from("admin_financial_actions_log").insert({
       admin_id: user.id,
       action_type: `dispute_${decision}`,
       target_type: "dispute",
       target_id: disputeId,
-      amount: refundAmount || merchantAmount || 0,
+      amount: actionAmount,
       reason: reason,
+      ip_address: ipAddress,
       metadata: {
         admin_email: adminUser.email,
         order_id: order.id,
         decision,
         refund_amount: refundAmount,
         merchant_amount: merchantAmount,
-        escrow_debited: !!escrowAccount && decision !== "resolve_no_funds"
+        escrow_debited: !!escrowAccount && decision !== "resolve_no_funds",
+        idempotency_key: idempotencyKey
       }
     });
+
+    // Check high value threshold for alerts
+    const { data: thresholdSetting } = await supabase
+      .from("order_settings")
+      .select("setting_value")
+      .eq("setting_key", "high_value_threshold")
+      .single();
+    const highValueThreshold = parseFloat(thresholdSetting?.setting_value || "50000");
+
+    // Create high-value alert if applicable
+    if (actionAmount > highValueThreshold) {
+      await supabase.from("admin_alerts").insert({
+        alert_type: "high_value_action",
+        severity: "high",
+        title: "High Value Dispute Decision Executed",
+        description: `Admin ${adminUser.email} made ${decision} decision for ₹${actionAmount} on dispute ${disputeId}`,
+        related_entity_type: "dispute",
+        related_entity_id: disputeId,
+        triggered_by: user.id,
+        triggered_by_type: "admin",
+        ip_address: ipAddress,
+        metadata: {
+          amount: actionAmount,
+          threshold: highValueThreshold,
+          order_id: order.id,
+          decision: decision,
+          reason: reason
+        }
+      });
+    }
 
     // Log to escrow_resolution_log for audit trail (if funds were moved)
     if (decision !== "resolve_no_funds") {
@@ -625,6 +659,29 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Error in admin dispute decision:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    
+    // Log financial failure alert
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const alertSupabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      await alertSupabase.from("admin_alerts").insert({
+        alert_type: "financial_failure",
+        severity: "critical",
+        title: "Dispute Decision Failed",
+        description: `Dispute decision operation failed: ${errorMessage}`,
+        related_entity_type: "dispute",
+        triggered_by_type: "system",
+        metadata: {
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined
+        }
+      });
+    } catch (alertError) {
+      console.error("Failed to create failure alert:", alertError);
+    }
+    
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

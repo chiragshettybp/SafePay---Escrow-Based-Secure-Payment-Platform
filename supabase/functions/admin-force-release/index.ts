@@ -71,8 +71,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    const idempotencyKey = `admin-force-release-${paymentId}-${Date.now()}`;
-    console.log(`Admin ${adminUser.email} initiating force release for payment ${paymentId}, idempotencyKey: ${idempotencyKey}`);
+    // Generate proper idempotency key (UUID-based for uniqueness)
+    const idempotencyKey = `admin-force-release-${paymentId}-${crypto.randomUUID()}`;
+    const ipAddress = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown";
+    
+    console.log(`Admin ${adminUser.email} initiating force release for payment ${paymentId}, idempotencyKey: ${idempotencyKey}, IP: ${ipAddress}`);
 
     // Fetch the payment with order details
     const { data: payment, error: paymentError } = await supabase
@@ -261,7 +264,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // FIX GAP 3: Log admin financial action
+    // FIX GAP 3: Log admin financial action with IP address
     await supabase.from("admin_financial_actions_log").insert({
       admin_id: user.id,
       action_type: "force_release",
@@ -269,14 +272,37 @@ Deno.serve(async (req) => {
       target_id: paymentId,
       amount: payment.amount,
       reason: reason,
+      ip_address: ipAddress,
       metadata: {
         admin_email: adminUser.email,
         order_id: order.id,
         merchant_id: order.merchant_id,
         merchant_name: merchant?.business_name,
-        high_value: payment.amount > highValueThreshold
+        high_value: payment.amount > highValueThreshold,
+        idempotency_key: idempotencyKey
       }
     });
+
+    // Create high-value alert if applicable
+    if (payment.amount > highValueThreshold) {
+      await supabase.from("admin_alerts").insert({
+        alert_type: "high_value_action",
+        severity: "high",
+        title: "High Value Force Release Executed",
+        description: `Admin ${adminUser.email} force released ₹${payment.amount} for payment ${paymentId}`,
+        related_entity_type: "payment",
+        related_entity_id: paymentId,
+        triggered_by: user.id,
+        triggered_by_type: "admin",
+        ip_address: ipAddress,
+        metadata: {
+          amount: payment.amount,
+          threshold: highValueThreshold,
+          order_id: order.id,
+          reason: reason
+        }
+      });
+    }
 
     // 5. Log to escrow_resolution_log (immutable audit trail)
     await supabase.from("escrow_resolution_log").insert({
@@ -345,6 +371,29 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Error in admin force release:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    
+    // Log financial failure alert
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const alertSupabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      await alertSupabase.from("admin_alerts").insert({
+        alert_type: "financial_failure",
+        severity: "critical",
+        title: "Force Release Failed",
+        description: `Force release operation failed: ${errorMessage}`,
+        related_entity_type: "payment",
+        triggered_by_type: "system",
+        metadata: {
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined
+        }
+      });
+    } catch (alertError) {
+      console.error("Failed to create failure alert:", alertError);
+    }
+    
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
