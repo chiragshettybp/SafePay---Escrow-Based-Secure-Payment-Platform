@@ -1324,6 +1324,286 @@ export type Database = {
         }
         Relationships: []
       }
+      gateway_admin_actions: {
+        Row: {
+          action_type: string
+          admin_id: string
+          created_at: string
+          gateway_id: string | null
+          id: string
+          ip_address: string | null
+          new_state: Json | null
+          previous_state: Json | null
+          reason: string | null
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          created_at?: string
+          gateway_id?: string | null
+          id?: string
+          ip_address?: string | null
+          new_state?: Json | null
+          previous_state?: Json | null
+          reason?: string | null
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          created_at?: string
+          gateway_id?: string | null
+          id?: string
+          ip_address?: string | null
+          new_state?: Json | null
+          previous_state?: Json | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_admin_actions_gateway_id_fkey"
+            columns: ["gateway_id"]
+            isOneToOne: false
+            referencedRelation: "payment_gateways"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gateway_error_logs: {
+        Row: {
+          amount: number | null
+          attempt_id: string | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          gateway_id: string | null
+          id: string
+          merchant_id: string | null
+          payment_method: string | null
+          session_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          attempt_id?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          gateway_id?: string | null
+          id?: string
+          merchant_id?: string | null
+          payment_method?: string | null
+          session_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          attempt_id?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          gateway_id?: string | null
+          id?: string
+          merchant_id?: string | null
+          payment_method?: string | null
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_error_logs_gateway_id_fkey"
+            columns: ["gateway_id"]
+            isOneToOne: false
+            referencedRelation: "payment_gateways"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gateway_health_metrics: {
+        Row: {
+          avg_latency_ms: number
+          failure_rate_1h: number
+          failure_rate_24h: number
+          gateway_id: string
+          id: string
+          last_failure_at: string | null
+          last_success_at: string | null
+          success_rate_1h: number
+          success_rate_24h: number
+          timeout_rate_1h: number
+          timeout_rate_24h: number
+          total_attempts_1h: number
+          total_attempts_24h: number
+          updated_at: string
+        }
+        Insert: {
+          avg_latency_ms?: number
+          failure_rate_1h?: number
+          failure_rate_24h?: number
+          gateway_id: string
+          id?: string
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          success_rate_1h?: number
+          success_rate_24h?: number
+          timeout_rate_1h?: number
+          timeout_rate_24h?: number
+          total_attempts_1h?: number
+          total_attempts_24h?: number
+          updated_at?: string
+        }
+        Update: {
+          avg_latency_ms?: number
+          failure_rate_1h?: number
+          failure_rate_24h?: number
+          gateway_id?: string
+          id?: string
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          success_rate_1h?: number
+          success_rate_24h?: number
+          timeout_rate_1h?: number
+          timeout_rate_24h?: number
+          total_attempts_1h?: number
+          total_attempts_24h?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_health_metrics_gateway_id_fkey"
+            columns: ["gateway_id"]
+            isOneToOne: false
+            referencedRelation: "payment_gateways"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gateway_incidents: {
+        Row: {
+          auto_detected: boolean
+          created_by: string | null
+          description: string | null
+          gateway_id: string
+          id: string
+          incident_type: string
+          metadata: Json | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          started_at: string
+          title: string
+        }
+        Insert: {
+          auto_detected?: boolean
+          created_by?: string | null
+          description?: string | null
+          gateway_id: string
+          id?: string
+          incident_type: string
+          metadata?: Json | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          started_at?: string
+          title: string
+        }
+        Update: {
+          auto_detected?: boolean
+          created_by?: string | null
+          description?: string | null
+          gateway_id?: string
+          id?: string
+          incident_type?: string
+          metadata?: Json | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          started_at?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_incidents_gateway_id_fkey"
+            columns: ["gateway_id"]
+            isOneToOne: false
+            referencedRelation: "payment_gateways"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gateway_overrides: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          gateway_id: string
+          id: string
+          is_active: boolean
+          override_type: string
+          reason: string
+          starts_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          gateway_id: string
+          id?: string
+          is_active?: boolean
+          override_type: string
+          reason: string
+          starts_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          gateway_id?: string
+          id?: string
+          is_active?: boolean
+          override_type?: string
+          reason?: string
+          starts_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_overrides_gateway_id_fkey"
+            columns: ["gateway_id"]
+            isOneToOne: false
+            referencedRelation: "payment_gateways"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gateway_routing_rules: {
+        Row: {
+          config: Json
+          id: string
+          is_enabled: boolean
+          rule_name: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          config?: Json
+          id?: string
+          is_enabled?: boolean
+          rule_name: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          config?: Json
+          id?: string
+          is_enabled?: boolean
+          rule_name?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       kyc_actions_log: {
         Row: {
           action_type: string
@@ -2606,6 +2886,75 @@ export type Database = {
           product_description?: string | null
           product_name?: string
           status?: Database["public"]["Enums"]["order_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payment_gateways: {
+        Row: {
+          config: Json | null
+          created_at: string
+          disabled_at: string | null
+          disabled_by: string | null
+          disabled_merchants: string[] | null
+          disabled_reason: string | null
+          display_name: string
+          enabled_merchants: string[] | null
+          environment: string
+          id: string
+          is_default: boolean
+          last_status_change_at: string | null
+          last_status_change_by: string | null
+          max_amount: number | null
+          min_amount: number | null
+          name: string
+          priority: number
+          status: string
+          supported_methods: string[]
+          updated_at: string
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string
+          disabled_at?: string | null
+          disabled_by?: string | null
+          disabled_merchants?: string[] | null
+          disabled_reason?: string | null
+          display_name: string
+          enabled_merchants?: string[] | null
+          environment?: string
+          id?: string
+          is_default?: boolean
+          last_status_change_at?: string | null
+          last_status_change_by?: string | null
+          max_amount?: number | null
+          min_amount?: number | null
+          name: string
+          priority?: number
+          status?: string
+          supported_methods?: string[]
+          updated_at?: string
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string
+          disabled_at?: string | null
+          disabled_by?: string | null
+          disabled_merchants?: string[] | null
+          disabled_reason?: string | null
+          display_name?: string
+          enabled_merchants?: string[] | null
+          environment?: string
+          id?: string
+          is_default?: boolean
+          last_status_change_at?: string | null
+          last_status_change_by?: string | null
+          max_amount?: number | null
+          min_amount?: number | null
+          name?: string
+          priority?: number
+          status?: string
+          supported_methods?: string[]
           updated_at?: string
         }
         Relationships: []

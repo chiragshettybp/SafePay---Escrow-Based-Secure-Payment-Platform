@@ -160,6 +160,11 @@ import AdminNotificationActions from "./pages/AdminNotificationActions";
 import AdminMerchantKyc from "./pages/AdminMerchantKyc";
 import AdminMerchantBankVerify from "./pages/AdminMerchantBankVerify";
 import AdminMerchantVerificationHistory from "./pages/AdminMerchantVerificationHistory";
+import AdminCheckout from "./pages/AdminCheckout";
+import AdminCheckoutSessions from "./pages/AdminCheckoutSessions";
+import AdminCheckoutSessionDetails from "./pages/AdminCheckoutSessionDetails";
+import AdminCheckoutGateways from "./pages/AdminCheckoutGateways";
+import AdminCheckoutGatewayDetails from "./pages/AdminCheckoutGatewayDetails";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -338,6 +343,12 @@ const App = () => (
               <Route path="/admin/notifications/:notificationId/recipients" element={<AdminProtectedRoute><AdminNotificationRecipients /></AdminProtectedRoute>} />
               <Route path="/admin/notifications/:notificationId/history" element={<AdminProtectedRoute><AdminNotificationHistory /></AdminProtectedRoute>} />
               <Route path="/admin/notifications/:notificationId/actions" element={<AdminProtectedRoute><AdminNotificationActions /></AdminProtectedRoute>} />
+              {/* Admin Checkout Routes */}
+              <Route path="/admin/checkout" element={<AdminProtectedRoute><AdminCheckout /></AdminProtectedRoute>} />
+              <Route path="/admin/checkout/sessions" element={<AdminProtectedRoute><AdminCheckoutSessions /></AdminProtectedRoute>} />
+              <Route path="/admin/checkout/session/:session_id" element={<AdminProtectedRoute><AdminCheckoutSessionDetails /></AdminProtectedRoute>} />
+              <Route path="/admin/checkout/gateways" element={<AdminProtectedRoute><AdminCheckoutGateways /></AdminProtectedRoute>} />
+              <Route path="/admin/checkout/gateways/:gateway_id" element={<AdminProtectedRoute><AdminCheckoutGatewayDetails /></AdminProtectedRoute>} />
               {/* Admin User Verification & Profile Routes */}
               <Route path="/admin/users/:user_id/profile" element={<AdminProtectedRoute><AdminUserProfile /></AdminProtectedRoute>} />
               <Route path="/admin/users/:user_id/controls" element={<AdminProtectedRoute><AdminUserControls /></AdminProtectedRoute>} />
