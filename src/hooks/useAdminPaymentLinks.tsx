@@ -365,21 +365,17 @@ export function useAdminPaymentLinkDetails(linkId: string | undefined) {
       });
 
       // Fetch payments for this link using simple query
-      const paymentsQuery = supabase
+      const paymentsResult = await (supabase
         .from("payments")
         .select("*")
-        .eq("payment_link_id", linkId);
-      
-      const paymentsResult = await paymentsQuery;
+        .eq("payment_link_id", linkId) as any);
       setPayments((paymentsResult.data || []) as any[]);
 
       // Fetch checkout sessions for this link
-      const sessionsQuery = supabase
+      const sessionsResult = await (supabase
         .from("checkout_sessions")
         .select("*")
-        .eq("payment_link_id", linkId);
-      
-      const sessionsResult = await sessionsQuery;
+        .eq("payment_link_id", linkId) as any);
       setSessions((sessionsResult.data || []) as any[]);
     } catch (error: unknown) {
       console.error("Error fetching payment link details:", error);
