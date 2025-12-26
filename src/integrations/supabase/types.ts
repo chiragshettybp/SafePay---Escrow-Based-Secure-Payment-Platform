@@ -461,6 +461,351 @@ export type Database = {
         }
         Relationships: []
       }
+      checkout_attempts: {
+        Row: {
+          amount: number
+          completed_at: string | null
+          error_code: string | null
+          error_message: string | null
+          gateway: string | null
+          gateway_order_id: string | null
+          gateway_payment_id: string | null
+          gateway_signature: string | null
+          id: string
+          initiated_at: string
+          metadata: Json | null
+          payment_method: Database["public"]["Enums"]["checkout_payment_method"]
+          session_id: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          completed_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          gateway?: string | null
+          gateway_order_id?: string | null
+          gateway_payment_id?: string | null
+          gateway_signature?: string | null
+          id?: string
+          initiated_at?: string
+          metadata?: Json | null
+          payment_method: Database["public"]["Enums"]["checkout_payment_method"]
+          session_id: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          completed_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          gateway?: string | null
+          gateway_order_id?: string | null
+          gateway_payment_id?: string | null
+          gateway_signature?: string | null
+          id?: string
+          initiated_at?: string
+          metadata?: Json | null
+          payment_method?: Database["public"]["Enums"]["checkout_payment_method"]
+          session_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkout_attempts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "checkout_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkout_events: {
+        Row: {
+          created_at: string
+          event_data: Json | null
+          event_type: string
+          id: string
+          ip_address: string | null
+          previous_step: Database["public"]["Enums"]["checkout_step"] | null
+          session_id: string
+          step: Database["public"]["Enums"]["checkout_step"] | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          previous_step?: Database["public"]["Enums"]["checkout_step"] | null
+          session_id: string
+          step?: Database["public"]["Enums"]["checkout_step"] | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          previous_step?: Database["public"]["Enums"]["checkout_step"] | null
+          session_id?: string
+          step?: Database["public"]["Enums"]["checkout_step"] | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkout_events_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "checkout_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkout_risk_flags: {
+        Row: {
+          auto_blocked: boolean
+          created_at: string
+          description: string | null
+          flag_type: string
+          id: string
+          resolution: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          session_id: string
+          severity: string
+        }
+        Insert: {
+          auto_blocked?: boolean
+          created_at?: string
+          description?: string | null
+          flag_type: string
+          id?: string
+          resolution?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          session_id: string
+          severity?: string
+        }
+        Update: {
+          auto_blocked?: boolean
+          created_at?: string
+          description?: string | null
+          flag_type?: string
+          id?: string
+          resolution?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          session_id?: string
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkout_risk_flags_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "checkout_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkout_sessions: {
+        Row: {
+          cart_data: Json
+          cart_total: number
+          cod_available: boolean
+          cod_fee: number
+          cod_verification_required: boolean
+          completed_at: string | null
+          created_at: string
+          current_step: Database["public"]["Enums"]["checkout_step"]
+          delivery_estimate: string | null
+          device_fingerprint: string | null
+          discount_amount: number
+          email: string | null
+          expires_at: string
+          final_amount: number
+          id: string
+          ip_address: string | null
+          is_guest: boolean
+          last_payment_error: string | null
+          merchant_id: string
+          metadata: Json | null
+          order_id: string | null
+          otp_attempts: number
+          otp_sent_at: string | null
+          otp_verified: boolean
+          payment_attempts: number
+          payment_id: string | null
+          phone_number: string | null
+          selected_payment_method:
+            | Database["public"]["Enums"]["checkout_payment_method"]
+            | null
+          shipping_address: Json | null
+          shipping_address_id: string | null
+          shipping_amount: number
+          shipping_name: string | null
+          shipping_pincode: string | null
+          status: Database["public"]["Enums"]["checkout_session_status"]
+          tax_amount: number
+          updated_at: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          cart_data?: Json
+          cart_total?: number
+          cod_available?: boolean
+          cod_fee?: number
+          cod_verification_required?: boolean
+          completed_at?: string | null
+          created_at?: string
+          current_step?: Database["public"]["Enums"]["checkout_step"]
+          delivery_estimate?: string | null
+          device_fingerprint?: string | null
+          discount_amount?: number
+          email?: string | null
+          expires_at?: string
+          final_amount?: number
+          id?: string
+          ip_address?: string | null
+          is_guest?: boolean
+          last_payment_error?: string | null
+          merchant_id: string
+          metadata?: Json | null
+          order_id?: string | null
+          otp_attempts?: number
+          otp_sent_at?: string | null
+          otp_verified?: boolean
+          payment_attempts?: number
+          payment_id?: string | null
+          phone_number?: string | null
+          selected_payment_method?:
+            | Database["public"]["Enums"]["checkout_payment_method"]
+            | null
+          shipping_address?: Json | null
+          shipping_address_id?: string | null
+          shipping_amount?: number
+          shipping_name?: string | null
+          shipping_pincode?: string | null
+          status?: Database["public"]["Enums"]["checkout_session_status"]
+          tax_amount?: number
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          cart_data?: Json
+          cart_total?: number
+          cod_available?: boolean
+          cod_fee?: number
+          cod_verification_required?: boolean
+          completed_at?: string | null
+          created_at?: string
+          current_step?: Database["public"]["Enums"]["checkout_step"]
+          delivery_estimate?: string | null
+          device_fingerprint?: string | null
+          discount_amount?: number
+          email?: string | null
+          expires_at?: string
+          final_amount?: number
+          id?: string
+          ip_address?: string | null
+          is_guest?: boolean
+          last_payment_error?: string | null
+          merchant_id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          otp_attempts?: number
+          otp_sent_at?: string | null
+          otp_verified?: boolean
+          payment_attempts?: number
+          payment_id?: string | null
+          phone_number?: string | null
+          selected_payment_method?:
+            | Database["public"]["Enums"]["checkout_payment_method"]
+            | null
+          shipping_address?: Json | null
+          shipping_address_id?: string | null
+          shipping_amount?: number
+          shipping_name?: string | null
+          shipping_pincode?: string | null
+          status?: Database["public"]["Enums"]["checkout_session_status"]
+          tax_amount?: number
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkout_sessions_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkout_sessions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_addresses: {
+        Row: {
+          address_line1: string
+          address_line2: string | null
+          city: string
+          country: string
+          created_at: string
+          full_name: string
+          id: string
+          is_default: boolean
+          label: string
+          phone: string
+          pincode: string
+          state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address_line1: string
+          address_line2?: string | null
+          city: string
+          country?: string
+          created_at?: string
+          full_name: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          phone: string
+          pincode: string
+          state: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address_line1?: string
+          address_line2?: string | null
+          city?: string
+          country?: string
+          created_at?: string
+          full_name?: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          phone?: string
+          pincode?: string
+          state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       delivery_proofs: {
         Row: {
           created_at: string
@@ -2162,6 +2507,48 @@ export type Database = {
           },
         ]
       }
+      pincode_serviceability: {
+        Row: {
+          city: string | null
+          cod_available: boolean
+          created_at: string
+          delivery_days_max: number
+          delivery_days_min: number
+          id: string
+          is_serviceable: boolean
+          pincode: string
+          prepaid_available: boolean
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          cod_available?: boolean
+          created_at?: string
+          delivery_days_max?: number
+          delivery_days_min?: number
+          id?: string
+          is_serviceable?: boolean
+          pincode: string
+          prepaid_available?: boolean
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          cod_available?: boolean
+          created_at?: string
+          delivery_days_max?: number
+          delivery_days_min?: number
+          id?: string
+          is_serviceable?: boolean
+          pincode?: string
+          prepaid_available?: boolean
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           account_status: string
@@ -3397,6 +3784,20 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "merchant" | "customer"
+      checkout_payment_method:
+        | "upi"
+        | "card"
+        | "wallet"
+        | "emi"
+        | "cod"
+        | "netbanking"
+      checkout_session_status:
+        | "active"
+        | "expired"
+        | "completed"
+        | "failed"
+        | "abandoned"
+      checkout_step: "login" | "address" | "payment" | "confirmation"
       dispute_status: "open" | "under_review" | "resolved" | "closed"
       order_status:
         | "pending"
@@ -3536,6 +3937,22 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "merchant", "customer"],
+      checkout_payment_method: [
+        "upi",
+        "card",
+        "wallet",
+        "emi",
+        "cod",
+        "netbanking",
+      ],
+      checkout_session_status: [
+        "active",
+        "expired",
+        "completed",
+        "failed",
+        "abandoned",
+      ],
+      checkout_step: ["login", "address", "payment", "confirmation"],
       dispute_status: ["open", "under_review", "resolved", "closed"],
       order_status: [
         "pending",
