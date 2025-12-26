@@ -13,6 +13,8 @@ interface Merchant {
   gst_number: string | null;
   address: string | null;
   status: string;
+  slug: string | null;
+  logo_url: string | null;
 }
 
 interface MerchantAuthContextType {

@@ -172,6 +172,12 @@ import AdminCheckoutRiskBlocked from "./pages/AdminCheckoutRiskBlocked";
 import AdminCheckoutSettings from "./pages/AdminCheckoutSettings";
 import AdminCheckoutSettingsCod from "./pages/AdminCheckoutSettingsCod";
 import AdminCheckoutSettingsOtp from "./pages/AdminCheckoutSettingsOtp";
+import MerchantPaymentLinks from "./pages/MerchantPaymentLinks";
+import MerchantPaymentLinkCreate from "./pages/MerchantPaymentLinkCreate";
+import MerchantPaymentLinkDetails from "./pages/MerchantPaymentLinkDetails";
+import MerchantCheckoutReports from "./pages/MerchantCheckoutReports";
+import PublicMerchantCheckout from "./pages/PublicMerchantCheckout";
+import PublicPaymentLinkCheckout from "./pages/PublicPaymentLinkCheckout";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -291,7 +297,15 @@ const App = () => (
                 <Route path="checkout/integration/webhooks" element={<MerchantCheckoutIntegrationWebhooks />} />
                 <Route path="checkout/integration/test" element={<MerchantCheckoutIntegrationTest />} />
                 <Route path="checkout/integration/how-it-works" element={<MerchantCheckoutIntegrationGuide />} />
+                <Route path="checkout/reports" element={<MerchantCheckoutReports />} />
+                {/* Payment Links Routes */}
+                <Route path="checkout/payment-links" element={<MerchantPaymentLinks />} />
+                <Route path="checkout/payment-links/create" element={<MerchantPaymentLinkCreate />} />
+                <Route path="checkout/payment-links/:linkId" element={<MerchantPaymentLinkDetails />} />
               </Route>
+              {/* Public Payment Routes */}
+              <Route path="/pay/:merchantSlug" element={<PublicMerchantCheckout />} />
+              <Route path="/pay/:merchantSlug/:linkCode" element={<PublicPaymentLinkCheckout />} />
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/reset-password" element={<AdminResetPassword />} />
