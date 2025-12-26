@@ -65,3 +65,6 @@ verify_jwt = true
 
 [functions.process-payout]
 verify_jwt = true
+
+[functions.reconcile-payments]
+verify_jwt = true
