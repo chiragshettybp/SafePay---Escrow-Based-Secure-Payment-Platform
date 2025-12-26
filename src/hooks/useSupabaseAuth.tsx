@@ -139,7 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    // Use global scope to invalidate sessions on all devices for security
+    await supabase.auth.signOut({ scope: 'global' });
     setUser(null);
     setSession(null);
     setProfile(null);
