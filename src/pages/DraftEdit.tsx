@@ -78,8 +78,6 @@ export default function DraftEdit() {
       navigate(`/drafts/${draft.id}`);
     } catch (error) {
       // Error handled by hook
-    } catch (error) {
-      // Error handled by hook
     }
   };
 
