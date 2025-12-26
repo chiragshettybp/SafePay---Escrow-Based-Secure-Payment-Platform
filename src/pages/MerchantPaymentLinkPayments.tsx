@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { merchantSupabase } from "@/integrations/supabase/merchantClient";
 import { useMerchantAuth } from "@/hooks/useMerchantAuth";
 import { MerchantLayout } from "@/components/merchant/MerchantLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,8 +77,8 @@ export default function MerchantPaymentLinkPayments() {
     try {
       setIsLoading(true);
 
-      // Fetch payment link
-      const { data: linkData, error: linkError } = await supabase
+      // Fetch payment link using merchantSupabase
+      const { data: linkData, error: linkError } = await merchantSupabase
         .from("payment_links")
         .select("*")
         .eq("id", linkId)
@@ -97,8 +97,8 @@ export default function MerchantPaymentLinkPayments() {
 
       setPaymentLink(linkData as PaymentLink);
 
-      // Fetch checkout sessions for this payment link
-      let query = supabase
+      // Fetch checkout sessions for this payment link using merchantSupabase
+      let query = merchantSupabase
         .from("checkout_sessions")
         .select("*")
         .eq("payment_link_id", linkId)
@@ -141,7 +141,7 @@ export default function MerchantPaymentLinkPayments() {
   useEffect(() => {
     if (!linkId) return;
 
-    const channel = supabase
+    const channel = merchantSupabase
       .channel('payment-link-sessions')
       .on(
         'postgres_changes',
@@ -158,7 +158,7 @@ export default function MerchantPaymentLinkPayments() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      merchantSupabase.removeChannel(channel);
     };
   }, [linkId, fetchData]);
 

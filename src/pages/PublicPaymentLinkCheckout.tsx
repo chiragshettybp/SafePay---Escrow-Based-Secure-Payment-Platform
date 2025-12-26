@@ -29,11 +29,32 @@ export default function PublicPaymentLinkCheckout() {
       return;
     }
 
+    // Double-check link is still active (client-side validation, server will also validate)
+    if (paymentLink.status !== 'active') {
+      toast({
+        title: "Link Unavailable",
+        description: "This payment link is no longer active.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check expiry client-side (server will also validate via trigger)
+    if (paymentLink.expires_at && new Date(paymentLink.expires_at) < new Date()) {
+      toast({
+        title: "Link Expired",
+        description: "This payment link has expired.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsCreatingSession(true);
       setShowDetails(false);
 
       // Create checkout session with payment link data
+      // Server-side trigger will validate the payment link
       const { data: session, error: sessionError } = await supabase
         .from("checkout_sessions")
         .insert({
@@ -60,7 +81,28 @@ export default function PublicPaymentLinkCheckout() {
         .select()
         .single();
 
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        // Handle specific error cases
+        const errorMsg = sessionError.message || '';
+        if (errorMsg.includes('not active') || errorMsg.includes('expired')) {
+          toast({
+            title: "Link Unavailable",
+            description: "This payment link is no longer available.",
+            variant: "destructive",
+          });
+        } else if (errorMsg.includes('merchant mismatch')) {
+          toast({
+            title: "Invalid Link",
+            description: "This payment link is invalid.",
+            variant: "destructive",
+          });
+        } else {
+          throw sessionError;
+        }
+        setIsCreatingSession(false);
+        setShowDetails(true);
+        return;
+      }
 
       // Redirect to checkout
       navigate(`/checkout/${session.id}`, { replace: true });

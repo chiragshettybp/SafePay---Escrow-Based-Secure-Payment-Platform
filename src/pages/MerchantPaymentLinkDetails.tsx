@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import { usePaymentLinks, PaymentLink } from "@/hooks/usePaymentLinks";
 import { useMerchantAuth } from "@/hooks/useMerchantAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { merchantSupabase } from "@/integrations/supabase/merchantClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Seo } from "@/components/seo/Seo";
@@ -91,8 +91,8 @@ export default function MerchantPaymentLinkDetails() {
       }
       setLink(linkData);
 
-      // Fetch associated checkout sessions
-      const { data: sessionData, error: sessionError } = await supabase
+      // Fetch associated checkout sessions using merchantSupabase
+      const { data: sessionData, error: sessionError } = await merchantSupabase
         .from("checkout_sessions")
         .select("id, status, final_amount, created_at, completed_at, phone_number, email")
         .eq("payment_link_id", id)
