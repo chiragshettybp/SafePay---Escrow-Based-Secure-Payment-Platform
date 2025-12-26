@@ -21,7 +21,7 @@ interface CreateSessionRequest {
 
 interface UpdateSessionRequest {
   session_id: string;
-  action: 'send_otp' | 'verify_otp' | 'update_address' | 'select_payment' | 'complete' | 'abandon';
+  action: 'collect_phone' | 'update_address' | 'select_payment' | 'complete' | 'abandon';
   data?: Record<string, unknown>;
 }
 
@@ -181,7 +181,6 @@ Deno.serve(async (req) => {
           final_amount: finalAmount,
           status: 'active',
           current_step: userId ? 'address' : 'login', // Skip login if already authenticated
-          otp_verified: !!userId,
           ip_address: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip"),
           user_agent: req.headers.get("user-agent"),
           metadata: showDegradationWarning ? { degradation_warning: true } : {},
@@ -245,68 +244,25 @@ Deno.serve(async (req) => {
       }
       
       switch (body.action) {
-        case 'send_otp': {
+        case 'collect_phone': {
           const phoneNumber = body.data?.phone_number as string;
           
           if (!phoneNumber || !/^\+91\d{10}$/.test(phoneNumber)) {
             return json(400, { error: "Invalid phone number format. Use +91XXXXXXXXXX" });
           }
           
-          // Check OTP rate limiting
-          if (session.otp_attempts >= 5) {
-            return json(429, { error: "Too many OTP attempts. Please try again later." });
-          }
-          
-          // In production, integrate with SMS provider
-          // For now, we'll simulate OTP sending
-          console.log(`[Checkout] Sending OTP to ${phoneNumber}`);
-          
-          // Update session with phone number
-          await supabase
-            .from("checkout_sessions")
-            .update({
-              phone_number: phoneNumber,
-              otp_sent_at: new Date().toISOString(),
-              otp_attempts: session.otp_attempts + 1,
-            })
-            .eq("id", body.session_id);
-          
-          // Log event
-          await supabase.from("checkout_events").insert({
-            session_id: body.session_id,
-            event_type: "otp_sent",
-            event_data: { phone_number: phoneNumber.replace(/\d(?=\d{4})/g, '*') },
-            step: 'login',
-          });
-          
-          return json(200, { message: "OTP sent successfully" });
-        }
-        
-        case 'verify_otp': {
-          const otp = body.data?.otp as string;
-          
-          if (!otp || otp.length !== 6) {
-            return json(400, { error: "Invalid OTP format" });
-          }
-          
-          // In production, verify OTP with SMS provider
-          // For demo, accept any 6-digit OTP or "123456"
-          const isValidOtp = otp === "123456" || /^\d{6}$/.test(otp);
-          
-          if (!isValidOtp) {
-            return json(400, { error: "Invalid OTP" });
-          }
+          console.log(`[Checkout] Collecting phone: ${phoneNumber.replace(/\d(?=\d{4})/g, '*')}`);
           
           // Check if user exists with this phone number
           const { data: existingUser } = await supabase
             .from("profiles")
             .select("id, full_name, phone")
-            .eq("phone", session.phone_number)
+            .eq("phone", phoneNumber)
             .single();
           
-          // Update session
+          // Update session with phone number and move to address step
           const updateData: Record<string, unknown> = {
-            otp_verified: true,
+            phone_number: phoneNumber,
             current_step: 'address',
           };
           
@@ -322,8 +278,8 @@ Deno.serve(async (req) => {
           // Log event
           await supabase.from("checkout_events").insert({
             session_id: body.session_id,
-            event_type: "otp_verified",
-            event_data: { returning_user: !!existingUser },
+            event_type: "phone_collected",
+            event_data: { phone_number: phoneNumber.replace(/\d(?=\d{4})/g, '*'), returning_user: !!existingUser },
             step: 'address',
             previous_step: 'login',
           });
@@ -341,7 +297,7 @@ Deno.serve(async (req) => {
           }
           
           return json(200, { 
-            message: "OTP verified successfully",
+            message: "Phone number saved",
             user: existingUser,
             addresses
           });
@@ -468,9 +424,9 @@ Deno.serve(async (req) => {
         }
         
         case 'complete': {
-          // Verify all required data is present
-          if (!session.otp_verified) {
-            return json(400, { error: "Phone verification required" });
+          // Verify all required data is present - phone must be collected (no OTP verification)
+          if (!session.phone_number) {
+            return json(400, { error: "Phone number required" });
           }
           
           if (!session.shipping_address) {

@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { Seo } from '@/components/seo/Seo';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -25,11 +24,7 @@ export default function CheckoutLogin() {
 
   const [merchant, setMerchant] = useState<MerchantData | null>(null);
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState('');
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [loading, setLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCooldown, setOtpCooldown] = useState(0);
   const [guestAllowed, setGuestAllowed] = useState(true);
 
   // Check for existing session
@@ -61,7 +56,7 @@ export default function CheckoutLogin() {
       if (sessionId) {
         const { data: session } = await supabase
           .from('checkout_sessions')
-          .select('user_id, status, merchant_id')
+          .select('user_id, status, merchant_id, phone_number')
           .eq('id', sessionId)
           .single();
 
@@ -74,8 +69,8 @@ export default function CheckoutLogin() {
             navigate(`/checkout/${sessionId}/expired`);
             return;
           }
-          if (session.user_id) {
-            // Session already has a user, redirect to checkout
+          // If phone already collected, go to checkout
+          if (session.phone_number) {
             navigate(`/checkout/${sessionId}`);
             return;
           }
@@ -99,15 +94,7 @@ export default function CheckoutLogin() {
     checkSession();
   }, [sessionId, merchantId, navigate]);
 
-  // OTP cooldown timer
-  useEffect(() => {
-    if (otpCooldown > 0) {
-      const timer = setTimeout(() => setOtpCooldown(otpCooldown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [otpCooldown]);
-
-  const handleSendOtp = async () => {
+  const handleContinue = async () => {
     if (phoneNumber.length !== 10) {
       toast({ title: 'Enter a valid 10-digit phone number', variant: 'destructive' });
       return;
@@ -115,129 +102,43 @@ export default function CheckoutLogin() {
 
     setLoading(true);
     try {
-      // Check OTP rate limits
-      const { count } = await supabase
-        .from('checkout_events')
-        .select('*', { count: 'exact', head: true })
-        .eq('event_type', 'otp_sent')
-        .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString());
+      const formattedPhone = `+91${phoneNumber}`;
 
-      if (count && count >= 5) {
-        toast({ 
-          title: 'Too many OTP requests',
-          description: 'Please try again later.',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      // Send OTP via Supabase Auth
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: `+91${phoneNumber}`,
-      });
-
-      if (error) throw error;
-
-      // Log OTP sent event
+      // Update session with phone number and move to address step
       if (sessionId) {
-        await supabase.from('checkout_events').insert({
-          session_id: sessionId,
-          event_type: 'otp_sent',
-          event_data: { phone: phoneNumber.slice(-4) }
-        });
+        // Check if user exists with this phone
+        const { data: existingUser } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('phone', formattedPhone)
+          .maybeSingle();
 
         await supabase
           .from('checkout_sessions')
           .update({ 
-            phone_number: phoneNumber,
-            otp_sent_at: new Date().toISOString(),
-            otp_attempts: 0
+            phone_number: formattedPhone,
+            current_step: 'address',
+            user_id: existingUser?.id || null
           })
           .eq('id', sessionId);
-      }
 
-      setOtpSent(true);
-      setStep('otp');
-      setOtpCooldown(60);
-      toast({ title: 'OTP sent successfully' });
+        // Log event
+        await supabase.from('checkout_events').insert({
+          session_id: sessionId,
+          event_type: 'phone_collected',
+          event_data: { phone: phoneNumber.slice(-4) }
+        });
+
+        toast({ title: 'Phone number saved' });
+        navigate(`/checkout/${sessionId}`);
+      } else {
+        toast({ title: 'No checkout session found', variant: 'destructive' });
+      }
     } catch (error: any) {
-      console.error('Error sending OTP:', error);
+      console.error('Error saving phone:', error);
       toast({ 
-        title: 'Failed to send OTP',
+        title: 'Failed to continue',
         description: error.message,
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (otp.length !== 6) {
-      toast({ title: 'Enter the 6-digit OTP', variant: 'destructive' });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Verify OTP
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone: `+91${phoneNumber}`,
-        token: otp,
-        type: 'sms'
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        // Link user to session
-        if (sessionId) {
-          await supabase
-            .from('checkout_sessions')
-            .update({ 
-              user_id: data.user.id,
-              otp_verified: true,
-              current_step: 'address'
-            })
-            .eq('id', sessionId);
-
-          // Log verification event
-          await supabase.from('checkout_events').insert({
-            session_id: sessionId,
-            event_type: 'otp_verified',
-            event_data: { user_id: data.user.id }
-          });
-
-          toast({ title: 'Verified successfully' });
-          navigate(`/checkout/${sessionId}`);
-        } else {
-          // No session, just show success
-          toast({ title: 'Logged in successfully' });
-          navigate('/');
-        }
-      }
-    } catch (error: any) {
-      console.error('Error verifying OTP:', error);
-      
-      // Increment OTP attempts - just update directly
-      if (sessionId) {
-        const { data: currentSession } = await supabase
-          .from('checkout_sessions')
-          .select('otp_attempts')
-          .eq('id', sessionId)
-          .single();
-        
-        if (currentSession) {
-          await supabase
-            .from('checkout_sessions')
-            .update({ otp_attempts: (currentSession.otp_attempts || 0) + 1 })
-            .eq('id', sessionId);
-        }
-      }
-
-      toast({ 
-        title: 'Invalid OTP',
-        description: 'Please check and try again.',
         variant: 'destructive'
       });
     } finally {
@@ -300,148 +201,72 @@ export default function CheckoutLogin() {
           
           <CardTitle className="text-xl">Continue Checkout</CardTitle>
           <p className="text-sm text-muted-foreground mt-2">
-            {step === 'phone' 
-              ? 'Enter your phone number to proceed'
-              : 'Enter the OTP sent to your phone'
-            }
+            Enter your phone number to proceed
           </p>
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {step === 'phone' ? (
-            <>
-              {/* Phone Input */}
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <div className="flex gap-2">
-                  <div className="flex items-center px-3 bg-muted rounded-md border border-input">
-                    <span className="text-sm text-muted-foreground">+91</span>
-                  </div>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    inputMode="numeric"
-                    placeholder="Enter 10-digit number"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    className="flex-1"
-                  />
-                </div>
+          {/* Phone Input */}
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <div className="flex gap-2">
+              <div className="flex items-center px-3 bg-muted rounded-md border border-input">
+                <span className="text-sm text-muted-foreground">+91</span>
               </div>
+              <Input
+                id="phone"
+                type="tel"
+                inputMode="numeric"
+                placeholder="Enter 10-digit number"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                className="flex-1"
+              />
+            </div>
+          </div>
 
-              <Button 
-                onClick={handleSendOtp} 
-                className="w-full gap-2"
-                disabled={loading || phoneNumber.length !== 10}
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Phone className="h-4 w-4" />
-                )}
-                Send OTP
-              </Button>
+          <Button 
+            onClick={handleContinue} 
+            className="w-full gap-2"
+            disabled={loading || phoneNumber.length !== 10}
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ArrowRight className="h-4 w-4" />
+            )}
+            Continue
+          </Button>
 
-              {/* Guest Option */}
-              {guestAllowed && sessionId && (
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">or</span>
-                  </div>
-                </div>
-              )}
-
-              {guestAllowed && sessionId && (
-                <Button 
-                  variant="outline" 
-                  onClick={handleContinueAsGuest}
-                  className="w-full gap-2"
-                  disabled={loading}
-                >
-                  <UserCircle className="h-4 w-4" />
-                  Continue as Guest
-                </Button>
-              )}
-            </>
-          ) : (
-            <>
-              {/* OTP Input */}
-              <div className="space-y-4">
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground mb-4">
-                    OTP sent to +91 {phoneNumber.slice(0, 2)}****{phoneNumber.slice(-4)}
-                  </p>
-                  <InputOTP
-                    value={otp}
-                    onChange={setOtp}
-                    maxLength={6}
-                    className="justify-center"
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
-
-                <Button 
-                  onClick={handleVerifyOtp}
-                  className="w-full gap-2"
-                  disabled={loading || otp.length !== 6}
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ArrowRight className="h-4 w-4" />
-                  )}
-                  Verify & Continue
-                </Button>
-
-                {/* Resend OTP */}
-                <div className="text-center">
-                  {otpCooldown > 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Resend OTP in {otpCooldown}s
-                    </p>
-                  ) : (
-                    <Button
-                      variant="link"
-                      onClick={handleSendOtp}
-                      disabled={loading}
-                      className="text-sm"
-                    >
-                      Resend OTP
-                    </Button>
-                  )}
-                </div>
-
-                {/* Change Number */}
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setStep('phone');
-                    setOtp('');
-                  }}
-                  className="w-full text-sm"
-                >
-                  Change Phone Number
-                </Button>
+          {/* Guest Option */}
+          {guestAllowed && sessionId && (
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
               </div>
-            </>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">or</span>
+              </div>
+            </div>
+          )}
+
+          {guestAllowed && sessionId && (
+            <Button 
+              variant="outline" 
+              onClick={handleContinueAsGuest}
+              className="w-full gap-2"
+              disabled={loading}
+            >
+              <UserCircle className="h-4 w-4" />
+              Continue as Guest
+            </Button>
           )}
 
           {/* Security Notice */}
           <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
             <Shield className="h-4 w-4 text-muted-foreground shrink-0" />
             <p className="text-xs text-muted-foreground">
-              Your order details will be saved securely. We use industry-standard encryption.
+              Your phone number is used for order updates and support. We use industry-standard encryption.
             </p>
           </div>
         </CardContent>
