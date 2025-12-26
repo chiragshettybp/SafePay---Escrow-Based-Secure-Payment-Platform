@@ -85,12 +85,26 @@ export default function MerchantWithdrawSuccess() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Amount */}
-                <div className="text-center p-4 rounded-lg bg-muted/30">
-                  <p className="text-sm text-muted-foreground mb-1">Amount</p>
-                  <p className="text-4xl font-bold text-green-500">
-                    ₹{payout.net_amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
+                {/* Amount Breakdown */}
+                <div className="space-y-2 p-4 rounded-lg bg-muted/30">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Withdrawal Amount</span>
+                    <span>₹{payout.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Processing Fee (2.5%)</span>
+                    <span>-₹{(payout.withdrawal_fee ?? payout.fee).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">GST (18%)</span>
+                    <span>-₹{(payout.gst ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="pt-2 border-t flex items-center justify-between font-semibold">
+                    <span>You'll Receive</span>
+                    <span className="text-2xl text-green-500">
+                      ₹{payout.net_amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Details */}

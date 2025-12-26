@@ -10,6 +10,9 @@ export interface WithdrawalRequest {
   bank_account_id: string;
   amount: number;
   fee: number;
+  gst: number | null;
+  withdrawal_fee: number | null;
+  platform_fee: number | null;
   net_amount: number;
   status: string;
   transaction_id: string | null;
@@ -135,6 +138,9 @@ export function useAdminWithdrawals(filters: WithdrawalFilters = {}) {
             bank_account_id: payout.bank_account_id,
             amount: payout.amount,
             fee: payout.fee || 0,
+            gst: payout.gst || null,
+            withdrawal_fee: payout.withdrawal_fee || null,
+            platform_fee: payout.platform_fee || null,
             net_amount: payout.net_amount,
             status: payout.status,
             transaction_id: payout.transaction_id,
@@ -211,6 +217,9 @@ export function useAdminWithdrawals(filters: WithdrawalFilters = {}) {
             bank_account_id: withdrawal.reference_id || "",
             amount: withdrawal.amount,
             fee: 0,
+            gst: null,
+            withdrawal_fee: null,
+            platform_fee: null,
             net_amount: withdrawal.amount,
             status: withdrawal.status,
             transaction_id: null,

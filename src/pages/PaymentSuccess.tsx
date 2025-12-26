@@ -127,8 +127,13 @@ export default function PaymentSuccess() {
     );
   }
 
-  const escrowFee = Math.round(order.amount * 0.025 * 100) / 100;
-  const totalAmount = order.amount + escrowFee;
+  // Escrow fee: 1% platform fee + 18% GST on fee
+  const ESCROW_FEE_PERCENT = 1;
+  const GST_PERCENT = 18;
+  const platformFee = order.amount * (ESCROW_FEE_PERCENT / 100);
+  const gstOnFee = platformFee * (GST_PERCENT / 100);
+  const totalEscrowFee = Math.round((platformFee + gstOnFee) * 100) / 100;
+  const totalAmount = order.amount + totalEscrowFee;
 
   return (
     <DashboardLayout>
