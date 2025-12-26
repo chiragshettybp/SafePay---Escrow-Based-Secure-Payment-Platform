@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { merchantSupabase } from "@/integrations/supabase/merchantClient";
 import { useToast } from "@/hooks/use-toast";
 import { useMerchantAuth } from "@/hooks/useMerchantAuth";
 
@@ -55,7 +56,8 @@ export function usePaymentLinks() {
 
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+      // Use merchantSupabase for authenticated merchant operations
+      const { data, error } = await merchantSupabase
         .from("payment_links")
         .select("*")
         .eq("merchant_id", merchant.id)
@@ -105,7 +107,8 @@ export function usePaymentLinks() {
       // Generate a unique link code
       const linkCode = `PLINK_${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       
-      const { data: newLink, error } = await supabase
+      // Use merchantSupabase for authenticated merchant operations
+      const { data: newLink, error } = await merchantSupabase
         .from("payment_links")
         .insert([{
           merchant_id: merchant.id,
@@ -145,7 +148,8 @@ export function usePaymentLinks() {
     updates: Partial<Pick<PaymentLink, 'status' | 'expires_at' | 'success_redirect_url' | 'cancel_redirect_url'>>
   ): Promise<boolean> => {
     try {
-      const { error } = await supabase
+      // Use merchantSupabase for authenticated merchant operations
+      const { error } = await merchantSupabase
         .from("payment_links")
         .update({
           ...updates,
@@ -183,7 +187,8 @@ export function usePaymentLinks() {
 
   const getLink = useCallback(async (linkId: string): Promise<PaymentLink | null> => {
     try {
-      const { data, error } = await supabase
+      // Use merchantSupabase for authenticated merchant operations
+      const { data, error } = await merchantSupabase
         .from("payment_links")
         .select("*")
         .eq("id", linkId)
@@ -234,7 +239,7 @@ export function usePaymentLinks() {
 
     fetchLinks();
 
-    const channel = supabase
+    const channel = merchantSupabase
       .channel('payment-links-changes')
       .on(
         'postgres_changes',
@@ -251,7 +256,7 @@ export function usePaymentLinks() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      merchantSupabase.removeChannel(channel);
     };
   }, [merchant?.id, fetchLinks]);
 
