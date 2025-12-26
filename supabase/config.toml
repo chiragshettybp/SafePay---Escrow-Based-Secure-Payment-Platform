@@ -89,3 +89,12 @@ verify_jwt = true
 
 [functions.expire-drafts]
 verify_jwt = false
+
+[functions.merchant-api-key]
+verify_jwt = true
+
+[functions.validate-api-key]
+verify_jwt = false
+
+[functions.webhook-dispatcher]
+verify_jwt = false

@@ -416,6 +416,42 @@ export type Database = {
         }
         Relationships: []
       }
+      api_key_audit_log: {
+        Row: {
+          action: string
+          api_key_id: string | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          key_prefix: string | null
+          merchant_id: string
+          metadata: Json | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          api_key_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          key_prefix?: string | null
+          merchant_id: string
+          metadata?: Json | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          api_key_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          key_prefix?: string | null
+          merchant_id?: string
+          metadata?: Json | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       bank_accounts: {
         Row: {
           account_holder_name: string
@@ -1501,39 +1537,48 @@ export type Database = {
       merchant_api_keys: {
         Row: {
           created_at: string
+          environment: string
           expires_at: string | null
           id: string
           is_active: boolean
           key_hash: string
           key_prefix: string
+          key_type: string
           last_used_at: string | null
           merchant_id: string
           name: string
           scopes: string[]
+          status: string
         }
         Insert: {
           created_at?: string
+          environment?: string
           expires_at?: string | null
           id?: string
           is_active?: boolean
           key_hash: string
           key_prefix: string
+          key_type?: string
           last_used_at?: string | null
           merchant_id: string
           name: string
           scopes?: string[]
+          status?: string
         }
         Update: {
           created_at?: string
+          environment?: string
           expires_at?: string | null
           id?: string
           is_active?: boolean
           key_hash?: string
           key_prefix?: string
+          key_type?: string
           last_used_at?: string | null
           merchant_id?: string
           name?: string
           scopes?: string[]
+          status?: string
         }
         Relationships: []
       }
@@ -1768,6 +1813,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      merchant_integrations: {
+        Row: {
+          created_at: string
+          integration_status: string
+          last_live_at: string | null
+          last_test_at: string | null
+          live_mode_enabled: boolean
+          merchant_id: string
+          test_mode_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          integration_status?: string
+          last_live_at?: string | null
+          last_test_at?: string | null
+          live_mode_enabled?: boolean
+          merchant_id: string
+          test_mode_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          integration_status?: string
+          last_live_at?: string | null
+          last_test_at?: string | null
+          live_mode_enabled?: boolean
+          merchant_id?: string
+          test_mode_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
       }
       merchant_kyc: {
         Row: {
@@ -3618,6 +3696,59 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      webhook_deliveries: {
+        Row: {
+          attempt: number
+          created_at: string
+          delivered_at: string | null
+          endpoint_id: string
+          error_message: string | null
+          event_type: string
+          id: string
+          merchant_id: string
+          payload: Json
+          response_body: string | null
+          response_code: number | null
+          status: string
+        }
+        Insert: {
+          attempt?: number
+          created_at?: string
+          delivered_at?: string | null
+          endpoint_id: string
+          error_message?: string | null
+          event_type: string
+          id?: string
+          merchant_id: string
+          payload?: Json
+          response_body?: string | null
+          response_code?: number | null
+          status?: string
+        }
+        Update: {
+          attempt?: number
+          created_at?: string
+          delivered_at?: string | null
+          endpoint_id?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          merchant_id?: string
+          payload?: Json
+          response_body?: string | null
+          response_code?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_deliveries_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       withdrawal_abuse_signals: {
         Row: {
