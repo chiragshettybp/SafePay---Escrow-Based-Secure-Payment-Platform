@@ -9,10 +9,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Seo } from "@/components/seo/Seo";
 
 export default function PublicPaymentLinkCheckout() {
-  const { merchant_slug, checkout_id } = useParams<{ merchant_slug: string; checkout_id: string }>();
+  const { merchantSlug, linkCode } = useParams<{ merchantSlug: string; linkCode: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { paymentLink, merchant, isLoading, error } = usePublicPaymentLink(checkout_id);
+  const { paymentLink, merchant, isLoading, error } = usePublicPaymentLink(linkCode);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
 
@@ -20,7 +20,7 @@ export default function PublicPaymentLinkCheckout() {
     if (!paymentLink || !merchant) return;
 
     // Validate merchant slug matches
-    if (merchant.slug !== merchant_slug) {
+    if (merchant.slug !== merchantSlug) {
       toast({
         title: "Invalid Link",
         description: "This payment link is not valid for this merchant.",
