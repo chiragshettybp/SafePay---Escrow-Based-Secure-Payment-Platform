@@ -137,16 +137,48 @@ export default function MerchantCheckoutIntegrationApiKeys() {
           </Button>
         </div>
 
-        {/* Security Notice */}
-        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800">
+        {/* Who Uses API Keys */}
+        <Card className="border-primary/30 bg-primary/5">
           <CardContent className="pt-6">
             <div className="flex gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="p-2 rounded-full bg-primary/10 flex-shrink-0">
+                <Key className="h-5 w-5 text-primary" />
+              </div>
               <div>
-                <p className="font-medium text-amber-800 dark:text-amber-300">Security Notice</p>
-                <p className="text-sm text-amber-700 dark:text-amber-400">
-                  Secret keys are only shown once when generated. Store them securely. 
-                  Never expose secret keys in client-side code.
+                <p className="font-medium">Who Uses API Keys?</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  API keys are used by <strong>your server or ecommerce platform</strong> — NOT by customers.
+                  Customers never see keys and never enter them. Your server uses the secret key to create 
+                  checkout sessions, then customers are redirected to our hosted checkout page.
+                </p>
+                <Button 
+                  variant="link" 
+                  className="px-0 h-auto mt-2"
+                  onClick={() => navigate('/merchant/checkout/integration/how-it-works')}
+                >
+                  Learn how integration works →
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Security Notice */}
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="pt-6">
+            <div className="flex gap-3">
+              <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-destructive">⚠️ Security Warning</p>
+                <ul className="text-sm text-muted-foreground mt-2 space-y-1">
+                  <li>• Secret keys are only shown <strong>once</strong> when generated</li>
+                  <li>• <strong>Never</strong> use secret keys in frontend JavaScript code</li>
+                  <li>• <strong>Never</strong> expose keys in HTML or browser DevTools</li>
+                  <li>• <strong>Never</strong> commit keys to public Git repositories</li>
+                  <li>• <strong>Never</strong> share secret keys with customers</li>
+                </ul>
+                <p className="text-xs text-destructive mt-2">
+                  Violation may result in account suspension.
                 </p>
               </div>
             </div>

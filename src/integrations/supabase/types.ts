@@ -2211,6 +2211,51 @@ export type Database = {
           },
         ]
       }
+      merchant_integration_checklist: {
+        Row: {
+          api_key_generated: boolean
+          api_key_generated_at: string | null
+          checkout_tested: boolean
+          checkout_tested_at: string | null
+          created_at: string
+          id: string
+          live_mode_enabled: boolean
+          live_mode_enabled_at: string | null
+          merchant_id: string
+          updated_at: string
+          webhook_configured: boolean
+          webhook_configured_at: string | null
+        }
+        Insert: {
+          api_key_generated?: boolean
+          api_key_generated_at?: string | null
+          checkout_tested?: boolean
+          checkout_tested_at?: string | null
+          created_at?: string
+          id?: string
+          live_mode_enabled?: boolean
+          live_mode_enabled_at?: string | null
+          merchant_id: string
+          updated_at?: string
+          webhook_configured?: boolean
+          webhook_configured_at?: string | null
+        }
+        Update: {
+          api_key_generated?: boolean
+          api_key_generated_at?: string | null
+          checkout_tested?: boolean
+          checkout_tested_at?: string | null
+          created_at?: string
+          id?: string
+          live_mode_enabled?: boolean
+          live_mode_enabled_at?: string | null
+          merchant_id?: string
+          updated_at?: string
+          webhook_configured?: boolean
+          webhook_configured_at?: string | null
+        }
+        Relationships: []
+      }
       merchant_integrations: {
         Row: {
           created_at: string
