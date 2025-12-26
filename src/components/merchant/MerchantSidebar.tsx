@@ -14,6 +14,7 @@ import {
   ChevronRight,
   LogOut,
   X,
+  ShoppingCart,
 } from "lucide-react";
 import { useMerchantAuth } from "@/hooks/useMerchantAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -30,6 +31,7 @@ import { Bell } from "lucide-react";
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/merchant/dashboard" },
   { icon: ShoppingBag, label: "Orders", href: "/merchant/orders" },
+  { icon: ShoppingCart, label: "Checkout", href: "/merchant/checkout" },
   { icon: Truck, label: "Shipments", href: "/merchant/shipments" },
   { icon: AlertTriangle, label: "Disputes", href: "/merchant/disputes" },
   { icon: Wallet, label: "Payouts", href: "/merchant/payouts" },
