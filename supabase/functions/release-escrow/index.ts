@@ -51,8 +51,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate idempotency key (use client-provided or generate)
-    const idempotencyKey = clientIdempotencyKey || `release-${orderId}-${reason}-${Date.now()}`;
+    // Generate idempotency key (use client-provided or generate with UUID for true uniqueness)
+    const idempotencyKey = clientIdempotencyKey || `release-${orderId}-${reason}-${crypto.randomUUID()}`;
     
     console.log(`Processing escrow release for order ${orderId}, reason: ${reason}, idempotencyKey: ${idempotencyKey}`);
 

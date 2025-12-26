@@ -3040,6 +3040,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_all_wallet_consistency: {
+        Args: never
+        Returns: {
+          discrepancy: number
+          ledger_balance: number
+          needs_attention: boolean
+          stored_balance: number
+          user_id: string
+          user_type: string
+        }[]
+      }
       check_kyc_document_uniqueness: {
         Args: {
           p_document_hash: string
