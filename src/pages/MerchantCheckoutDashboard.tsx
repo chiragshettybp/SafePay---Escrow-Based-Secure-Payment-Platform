@@ -15,7 +15,11 @@ import {
   Settings,
   UserCheck,
   ArrowUpDown,
-  Gift
+  Gift,
+  Key,
+  Webhook,
+  TestTube,
+  Link
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -282,6 +286,44 @@ export default function MerchantCheckoutDashboard() {
                 description="View complete checkout configuration"
                 icon={Settings}
                 onClick={() => navigate('/merchant/checkout/settings')}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Checkout Integration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Link className="h-5 w-5" />
+              Checkout Integration
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <SettingsCard
+                title="API Keys"
+                description="Manage API keys for checkout integration"
+                icon={Key}
+                onClick={() => navigate('/merchant/checkout/integration/api-keys')}
+              />
+              <SettingsCard
+                title="Webhooks"
+                description="Configure webhook endpoints"
+                icon={Webhook}
+                onClick={() => navigate('/merchant/checkout/integration/webhooks')}
+              />
+              <SettingsCard
+                title="Test Integration"
+                description="Run test checkout flows"
+                icon={TestTube}
+                onClick={() => navigate('/merchant/checkout/integration/test')}
+              />
+              <SettingsCard
+                title="Integration Overview"
+                description="View integration status & health"
+                icon={Link}
+                onClick={() => navigate('/merchant/checkout/integration')}
               />
             </div>
           </CardContent>
