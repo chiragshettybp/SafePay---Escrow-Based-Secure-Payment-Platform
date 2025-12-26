@@ -64,6 +64,7 @@ import MerchantCheckoutIntegration from "./pages/MerchantCheckoutIntegration";
 import MerchantCheckoutIntegrationApiKeys from "./pages/MerchantCheckoutIntegrationApiKeys";
 import MerchantCheckoutIntegrationWebhooks from "./pages/MerchantCheckoutIntegrationWebhooks";
 import MerchantCheckoutIntegrationTest from "./pages/MerchantCheckoutIntegrationTest";
+import MerchantCheckoutIntegrationGuide from "./pages/MerchantCheckoutIntegrationGuide";
 import MerchantLogin from "./pages/MerchantLogin";
 import MerchantSignup from "./pages/MerchantSignup";
 import MerchantDashboard from "./pages/MerchantDashboard";
@@ -289,6 +290,7 @@ const App = () => (
                 <Route path="checkout/integration/api-keys" element={<MerchantCheckoutIntegrationApiKeys />} />
                 <Route path="checkout/integration/webhooks" element={<MerchantCheckoutIntegrationWebhooks />} />
                 <Route path="checkout/integration/test" element={<MerchantCheckoutIntegrationTest />} />
+                <Route path="checkout/integration/how-it-works" element={<MerchantCheckoutIntegrationGuide />} />
               </Route>
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
