@@ -1731,6 +1731,53 @@ export type Database = {
         }
         Relationships: []
       }
+      killswitch_audit_log: {
+        Row: {
+          action_type: string
+          admin_id: string
+          created_at: string
+          id: string
+          incident_id: string | null
+          ip_address: string | null
+          new_level: number | null
+          previous_level: number | null
+          reason: string
+          user_agent: string | null
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          created_at?: string
+          id?: string
+          incident_id?: string | null
+          ip_address?: string | null
+          new_level?: number | null
+          previous_level?: number | null
+          reason: string
+          user_agent?: string | null
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          created_at?: string
+          id?: string
+          incident_id?: string | null
+          ip_address?: string | null
+          new_level?: number | null
+          previous_level?: number | null
+          reason?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "killswitch_audit_log_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "platform_incidents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kyc_actions_log: {
         Row: {
           action_type: string
@@ -3481,6 +3528,78 @@ export type Database = {
           setting_value?: string
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      platform_flags: {
+        Row: {
+          description: string | null
+          id: string
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
+      platform_incidents: {
+        Row: {
+          activated_at: string
+          activated_by: string
+          created_at: string
+          id: string
+          impact_summary: Json | null
+          level: number
+          metadata: Json | null
+          reason: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          activated_at?: string
+          activated_by: string
+          created_at?: string
+          id?: string
+          impact_summary?: Json | null
+          level: number
+          metadata?: Json | null
+          reason: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          activated_at?: string
+          activated_by?: string
+          created_at?: string
+          id?: string
+          impact_summary?: Json | null
+          level?: number
+          metadata?: Json | null
+          reason?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
         }
         Relationships: []
       }
