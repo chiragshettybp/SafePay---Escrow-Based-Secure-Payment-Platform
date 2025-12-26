@@ -165,6 +165,9 @@ import AdminCheckoutSessions from "./pages/AdminCheckoutSessions";
 import AdminCheckoutSessionDetails from "./pages/AdminCheckoutSessionDetails";
 import AdminCheckoutGateways from "./pages/AdminCheckoutGateways";
 import AdminCheckoutGatewayDetails from "./pages/AdminCheckoutGatewayDetails";
+import AdminCheckoutRisk from "./pages/AdminCheckoutRisk";
+import AdminCheckoutRiskRules from "./pages/AdminCheckoutRiskRules";
+import AdminCheckoutRiskBlocked from "./pages/AdminCheckoutRiskBlocked";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -349,6 +352,10 @@ const App = () => (
               <Route path="/admin/checkout/session/:session_id" element={<AdminProtectedRoute><AdminCheckoutSessionDetails /></AdminProtectedRoute>} />
               <Route path="/admin/checkout/gateways" element={<AdminProtectedRoute><AdminCheckoutGateways /></AdminProtectedRoute>} />
               <Route path="/admin/checkout/gateways/:gateway_id" element={<AdminProtectedRoute><AdminCheckoutGatewayDetails /></AdminProtectedRoute>} />
+              {/* Admin Checkout Risk Routes */}
+              <Route path="/admin/checkout/risk" element={<AdminProtectedRoute><AdminCheckoutRisk /></AdminProtectedRoute>} />
+              <Route path="/admin/checkout/risk/rules" element={<AdminProtectedRoute><AdminCheckoutRiskRules /></AdminProtectedRoute>} />
+              <Route path="/admin/checkout/risk/blocked" element={<AdminProtectedRoute><AdminCheckoutRiskBlocked /></AdminProtectedRoute>} />
               {/* Admin User Verification & Profile Routes */}
               <Route path="/admin/users/:user_id/profile" element={<AdminProtectedRoute><AdminUserProfile /></AdminProtectedRoute>} />
               <Route path="/admin/users/:user_id/controls" element={<AdminProtectedRoute><AdminUserControls /></AdminProtectedRoute>} />

@@ -174,7 +174,6 @@ export default function AdminCheckoutRiskRules() {
       <div className="p-4 sm:p-6 space-y-6">
         <AdminPageHeader
           title="Risk Rules"
-          backHref="/admin/checkout/risk"
           actions={
             <Button onClick={handleCreate}>
               <Plus className="h-4 w-4 mr-2" />
