@@ -1146,6 +1146,53 @@ export type Database = {
           },
         ]
       }
+      merchant_order_actions_log: {
+        Row: {
+          action_type: string
+          created_at: string
+          field_changes: Json | null
+          id: string
+          ip_address: string | null
+          merchant_id: string
+          new_status: string | null
+          order_id: string
+          previous_status: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          field_changes?: Json | null
+          id?: string
+          ip_address?: string | null
+          merchant_id: string
+          new_status?: string | null
+          order_id: string
+          previous_status?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          field_changes?: Json | null
+          id?: string
+          ip_address?: string | null
+          merchant_id?: string
+          new_status?: string | null
+          order_id?: string
+          previous_status?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_order_actions_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       merchant_payouts: {
         Row: {
           amount: number
