@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { merchantSupabase } from '@/integrations/supabase/merchantClient';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 export interface CheckoutMetrics {
   totalSessions: number;
@@ -85,21 +85,47 @@ interface UseMerchantCheckoutOptions {
   dateRange?: { from: Date; to: Date };
 }
 
-export function useMerchantCheckout({ merchantId, dateRange }: UseMerchantCheckoutOptions = {}) {
-  const [realtimeSession, setRealtimeSession] = useState<CheckoutSession | null>(null);
+// Debounce helper to prevent realtime storms
+function useDebouncedCallback<T extends (...args: unknown[]) => void>(
+  callback: T,
+  delay: number
+): T {
+  const timeoutRef = useRef<number | null>(null);
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
 
-  // Fetch checkout sessions
-  const { data: sessions, isLoading: sessionsLoading, refetch: refetchSessions } = useQuery({
-    queryKey: ['merchant-checkout-sessions', merchantId, dateRange],
+  return useCallback((...args: unknown[]) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = window.setTimeout(() => {
+      callbackRef.current(...args);
+    }, delay);
+  }, [delay]) as T;
+}
+
+export function useMerchantCheckout({ merchantId, dateRange }: UseMerchantCheckoutOptions = {}) {
+  const queryClient = useQueryClient();
+  const subscriptionRef = useRef<ReturnType<typeof merchantSupabase.channel> | null>(null);
+
+  // Fetch checkout sessions with proper error handling and retry
+  const { 
+    data: sessions, 
+    isLoading: sessionsLoading, 
+    refetch: refetchSessions,
+    error: sessionsError 
+  } = useQuery({
+    queryKey: ['merchant-checkout-sessions', merchantId, dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
+      if (!merchantId) {
+        return [];
+      }
+
       let query = merchantSupabase
         .from('checkout_sessions')
         .select('*')
+        .eq('merchant_id', merchantId)
         .order('created_at', { ascending: false });
-
-      if (merchantId) {
-        query = query.eq('merchant_id', merchantId);
-      }
 
       if (dateRange?.from) {
         query = query.gte('created_at', dateRange.from.toISOString());
@@ -109,32 +135,49 @@ export function useMerchantCheckout({ merchantId, dateRange }: UseMerchantChecko
       }
 
       const { data, error } = await query.limit(500);
-      if (error) throw error;
-      return data as CheckoutSession[];
+      
+      if (error) {
+        console.error('[MerchantCheckout] Failed to fetch sessions:', error);
+        throw error;
+      }
+      
+      return (data || []) as CheckoutSession[];
     },
     enabled: !!merchantId,
+    staleTime: 30000, // 30 seconds - reduce unnecessary refetches
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 
   // Fetch checkout events for analytics
   const { data: events, isLoading: eventsLoading } = useQuery({
-    queryKey: ['merchant-checkout-events', merchantId, dateRange],
+    queryKey: ['merchant-checkout-events', merchantId, sessions?.length],
     queryFn: async () => {
       const sessionIds = sessions?.map(s => s.id) || [];
       if (sessionIds.length === 0) return [];
 
+      // Limit to first 100 sessions to prevent query size issues
+      const limitedIds = sessionIds.slice(0, 100);
+
       const { data, error } = await merchantSupabase
         .from('checkout_events')
         .select('*')
-        .in('session_id', sessionIds.slice(0, 100))
+        .in('session_id', limitedIds)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      return data as CheckoutEvent[];
+      if (error) {
+        console.error('[MerchantCheckout] Failed to fetch events:', error);
+        throw error;
+      }
+      
+      return (data || []) as CheckoutEvent[];
     },
     enabled: !!sessions && sessions.length > 0,
+    staleTime: 30000,
+    retry: 2,
   });
 
-  // Calculate metrics
+  // Calculate metrics with null safety
   const metrics: CheckoutMetrics = {
     totalSessions: sessions?.length || 0,
     completedSessions: sessions?.filter(s => s.status === 'completed').length || 0,
@@ -155,12 +198,23 @@ export function useMerchantCheckout({ merchantId, dateRange }: UseMerchantChecko
   // Generate alerts
   const alerts: CheckoutAlert[] = generateAlerts(sessions || [], metrics);
 
-  // Real-time subscription
+  // Debounced refetch to prevent realtime storms
+  const debouncedRefetch = useDebouncedCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['merchant-checkout-sessions', merchantId] });
+  }, 1000);
+
+  // Real-time subscription with proper cleanup and debouncing
   useEffect(() => {
     if (!merchantId) return;
 
+    // Cleanup previous subscription if exists
+    if (subscriptionRef.current) {
+      merchantSupabase.removeChannel(subscriptionRef.current);
+      subscriptionRef.current = null;
+    }
+
     const channel = merchantSupabase
-      .channel('merchant-checkout-updates')
+      .channel(`merchant-checkout-${merchantId}`)
       .on(
         'postgres_changes',
         {
@@ -170,28 +224,38 @@ export function useMerchantCheckout({ merchantId, dateRange }: UseMerchantChecko
           filter: `merchant_id=eq.${merchantId}`,
         },
         (payload) => {
-          if (payload.new) {
-            setRealtimeSession(payload.new as CheckoutSession);
-            refetchSessions();
-          }
+          console.log('[MerchantCheckout] Realtime update:', payload.eventType);
+          // Use debounced refetch to prevent storms
+          debouncedRefetch();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[MerchantCheckout] Realtime subscription active');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[MerchantCheckout] Realtime subscription error');
+        }
+      });
+
+    subscriptionRef.current = channel;
 
     return () => {
-      merchantSupabase.removeChannel(channel);
+      if (subscriptionRef.current) {
+        merchantSupabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
     };
-  }, [merchantId, refetchSessions]);
+  }, [merchantId, debouncedRefetch]);
 
   return {
-    sessions,
-    events,
+    sessions: sessions || [],
+    events: events || [],
     metrics,
     funnel,
     alerts,
     isLoading: sessionsLoading || eventsLoading,
+    error: sessionsError,
     refetch: refetchSessions,
-    realtimeSession,
   };
 }
 
@@ -202,10 +266,23 @@ function calculateAvgCheckoutTime(sessions: CheckoutSession[]): number {
   const totalTime = completedSessions.reduce((acc, session) => {
     const start = new Date(session.created_at).getTime();
     const end = new Date(session.completed_at!).getTime();
-    return acc + (end - start);
+    const duration = end - start;
+    // Sanity check: ignore sessions with invalid duration (negative or > 1 hour)
+    if (duration > 0 && duration < 3600000) {
+      return acc + duration;
+    }
+    return acc;
   }, 0);
 
-  return Math.round(totalTime / completedSessions.length / 1000); // in seconds
+  const validCount = completedSessions.filter(s => {
+    const start = new Date(s.created_at).getTime();
+    const end = new Date(s.completed_at!).getTime();
+    const duration = end - start;
+    return duration > 0 && duration < 3600000;
+  }).length;
+
+  if (validCount === 0) return 0;
+  return Math.round(totalTime / validCount / 1000); // in seconds
 }
 
 function calculateFunnel(sessions: CheckoutSession[]): FunnelStep[] {
@@ -230,7 +307,7 @@ function generateAlerts(sessions: CheckoutSession[], metrics: CheckoutMetrics): 
   const alerts: CheckoutAlert[] = [];
 
   // High payment failure rate
-  if (metrics.paymentFailureRate > 20) {
+  if (metrics.paymentFailureRate > 20 && metrics.totalSessions > 5) {
     alerts.push({
       id: 'high-failure-rate',
       type: 'error',
@@ -243,7 +320,7 @@ function generateAlerts(sessions: CheckoutSession[], metrics: CheckoutMetrics): 
 
   // Many expired sessions
   const expiredCount = sessions.filter(s => s.status === 'expired').length;
-  if (expiredCount > sessions.length * 0.3) {
+  if (expiredCount > sessions.length * 0.3 && expiredCount > 3) {
     alerts.push({
       id: 'high-expiry',
       type: 'warning',
@@ -267,12 +344,13 @@ function generateAlerts(sessions: CheckoutSession[], metrics: CheckoutMetrics): 
   }
 
   // COD heavy
-  if (metrics.codCount > metrics.prepaidCount * 2 && metrics.codCount > 5) {
+  const totalPaymentMethods = metrics.codCount + metrics.prepaidCount;
+  if (metrics.codCount > metrics.prepaidCount * 2 && metrics.codCount > 5 && totalPaymentMethods > 0) {
     alerts.push({
       id: 'cod-heavy',
       type: 'info',
       title: 'COD Dominant',
-      description: `${Math.round((metrics.codCount / (metrics.codCount + metrics.prepaidCount)) * 100)}% of orders are COD.`,
+      description: `${Math.round((metrics.codCount / totalPaymentMethods) * 100)}% of orders are COD.`,
       action: 'View COD Sessions',
       filter: { payment_method: 'cod' },
     });
@@ -281,9 +359,12 @@ function generateAlerts(sessions: CheckoutSession[], metrics: CheckoutMetrics): 
   return alerts;
 }
 
-// Hook for single session details
+// Hook for single session details with proper error handling
 export function useMerchantCheckoutSession(sessionId: string | undefined) {
-  const { data: session, isLoading: sessionLoading, refetch } = useQuery({
+  const queryClient = useQueryClient();
+  const subscriptionRef = useRef<ReturnType<typeof merchantSupabase.channel> | null>(null);
+
+  const { data: session, isLoading: sessionLoading, refetch, error: sessionError } = useQuery({
     queryKey: ['checkout-session', sessionId],
     queryFn: async () => {
       if (!sessionId) return null;
@@ -294,10 +375,15 @@ export function useMerchantCheckoutSession(sessionId: string | undefined) {
         .eq('id', sessionId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[MerchantCheckout] Failed to fetch session:', error);
+        throw error;
+      }
       return data as CheckoutSession;
     },
     enabled: !!sessionId,
+    staleTime: 10000,
+    retry: 2,
   });
 
   const { data: events, isLoading: eventsLoading } = useQuery({
@@ -311,10 +397,15 @@ export function useMerchantCheckoutSession(sessionId: string | undefined) {
         .eq('session_id', sessionId)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      return data as CheckoutEvent[];
+      if (error) {
+        console.error('[MerchantCheckout] Failed to fetch events:', error);
+        throw error;
+      }
+      return (data || []) as CheckoutEvent[];
     },
     enabled: !!sessionId,
+    staleTime: 10000,
+    retry: 2,
   });
 
   const { data: attempts, isLoading: attemptsLoading } = useQuery({
@@ -328,10 +419,15 @@ export function useMerchantCheckoutSession(sessionId: string | undefined) {
         .eq('session_id', sessionId)
         .order('initiated_at', { ascending: false });
 
-      if (error) throw error;
-      return data as CheckoutAttempt[];
+      if (error) {
+        console.error('[MerchantCheckout] Failed to fetch attempts:', error);
+        throw error;
+      }
+      return (data || []) as CheckoutAttempt[];
     },
     enabled: !!sessionId,
+    staleTime: 10000,
+    retry: 2,
   });
 
   const { data: riskFlags } = useQuery({
@@ -344,18 +440,30 @@ export function useMerchantCheckoutSession(sessionId: string | undefined) {
         .select('*')
         .eq('session_id', sessionId);
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('[MerchantCheckout] Failed to fetch risk flags:', error);
+        return [];
+      }
+      return data || [];
     },
     enabled: !!sessionId,
+    staleTime: 10000,
   });
 
-  // Real-time updates for this session
+  // Real-time updates for this session with debouncing
   useEffect(() => {
     if (!sessionId) return;
 
+    // Cleanup previous subscription
+    if (subscriptionRef.current) {
+      merchantSupabase.removeChannel(subscriptionRef.current);
+      subscriptionRef.current = null;
+    }
+
+    let debounceTimer: number | null = null;
+
     const channel = merchantSupabase
-      .channel(`session-${sessionId}`)
+      .channel(`session-detail-${sessionId}`)
       .on(
         'postgres_changes',
         {
@@ -365,22 +473,33 @@ export function useMerchantCheckoutSession(sessionId: string | undefined) {
           filter: `id=eq.${sessionId}`,
         },
         () => {
-          refetch();
+          // Debounce refetch
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = window.setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ['checkout-session', sessionId] });
+          }, 500);
         }
       )
       .subscribe();
 
+    subscriptionRef.current = channel;
+
     return () => {
-      merchantSupabase.removeChannel(channel);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (subscriptionRef.current) {
+        merchantSupabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
     };
-  }, [sessionId, refetch]);
+  }, [sessionId, queryClient]);
 
   return {
     session,
-    events,
-    attempts,
-    riskFlags,
+    events: events || [],
+    attempts: attempts || [],
+    riskFlags: riskFlags || [],
     isLoading: sessionLoading || eventsLoading || attemptsLoading,
+    error: sessionError,
     refetch,
   };
 }

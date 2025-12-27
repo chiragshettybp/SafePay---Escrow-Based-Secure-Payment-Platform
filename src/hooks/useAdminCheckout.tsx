@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -131,6 +131,15 @@ export interface SessionFilters {
   search?: string;
 }
 
+// Debounce helper
+function debounce<T extends (...args: unknown[]) => void>(fn: T, delay: number): T {
+  let timeoutId: number | null = null;
+  return ((...args: unknown[]) => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = window.setTimeout(() => fn(...args), delay);
+  }) as T;
+}
+
 export function useAdminCheckout() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -150,92 +159,89 @@ export function useAdminCheckout() {
   const [gatewayHealth, setGatewayHealth] = useState<GatewayHealth[]>([]);
   const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  
+  // Refs for subscription management and preventing concurrent fetches
+  const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const isFetchingMetricsRef = useRef(false);
+  const isFetchingSessionsRef = useRef(false);
+  const lastFiltersRef = useRef<string>('');
 
-  // Fetch platform-wide metrics
+  // Fetch platform-wide metrics with proper error handling and concurrency control
   const fetchMetrics = useCallback(async () => {
+    // Prevent concurrent fetches
+    if (isFetchingMetricsRef.current) {
+      console.log('[AdminCheckout] Skipping metrics fetch - already in progress');
+      return;
+    }
+    
+    isFetchingMetricsRef.current = true;
+    
     try {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toISOString();
       const yesterdayEnd = todayStart;
 
-      // Today's sessions
-      const { count: todaySessions } = await supabase
-        .from('checkout_sessions')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', todayStart);
+      // Batch queries for efficiency
+      const [
+        todayResult,
+        yesterdayResult,
+        totalResult,
+        completedResult,
+        todayCompletedResult,
+        yesterdayCompletedResult,
+        failedResult,
+        durationResult
+      ] = await Promise.all([
+        supabase.from('checkout_sessions').select('*', { count: 'exact', head: true }).gte('created_at', todayStart),
+        supabase.from('checkout_sessions').select('*', { count: 'exact', head: true }).gte('created_at', yesterdayStart).lt('created_at', yesterdayEnd),
+        supabase.from('checkout_sessions').select('*', { count: 'exact', head: true }),
+        supabase.from('checkout_sessions').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+        supabase.from('checkout_sessions').select('*', { count: 'exact', head: true }).eq('status', 'completed').gte('created_at', todayStart),
+        supabase.from('checkout_sessions').select('*', { count: 'exact', head: true }).eq('status', 'completed').gte('created_at', yesterdayStart).lt('created_at', yesterdayEnd),
+        supabase.from('checkout_sessions').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
+        supabase.from('checkout_sessions').select('created_at, completed_at').eq('status', 'completed').not('completed_at', 'is', null).limit(100)
+      ]);
 
-      // Yesterday's sessions for comparison
-      const { count: yesterdaySessions } = await supabase
-        .from('checkout_sessions')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', yesterdayStart)
-        .lt('created_at', yesterdayEnd);
+      const todaySessions = todayResult.count || 0;
+      const yesterdaySessions = yesterdayResult.count || 0;
+      const total = totalResult.count || 0;
+      const completed = completedResult.count || 0;
+      const todayCompleted = todayCompletedResult.count || 0;
+      const yesterdayCompleted = yesterdayCompletedResult.count || 0;
+      const failed = failedResult.count || 0;
 
-      // Total sessions
-      const { count: totalSessions } = await supabase
-        .from('checkout_sessions')
-        .select('*', { count: 'exact', head: true });
-
-      // Completed sessions
-      const { count: completedSessions } = await supabase
-        .from('checkout_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'completed');
-
-      // Today's completed
-      const { count: todayCompleted } = await supabase
-        .from('checkout_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'completed')
-        .gte('created_at', todayStart);
-
-      // Yesterday's completed
-      const { count: yesterdayCompleted } = await supabase
-        .from('checkout_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'completed')
-        .gte('created_at', yesterdayStart)
-        .lt('created_at', yesterdayEnd);
-
-      // Failed sessions
-      const { count: failedSessions } = await supabase
-        .from('checkout_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'failed');
-
-      // Calculate metrics
-      const total = totalSessions || 0;
-      const completed = completedSessions || 0;
-      const failed = failedSessions || 0;
       const conversionRate = total > 0 ? (completed / total) * 100 : 0;
       const failureRate = total > 0 ? (failed / total) * 100 : 0;
 
-      // Calculate changes
-      const sessionsChange = yesterdaySessions && yesterdaySessions > 0
-        ? (((todaySessions || 0) - yesterdaySessions) / yesterdaySessions) * 100
+      // Calculate changes with zero-division protection
+      const sessionsChange = yesterdaySessions > 0
+        ? ((todaySessions - yesterdaySessions) / yesterdaySessions) * 100
         : 0;
-      const completedChange = yesterdayCompleted && yesterdayCompleted > 0
-        ? (((todayCompleted || 0) - yesterdayCompleted) / yesterdayCompleted) * 100
+      const completedChange = yesterdayCompleted > 0
+        ? ((todayCompleted - yesterdayCompleted) / yesterdayCompleted) * 100
         : 0;
 
-      // Avg checkout duration (from completed sessions)
-      const { data: durationData } = await supabase
-        .from('checkout_sessions')
-        .select('created_at, completed_at')
-        .eq('status', 'completed')
-        .not('completed_at', 'is', null)
-        .limit(100);
-
+      // Avg checkout duration with sanity checks
       let avgDuration = 0;
-      if (durationData && durationData.length > 0) {
+      const durationData = durationResult.data || [];
+      if (durationData.length > 0) {
+        let validCount = 0;
         const totalDuration = durationData.reduce((acc, s) => {
           if (s.completed_at) {
-            return acc + (new Date(s.completed_at).getTime() - new Date(s.created_at).getTime());
+            const duration = new Date(s.completed_at).getTime() - new Date(s.created_at).getTime();
+            // Sanity check: ignore invalid durations (negative or > 1 hour)
+            if (duration > 0 && duration < 3600000) {
+              validCount++;
+              return acc + duration;
+            }
           }
           return acc;
         }, 0);
-        avgDuration = totalDuration / durationData.length / 1000 / 60; // minutes
+        
+        if (validCount > 0) {
+          avgDuration = totalDuration / validCount / 1000 / 60; // minutes
+        }
       }
 
       setMetrics({
@@ -244,26 +250,41 @@ export function useAdminCheckout() {
         conversionRate,
         failureRate,
         avgCheckoutDuration: avgDuration,
-        sessionsToday: todaySessions || 0,
+        sessionsToday: todaySessions,
         sessionsChange,
         completedChange,
         conversionChange: 0,
         failureChange: 0,
       });
     } catch (error) {
-      console.error('Error fetching metrics:', error);
+      console.error('[AdminCheckout] Error fetching metrics:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch checkout metrics',
+        variant: 'destructive',
+      });
+    } finally {
+      isFetchingMetricsRef.current = false;
     }
-  }, []);
+  }, [toast]);
 
-  // Fetch gateway health
+  // Fetch gateway health with proper error handling
   const fetchGatewayHealth = useCallback(async () => {
     try {
-      const { data: attempts } = await supabase
+      const { data: attempts, error } = await supabase
         .from('checkout_attempts')
         .select('gateway, status, initiated_at, completed_at')
         .gte('initiated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-      if (!attempts) return;
+      if (error) {
+        console.error('[AdminCheckout] Error fetching gateway health:', error);
+        return;
+      }
+
+      if (!attempts || attempts.length === 0) {
+        setGatewayHealth([]);
+        return;
+      }
 
       const gatewayStats: Record<string, { total: number; success: number; failed: number; timeout: number; latencies: number[] }> = {};
 
@@ -278,7 +299,10 @@ export function useAdminCheckout() {
           gatewayStats[gateway].success++;
           if (attempt.completed_at && attempt.initiated_at) {
             const latency = new Date(attempt.completed_at).getTime() - new Date(attempt.initiated_at).getTime();
-            gatewayStats[gateway].latencies.push(latency);
+            // Sanity check latency
+            if (latency > 0 && latency < 120000) { // < 2 minutes
+              gatewayStats[gateway].latencies.push(latency);
+            }
           }
         } else if (attempt.status === 'failed') {
           gatewayStats[gateway].failed++;
@@ -296,12 +320,12 @@ export function useAdminCheckout() {
           ? stats.latencies.reduce((a, b) => a + b, 0) / stats.latencies.length / 1000
           : 0,
         totalAttempts: stats.total,
-        isDegraded: (stats.failed / stats.total) > 0.1 || (stats.timeout / stats.total) > 0.05,
+        isDegraded: stats.total > 5 && ((stats.failed / stats.total) > 0.1 || (stats.timeout / stats.total) > 0.05),
       }));
 
       setGatewayHealth(health);
     } catch (error) {
-      console.error('Error fetching gateway health:', error);
+      console.error('[AdminCheckout] Error fetching gateway health:', error);
     }
   }, []);
 
@@ -311,21 +335,23 @@ export function useAdminCheckout() {
       const alerts: SystemAlert[] = [];
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-      // Check for failure spike
-      const { count: recentFailures } = await supabase
-        .from('checkout_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'failed')
-        .gte('created_at', oneHourAgo);
+      // Batch queries
+      const [recentFailuresResult, totalRecentResult, highRetryResult, riskFlaggedResult] = await Promise.all([
+        supabase.from('checkout_sessions').select('*', { count: 'exact', head: true }).eq('status', 'failed').gte('created_at', oneHourAgo),
+        supabase.from('checkout_sessions').select('*', { count: 'exact', head: true }).gte('created_at', oneHourAgo),
+        supabase.from('checkout_sessions').select('id, payment_attempts').gte('created_at', oneHourAgo).gt('payment_attempts', 5),
+        supabase.from('checkout_risk_flags').select('*', { count: 'exact', head: true }).eq('severity', 'critical').is('reviewed_at', null)
+      ]);
 
-      const { count: totalRecent } = await supabase
-        .from('checkout_sessions')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', oneHourAgo);
+      const recentFailures = recentFailuresResult.count || 0;
+      const totalRecent = totalRecentResult.count || 0;
+      const highRetry = highRetryResult.data || [];
+      const riskFlagged = riskFlaggedResult.count || 0;
 
-      if (totalRecent && totalRecent > 10 && recentFailures && (recentFailures / totalRecent) > 0.3) {
+      // Failure spike alert
+      if (totalRecent > 10 && recentFailures > 0 && (recentFailures / totalRecent) > 0.3) {
         alerts.push({
-          id: 'failure-spike-' + Date.now(),
+          id: `failure-spike-${Date.now()}`,
           type: 'failure_spike',
           severity: 'error',
           title: 'Elevated Payment Failure Rate',
@@ -336,16 +362,10 @@ export function useAdminCheckout() {
         });
       }
 
-      // Check for suspicious retry patterns
-      const { data: highRetry } = await supabase
-        .from('checkout_sessions')
-        .select('id, payment_attempts')
-        .gte('created_at', oneHourAgo)
-        .gt('payment_attempts', 5);
-
-      if (highRetry && highRetry.length > 3) {
+      // Abnormal retry alert
+      if (highRetry.length > 3) {
         alerts.push({
-          id: 'abnormal-retry-' + Date.now(),
+          id: `abnormal-retry-${Date.now()}`,
           type: 'abnormal_retry',
           severity: 'warning',
           title: 'Abnormal Retry Behavior Detected',
@@ -356,16 +376,10 @@ export function useAdminCheckout() {
         });
       }
 
-      // Check for risk-flagged sessions
-      const { count: riskFlagged } = await supabase
-        .from('checkout_risk_flags')
-        .select('*', { count: 'exact', head: true })
-        .eq('severity', 'critical')
-        .is('reviewed_at', null);
-
-      if (riskFlagged && riskFlagged > 0) {
+      // Critical risk flags alert
+      if (riskFlagged > 0) {
         alerts.push({
-          id: 'suspicious-pattern-' + Date.now(),
+          id: `suspicious-pattern-${Date.now()}`,
           type: 'suspicious_pattern',
           severity: 'critical',
           title: 'Critical Risk Flags Pending Review',
@@ -378,13 +392,25 @@ export function useAdminCheckout() {
 
       setSystemAlerts(alerts);
     } catch (error) {
-      console.error('Error generating alerts:', error);
+      console.error('[AdminCheckout] Error generating alerts:', error);
     }
   }, []);
 
-  // Fetch sessions with filters
+  // Fetch sessions with filters and concurrency control
   const fetchSessions = useCallback(async (filters?: SessionFilters, page = 1, pageSize = 20) => {
+    // Create a hash of current filters to detect changes
+    const filterHash = JSON.stringify({ filters, page, pageSize });
+    
+    // Prevent concurrent fetches with same filters
+    if (isFetchingSessionsRef.current && lastFiltersRef.current === filterHash) {
+      console.log('[AdminCheckout] Skipping sessions fetch - identical request in progress');
+      return;
+    }
+    
+    isFetchingSessionsRef.current = true;
+    lastFiltersRef.current = filterHash;
     setIsLoading(true);
+    
     try {
       let query = supabase
         .from('checkout_sessions')
@@ -395,7 +421,7 @@ export function useAdminCheckout() {
         .order('created_at', { ascending: false })
         .range((page - 1) * pageSize, page * pageSize - 1);
 
-      // Apply filters
+      // Apply filters safely
       if (filters?.dateRange?.from) {
         query = query.gte('created_at', filters.dateRange.from.toISOString());
       }
@@ -406,26 +432,30 @@ export function useAdminCheckout() {
         query = query.eq('merchant_id', filters.merchantId);
       }
       if (filters?.status && filters.status.length > 0) {
-        query = query.in('status', filters.status as any);
+        query = query.in('status', filters.status as ('active' | 'completed' | 'expired' | 'abandoned' | 'failed')[]);
       }
       if (filters?.failureStage) {
-        query = query.eq('current_step', filters.failureStage as any);
+        query = query.eq('current_step', filters.failureStage as 'login' | 'address' | 'payment' | 'confirmation');
       }
       if (filters?.paymentMethod) {
-        query = query.eq('selected_payment_method', filters.paymentMethod as any);
+        query = query.eq('selected_payment_method', filters.paymentMethod as 'upi' | 'card' | 'wallet' | 'emi' | 'cod' | 'netbanking');
       }
       if (filters?.search) {
-        query = query.or(`id.ilike.%${filters.search}%,phone_number.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
+        // Sanitize search input
+        const sanitizedSearch = filters.search.replace(/[%_\\]/g, '');
+        query = query.or(`id.ilike.%${sanitizedSearch}%,phone_number.ilike.%${sanitizedSearch}%,email.ilike.%${sanitizedSearch}%`);
       }
 
       const { data, count, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       setSessions((data as unknown as CheckoutSession[]) || []);
       setTotalCount(count || 0);
     } catch (error) {
-      console.error('Error fetching sessions:', error);
+      console.error('[AdminCheckout] Error fetching sessions:', error);
       toast({
         title: 'Error',
         description: 'Failed to fetch checkout sessions',
@@ -433,43 +463,31 @@ export function useAdminCheckout() {
       });
     } finally {
       setIsLoading(false);
+      isFetchingSessionsRef.current = false;
     }
   }, [toast]);
 
   // Fetch single session details
   const fetchSessionDetails = useCallback(async (sessionId: string) => {
+    if (!sessionId) {
+      console.error('[AdminCheckout] fetchSessionDetails called without sessionId');
+      return null;
+    }
+
     try {
-      const { data: session, error: sessionError } = await supabase
-        .from('checkout_sessions')
-        .select(`
-          *,
-          merchant:merchants(id, business_name, email)
-        `)
-        .eq('id', sessionId)
-        .single();
+      // Batch all queries
+      const [sessionResult, eventsResult, attemptsResult, riskFlagsResult] = await Promise.all([
+        supabase.from('checkout_sessions').select(`*, merchant:merchants(id, business_name, email)`).eq('id', sessionId).single(),
+        supabase.from('checkout_events').select('*').eq('session_id', sessionId).order('created_at', { ascending: true }),
+        supabase.from('checkout_attempts').select('*').eq('session_id', sessionId).order('initiated_at', { ascending: true }),
+        supabase.from('checkout_risk_flags').select('*').eq('session_id', sessionId).order('created_at', { ascending: true })
+      ]);
 
-      if (sessionError) throw sessionError;
+      if (sessionResult.error) {
+        throw sessionResult.error;
+      }
 
-      // Fetch events
-      const { data: events } = await supabase
-        .from('checkout_events')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: true });
-
-      // Fetch attempts
-      const { data: attempts } = await supabase
-        .from('checkout_attempts')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('initiated_at', { ascending: true });
-
-      // Fetch risk flags
-      const { data: riskFlags } = await supabase
-        .from('checkout_risk_flags')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: true });
+      const session = sessionResult.data;
 
       // Fetch linked order if exists
       let order = null;
@@ -484,13 +502,13 @@ export function useAdminCheckout() {
 
       return {
         session: session as unknown as CheckoutSession,
-        events: (events as unknown as CheckoutEvent[]) || [],
-        attempts: (attempts as unknown as CheckoutAttempt[]) || [],
-        riskFlags: (riskFlags as unknown as CheckoutRiskFlag[]) || [],
+        events: (eventsResult.data as unknown as CheckoutEvent[]) || [],
+        attempts: (attemptsResult.data as unknown as CheckoutAttempt[]) || [],
+        riskFlags: (riskFlagsResult.data as unknown as CheckoutRiskFlag[]) || [],
         order,
       };
     } catch (error) {
-      console.error('Error fetching session details:', error);
+      console.error('[AdminCheckout] Error fetching session details:', error);
       toast({
         title: 'Error',
         description: 'Failed to fetch session details',
@@ -500,23 +518,39 @@ export function useAdminCheckout() {
     }
   }, [toast]);
 
-  // Add admin note to session (stored as risk flag with admin_note type)
+  // Add admin note to session with validation
   const addSessionNote = useCallback(async (sessionId: string, note: string): Promise<boolean> => {
+    if (!sessionId || !note?.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Session ID and note are required',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      if (!user) {
+        toast({
+          title: 'Error',
+          description: 'You must be logged in to add notes',
+          variant: 'destructive',
+        });
+        return false;
+      }
 
       const { error } = await supabase
         .from('checkout_risk_flags')
-        .insert({
+        .insert([{
           session_id: sessionId,
           flag_type: 'admin_note',
           severity: 'low',
-          description: note,
+          description: note.trim().slice(0, 1000), // Limit note length
           auto_blocked: false,
           reviewed_by: user.id,
           reviewed_at: new Date().toISOString(),
-        } as any);
+        }]);
 
       if (error) throw error;
 
@@ -525,32 +559,48 @@ export function useAdminCheckout() {
         description: 'Your note has been saved',
       });
       return true;
-    } catch (error: any) {
-      console.error('Error adding note:', error);
+    } catch (error: unknown) {
+      console.error('[AdminCheckout] Error adding note:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to add note',
+        description: (error as Error)?.message || 'Failed to add note',
         variant: 'destructive',
       });
       return false;
     }
   }, [toast]);
 
-  // Flag session for review
+  // Flag session for review with validation
   const flagSession = useCallback(async (sessionId: string, reason: string): Promise<boolean> => {
+    if (!sessionId || !reason?.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Session ID and reason are required',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      if (!user) {
+        toast({
+          title: 'Error',
+          description: 'You must be logged in to flag sessions',
+          variant: 'destructive',
+        });
+        return false;
+      }
 
       const { error } = await supabase
         .from('checkout_risk_flags')
-        .insert({
+        .insert([{
           session_id: sessionId,
           flag_type: 'admin_flagged',
           severity: 'medium',
-          description: reason,
+          description: reason.trim().slice(0, 1000), // Limit reason length
           auto_blocked: false,
-        } as any);
+        }]);
 
       if (error) throw error;
 
@@ -559,19 +609,21 @@ export function useAdminCheckout() {
         description: 'Session has been flagged for review',
       });
       return true;
-    } catch (error: any) {
-      console.error('Error flagging session:', error);
+    } catch (error: unknown) {
+      console.error('[AdminCheckout] Error flagging session:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to flag session',
+        description: (error as Error)?.message || 'Failed to flag session',
         variant: 'destructive',
       });
       return false;
     }
   }, [toast]);
 
-  // Fetch session notes (from risk flags with admin_note type)
+  // Fetch session notes
   const fetchSessionNotes = useCallback(async (sessionId: string): Promise<AdminCheckoutNote[]> => {
+    if (!sessionId) return [];
+
     try {
       const { data, error } = await supabase
         .from('checkout_risk_flags')
@@ -582,24 +634,39 @@ export function useAdminCheckout() {
 
       if (error) throw error;
       
-      // Map risk flags to notes format
-      return (data || []).map((flag: any) => ({
-        id: flag.id,
-        session_id: flag.session_id,
-        admin_id: flag.reviewed_by || '',
-        note: flag.description || '',
-        created_at: flag.created_at,
+      return (data || []).map((flag: Record<string, unknown>) => ({
+        id: flag.id as string,
+        session_id: flag.session_id as string,
+        admin_id: (flag.reviewed_by as string) || '',
+        note: (flag.description as string) || '',
+        created_at: flag.created_at as string,
       }));
     } catch (error) {
-      console.error('Error fetching notes:', error);
+      console.error('[AdminCheckout] Error fetching notes:', error);
       return [];
     }
   }, []);
 
-  // Setup realtime subscriptions
+  // Debounced refetch function for realtime updates
+  const debouncedRefetch = useCallback(
+    debounce(() => {
+      console.log('[AdminCheckout] Debounced refetch triggered');
+      fetchMetrics();
+      fetchSessions();
+    }, 1000),
+    [fetchMetrics, fetchSessions]
+  );
+
+  // Setup realtime subscriptions with proper cleanup and debouncing
   useEffect(() => {
+    // Cleanup previous subscription
+    if (subscriptionRef.current) {
+      supabase.removeChannel(subscriptionRef.current);
+      subscriptionRef.current = null;
+    }
+
     const channel = supabase
-      .channel('admin-checkout')
+      .channel('admin-checkout-realtime')
       .on(
         'postgres_changes',
         {
@@ -608,8 +675,7 @@ export function useAdminCheckout() {
           table: 'checkout_sessions',
         },
         () => {
-          fetchMetrics();
-          fetchSessions();
+          debouncedRefetch();
         }
       )
       .on(
@@ -620,6 +686,7 @@ export function useAdminCheckout() {
           table: 'checkout_attempts',
         },
         () => {
+          // Only refetch gateway health for attempt changes
           fetchGatewayHealth();
         }
       )
@@ -634,19 +701,35 @@ export function useAdminCheckout() {
           generateSystemAlerts();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[AdminCheckout] Realtime subscription active');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[AdminCheckout] Realtime subscription error');
+        }
+      });
+
+    subscriptionRef.current = channel;
 
     return () => {
-      supabase.removeChannel(channel);
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
     };
-  }, [fetchMetrics, fetchSessions, fetchGatewayHealth, generateSystemAlerts]);
+  }, [fetchGatewayHealth, generateSystemAlerts, debouncedRefetch]);
 
   // Initial data fetch
   useEffect(() => {
-    fetchMetrics();
-    fetchGatewayHealth();
-    generateSystemAlerts();
-    fetchSessions();
+    const initFetch = async () => {
+      await Promise.all([
+        fetchMetrics(),
+        fetchGatewayHealth(),
+        generateSystemAlerts(),
+        fetchSessions()
+      ]);
+    };
+    initFetch();
   }, [fetchMetrics, fetchGatewayHealth, generateSystemAlerts, fetchSessions]);
 
   return {
