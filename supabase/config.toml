@@ -104,3 +104,6 @@ verify_jwt = true
 
 [functions.resolve-payment-link-user]
 verify_jwt = false
+
+[functions.complete-checkout]
+verify_jwt = false
