@@ -29,10 +29,10 @@ Deno.serve(async (req) => {
       { auth: { persistSession: false } }
     )
 
-    // Get checkout session with merchant info
+    // Get checkout session
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('checkout_sessions')
-      .select('*, merchants(id, user_id, business_name)')
+      .select('*')
       .eq('id', session_id)
       .single()
 
@@ -44,8 +44,19 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Get the merchant's user_id (auth UUID) - orders should be linked to user_id, not merchants table ID
-    const merchantData = session.merchants as { id: string; user_id: string; business_name: string } | null
+    // Fetch merchant separately to ensure we get user_id correctly
+    // checkout_sessions.merchant_id references merchants.id (table PK)
+    const { data: merchantData, error: merchantError } = await supabaseAdmin
+      .from('merchants')
+      .select('id, user_id, business_name')
+      .eq('id', session.merchant_id)
+      .single()
+
+    if (merchantError) {
+      console.error('Merchant fetch error:', merchantError)
+    }
+
+    // CRITICAL: Use merchant's user_id (auth UUID) for orders, NOT merchants table ID
     const merchantUserId = merchantData?.user_id || session.merchant_id
     const merchantBusinessName = merchantData?.business_name || 'Merchant'
 
@@ -54,7 +65,9 @@ Deno.serve(async (req) => {
       phone: session.phone_number,
       user_id: session.user_id,
       payment_link_id: session.payment_link_id,
-      payment_method: session.selected_payment_method
+      payment_method: session.selected_payment_method,
+      merchant_table_id: session.merchant_id,
+      merchant_user_id: merchantUserId,
     })
 
     // Validate session state
@@ -104,94 +117,78 @@ Deno.serve(async (req) => {
         normalizedPhone = normalizedPhone.startsWith('91') ? `+${normalizedPhone}` : `+91${normalizedPhone}`
       }
 
-      // Check if user exists with this phone - use user_id column
-      const { data: existingProfile, error: profileError } = await supabaseAdmin
+      // Strategy 1: Check profiles table for user with this phone
+      const { data: existingProfile } = await supabaseAdmin
         .from('profiles')
-        .select('user_id, phone')
+        .select('id, user_id, phone')
         .eq('phone', normalizedPhone)
         .maybeSingle()
 
       if (existingProfile?.user_id) {
         effectiveCustomerId = existingProfile.user_id
         console.log('Found existing user by profile phone:', effectiveCustomerId)
-      } else {
-        // Also check auth.users directly in case profile wasn't created yet
-        const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers({
-          page: 1,
-          perPage: 1,
-        })
-        
-        // Find user by phone in auth.users
-        const existingAuthUser = authUsers?.users?.find(u => u.phone === normalizedPhone)
-        
-        if (existingAuthUser) {
-          effectiveCustomerId = existingAuthUser.id
-          console.log('Found existing user in auth.users:', effectiveCustomerId)
-          
-          // Ensure profile exists
-          const { error: upsertError } = await supabaseAdmin
-            .from('profiles')
-            .upsert({
-              id: existingAuthUser.id,
-              user_id: existingAuthUser.id,
-              phone: normalizedPhone,
-              account_source: 'payment_link',
-              account_claimed: false,
-              auth_provider: 'payment_link',
-              phone_verified: true,
-            }, { onConflict: 'user_id' })
-          
-          if (upsertError) {
-            console.error('Profile upsert error:', upsertError)
-          }
-        } else {
-          // Create new user via auth admin API
-          console.log('Creating new user for phone:', normalizedPhone)
-          
-          const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-            phone: normalizedPhone,
-            phone_confirm: true,
-            user_metadata: {
-              account_source: 'payment_link',
-              created_via_checkout: session_id,
-            },
-          })
+      } else if (existingProfile?.id) {
+        effectiveCustomerId = existingProfile.id
+        console.log('Found existing user by profile id:', effectiveCustomerId)
+      }
 
-          if (authError) {
-            // Handle duplicate phone - try multiple lookup strategies
-            const isDuplicate = authError.message?.includes('already') || 
-                               authError.message?.includes('exists') ||
-                               authError.message?.includes('duplicate') ||
-                               authError.code === '23505'
+      // Strategy 2: If not found in profiles, try to create user
+      if (!effectiveCustomerId) {
+        console.log('Creating new user for phone:', normalizedPhone)
+        
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          phone: normalizedPhone,
+          phone_confirm: true,
+          user_metadata: {
+            account_source: 'payment_link',
+            created_via_checkout: session_id,
+          },
+        })
+
+        if (authError) {
+          // Handle duplicate phone - user exists in auth but not in profiles
+          const isDuplicate = authError.message?.includes('already') || 
+                             authError.message?.includes('exists') ||
+                             authError.message?.includes('duplicate') ||
+                             authError.message?.includes('unique') ||
+                             (authError as any).code === '23505'
+          
+          if (isDuplicate) {
+            console.log('User already exists, performing comprehensive search...')
             
-            if (isDuplicate) {
-              console.log('User already exists, searching with different strategies...')
-              
-              // Strategy 1: Lookup by phone in profiles again (might have been created by trigger)
-              const { data: retryProfile } = await supabaseAdmin
-                .from('profiles')
-                .select('user_id')
-                .eq('phone', normalizedPhone)
-                .maybeSingle()
-              
-              if (retryProfile?.user_id) {
-                effectiveCustomerId = retryProfile.user_id
-                console.log('Found user on retry (profiles):', effectiveCustomerId)
-              } else {
-                // Strategy 2: List all users and find by phone
-                const { data: allUsers } = await supabaseAdmin.auth.admin.listUsers({
-                  page: 1,
+            // Re-check profiles with a slight delay (trigger might have created it)
+            await new Promise(resolve => setTimeout(resolve, 200))
+            
+            const { data: retryProfile } = await supabaseAdmin
+              .from('profiles')
+              .select('id, user_id')
+              .eq('phone', normalizedPhone)
+              .maybeSingle()
+            
+            if (retryProfile?.user_id) {
+              effectiveCustomerId = retryProfile.user_id
+              console.log('Found user on retry (profiles):', effectiveCustomerId)
+            } else if (retryProfile?.id) {
+              effectiveCustomerId = retryProfile.id
+              console.log('Found user on retry (profiles id):', effectiveCustomerId)
+            } else {
+              // Last resort: Paginate through auth users to find by phone
+              let page = 1
+              let found = false
+              while (!found && page <= 10) { // Max 1000 users search
+                const { data: pageUsers } = await supabaseAdmin.auth.admin.listUsers({
+                  page,
                   perPage: 100,
                 })
                 
-                const matchingUser = allUsers?.users?.find(u => u.phone === normalizedPhone)
-                
+                const matchingUser = pageUsers?.users?.find(u => u.phone === normalizedPhone)
                 if (matchingUser) {
                   effectiveCustomerId = matchingUser.id
-                  console.log('Found user in auth list:', effectiveCustomerId)
+                  console.log('Found user in auth list (page', page, '):', effectiveCustomerId)
+                  found = true
                   
                   // Ensure profile exists for this user
-                  await supabaseAdmin
+                  const { error: upsertErr } = await supabaseAdmin
                     .from('profiles')
                     .upsert({
                       id: matchingUser.id,
@@ -201,34 +198,41 @@ Deno.serve(async (req) => {
                       account_claimed: false,
                       auth_provider: 'payment_link',
                       phone_verified: true,
-                    }, { onConflict: 'user_id' })
+                    }, { onConflict: 'id' })
+                  
+                  if (upsertErr) {
+                    console.error('Profile upsert error:', upsertErr)
+                  }
                 }
+                
+                if (!pageUsers?.users?.length || pageUsers.users.length < 100) break
+                page++
               }
-            } else {
-              console.error('Auth user creation error:', authError)
             }
-          } else if (authData?.user) {
-            effectiveCustomerId = authData.user.id
-            console.log('Created new user:', effectiveCustomerId)
+          } else {
+            console.error('Auth user creation error:', authError)
+          }
+        } else if (authData?.user) {
+          effectiveCustomerId = authData.user.id
+          console.log('Created new user:', effectiveCustomerId)
 
-            // Wait a moment for trigger to create profile, then ensure correct fields
-            await new Promise(resolve => setTimeout(resolve, 100))
-            
-            const { error: profileUpsertError } = await supabaseAdmin
-              .from('profiles')
-              .upsert({
-                id: authData.user.id,
-                user_id: authData.user.id,
-                phone: normalizedPhone,
-                account_source: 'payment_link',
-                account_claimed: false,
-                auth_provider: 'payment_link',
-                phone_verified: true,
-              }, { onConflict: 'user_id' })
+          // Wait a moment for trigger to create profile, then ensure correct fields
+          await new Promise(resolve => setTimeout(resolve, 150))
+          
+          const { error: profileUpsertError } = await supabaseAdmin
+            .from('profiles')
+            .upsert({
+              id: authData.user.id,
+              user_id: authData.user.id,
+              phone: normalizedPhone,
+              account_source: 'payment_link',
+              account_claimed: false,
+              auth_provider: 'payment_link',
+              phone_verified: true,
+            }, { onConflict: 'id' })
 
-            if (profileUpsertError) {
-              console.error('Profile upsert error:', profileUpsertError)
-            }
+          if (profileUpsertError) {
+            console.error('Profile upsert error:', profileUpsertError)
           }
         }
       }
@@ -324,7 +328,7 @@ Deno.serve(async (req) => {
         payment_link_id: session.payment_link_id,
         checkout_session_id: session_id,
         user_id: effectiveCustomerId,
-        phone_used: session.phone_number,
+        phone_number: session.phone_number, // Column is phone_number, not phone_used
         association_type: 'order_completed',
       })
       if (assocError) {
