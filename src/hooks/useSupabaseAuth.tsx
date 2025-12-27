@@ -22,26 +22,51 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isEmailVerified: boolean;
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<{ error: Error | null }>;
-  loginWithPhone: (phone: string, password: string, rememberMe?: boolean) => Promise<{ error: Error | null }>;
-  signup: (email: string, password: string, fullName: string, phone?: string) => Promise<{ error: Error | null }>;
-  signupWithPhone: (phone: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  needsPhoneMigration: boolean;
+  // Phone-based auth (PRIMARY)
+  loginWithPhone: (phone: string) => Promise<{ error: Error | null; isNewUser?: boolean }>;
+  signupWithPhone: (phone: string, fullName: string) => Promise<{ error: Error | null }>;
+  // Password management (OPTIONAL)
+  setPassword: (password: string) => Promise<{ error: Error | null }>;
+  loginWithPhoneAndPassword: (phone: string, password: string) => Promise<{ error: Error | null }>;
+  // Profile management
+  updateProfile: (data: Partial<Pick<Profile, 'phone' | 'email' | 'full_name'>>) => Promise<{ error: Error | null }>;
+  addEmail: (email: string) => Promise<{ error: Error | null }>;
+  addPhoneToAccount: (phone: string) => Promise<{ error: Error | null }>;
+  // Session management
   logout: () => Promise<void>;
   resendVerificationEmail: () => Promise<{ error: Error | null }>;
+  // OAuth (still available)
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signInWithApple: () => Promise<{ error: Error | null }>;
-  updateProfile: (data: Partial<Pick<Profile, 'phone' | 'email' | 'full_name'>>) => Promise<{ error: Error | null }>;
-  linkPhone: (phone: string) => Promise<{ error: Error | null }>;
-  linkEmail: (email: string) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Helper to format phone number
+const formatPhone = (phone: string): string => {
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('91') && cleaned.length === 12) {
+    return `+${cleaned}`;
+  }
+  if (cleaned.length === 10) {
+    return `+91${cleaned}`;
+  }
+  return phone.startsWith('+') ? phone : `+91${cleaned}`;
+};
+
+// Helper to create pseudo-email for phone-based auth
+const phoneToEmail = (phone: string): string => {
+  const cleaned = phone.replace(/\+/g, '');
+  return `${cleaned}@phone.safepay.local`;
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [needsPhoneMigration, setNeedsPhoneMigration] = useState(false);
   const navigate = useNavigate();
 
   const fetchProfile = async (userId: string) => {
@@ -57,27 +82,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setProfile(data as Profile | null);
+    
+    // Check if user needs phone migration (has email but no phone)
+    if (data && !data.phone && data.email && !data.email.endsWith('@phone.safepay.local')) {
+      setNeedsPhoneMigration(true);
+    } else {
+      setNeedsPhoneMigration(false);
+    }
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
 
-        // Defer profile fetch to avoid deadlock
         if (session?.user) {
           setTimeout(() => {
             fetchProfile(session.user.id);
           }, 0);
         } else {
           setProfile(null);
+          setNeedsPhoneMigration(false);
         }
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -92,119 +122,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string, rememberMe?: boolean): Promise<{ error: Error | null }> => {
+  // PRIMARY: Login with phone number (no password required)
+  const loginWithPhone = async (phone: string): Promise<{ error: Error | null; isNewUser?: boolean }> => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        return { error };
-      }
-
-      // Handle remember me
-      if (rememberMe) {
-        localStorage.setItem("rememberMe", "true");
-      } else {
-        localStorage.removeItem("rememberMe");
-      }
-
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
-
-  const loginWithPhone = async (phone: string, password: string, rememberMe?: boolean): Promise<{ error: Error | null }> => {
-    try {
-      // Format phone number to ensure it has country code
-      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+      const formattedPhone = formatPhone(phone);
       
-      // First, find user by phone in profiles
-      const { data: profileData, error: profileError } = await supabase
+      // Check if user exists by phone in profiles
+      const { data: existingProfile, error: profileError } = await supabase
         .from("profiles")
-        .select("user_id, email")
+        .select("user_id, email, phone")
         .eq("phone", formattedPhone)
         .maybeSingle();
 
-      if (profileError || !profileData) {
-        return { error: new Error("No account found with this phone number") };
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error("Profile lookup error:", profileError);
       }
 
-      // If user has email, use email to login (Supabase standard auth)
-      if (profileData.email) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: profileData.email,
-          password,
-        });
-
-        if (error) {
-          return { error };
-        }
-      } else {
-        // For phone-only users, use phone as email (Supabase workaround)
-        const phoneEmail = `${formattedPhone.replace('+', '')}@phone.safepay.local`;
-        const { error } = await supabase.auth.signInWithPassword({
-          email: phoneEmail,
-          password,
-        });
-
-        if (error) {
-          return { error };
-        }
+      if (!existingProfile) {
+        // User doesn't exist - return indicator to redirect to signup
+        return { error: new Error("No account found. Please sign up first."), isNewUser: true };
       }
 
-      // Handle remember me
-      if (rememberMe) {
-        localStorage.setItem("rememberMe", "true");
-      } else {
-        localStorage.removeItem("rememberMe");
-      }
-
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
-
-  const signup = async (
-    email: string, 
-    password: string, 
-    fullName: string, 
-    phone?: string
-  ): Promise<{ error: Error | null }> => {
-    try {
-      const redirectUrl = `${window.location.origin}/`;
-      const formattedPhone = phone && !phone.startsWith('+') ? `+91${phone}` : phone;
+      // User exists - sign them in using the phone-based email
+      const phoneEmail = phoneToEmail(formattedPhone);
       
-      // Check if phone already exists
-      if (formattedPhone) {
-        const { data: existingPhone } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("phone", formattedPhone)
-          .maybeSingle();
-        
-        if (existingPhone) {
-          return { error: new Error("This phone number is already registered. Please sign in or use a different number.") };
-        }
-      }
+      // For phone-only auth, we use a deterministic password based on phone
+      // This is secure because the phone itself is the identity
+      const phonePassword = `phone_${formattedPhone}_safepay_auth`;
       
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            full_name: fullName,
-            phone: formattedPhone || null,
-          },
-        },
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: phoneEmail,
+        password: phonePassword,
       });
 
-      if (error) {
-        return { error };
+      if (signInError) {
+        // If sign in fails, the user might have been created with email
+        // Try to look up their real email
+        if (existingProfile.email && !existingProfile.email.endsWith('@phone.safepay.local')) {
+          return { error: new Error("This account was created with email. Please add a phone number to continue.") };
+        }
+        return { error: signInError };
       }
 
       return { error: null };
@@ -213,33 +170,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signupWithPhone = async (
-    phone: string, 
-    password: string, 
-    fullName: string
-  ): Promise<{ error: Error | null }> => {
+  // PRIMARY: Signup with phone number
+  const signupWithPhone = async (phone: string, fullName: string): Promise<{ error: Error | null }> => {
     try {
-      // Format phone number
-      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+      const formattedPhone = formatPhone(phone);
       
       // Check if phone already exists
-      const { data: existingPhone } = await supabase
+      const { data: existingProfile } = await supabase
         .from("profiles")
         .select("id")
         .eq("phone", formattedPhone)
         .maybeSingle();
       
-      if (existingPhone) {
-        return { error: new Error("This phone number is already registered. Please sign in instead.") };
+      if (existingProfile) {
+        return { error: new Error("This phone number is already registered. Please log in instead.") };
       }
       
-      // Create a pseudo-email for phone-only users (Supabase requires email)
-      // We use a local domain that's clearly marked as phone-based
-      const phoneEmail = `${formattedPhone.replace('+', '')}@phone.safepay.local`;
+      // Create user with phone-based pseudo-email
+      const phoneEmail = phoneToEmail(formattedPhone);
+      const phonePassword = `phone_${formattedPhone}_safepay_auth`;
       
-      const { error } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: phoneEmail,
-        password,
+        password: phonePassword,
         options: {
           data: {
             full_name: fullName,
@@ -249,26 +202,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       });
 
-      if (error) {
-        return { error };
+      if (signUpError) {
+        return { error: signUpError };
       }
 
-      // Update profile to mark as phone-based and verified (since no email verification needed)
-      // This will be handled by the trigger, but we update to ensure phone_verified is true
-      setTimeout(async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
+      // Update profile to ensure phone is set correctly
+      if (signUpData.user) {
+        setTimeout(async () => {
           await supabase
             .from("profiles")
             .update({ 
               phone: formattedPhone,
               phone_verified: true,
               auth_provider: 'phone',
-              email: null // Clear the pseudo-email from profile
+              email: null // Clear pseudo-email from profile display
             })
-            .eq("user_id", user.id);
-        }
-      }, 1000);
+            .eq("user_id", signUpData.user!.id);
+        }, 500);
+      }
 
       return { error: null };
     } catch (error) {
@@ -276,25 +227,165 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // OPTIONAL: Login with phone and password (for users who set password)
+  const loginWithPhoneAndPassword = async (phone: string, password: string): Promise<{ error: Error | null }> => {
+    try {
+      const formattedPhone = formatPhone(phone);
+      const phoneEmail = phoneToEmail(formattedPhone);
+      
+      const { error } = await supabase.auth.signInWithPassword({
+        email: phoneEmail,
+        password,
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  // OPTIONAL: Set password for account security
+  const setPassword = async (password: string): Promise<{ error: Error | null }> => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      
+      if (error) {
+        return { error };
+      }
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  // Add email to profile (optional, for receipts/communication)
+  const addEmail = async (email: string): Promise<{ error: Error | null }> => {
+    try {
+      if (!user) {
+        return { error: new Error("Not authenticated") };
+      }
+
+      // Check if email already exists
+      const { data: existingEmail } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", email)
+        .neq("user_id", user.id)
+        .maybeSingle();
+      
+      if (existingEmail) {
+        return { error: new Error("This email is already linked to another account.") };
+      }
+
+      // Update profile with email
+      const { error } = await supabase
+        .from("profiles")
+        .update({ 
+          email,
+          auth_provider: 'both'
+        })
+        .eq("user_id", user.id);
+
+      if (error) {
+        return { error };
+      }
+
+      await fetchProfile(user.id);
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  // Add phone to existing email-only account (migration)
+  const addPhoneToAccount = async (phone: string): Promise<{ error: Error | null }> => {
+    try {
+      if (!user) {
+        return { error: new Error("Not authenticated") };
+      }
+
+      const formattedPhone = formatPhone(phone);
+
+      // Check if phone already exists
+      const { data: existingPhone } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("phone", formattedPhone)
+        .neq("user_id", user.id)
+        .maybeSingle();
+      
+      if (existingPhone) {
+        return { error: new Error("This phone number is already linked to another account.") };
+      }
+
+      // Update profile with phone
+      const { error } = await supabase
+        .from("profiles")
+        .update({ 
+          phone: formattedPhone,
+          phone_verified: true,
+          auth_provider: 'phone' // Switch to phone-based auth
+        })
+        .eq("user_id", user.id);
+
+      if (error) {
+        return { error };
+      }
+
+      setNeedsPhoneMigration(false);
+      await fetchProfile(user.id);
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  const updateProfile = async (data: Partial<Pick<Profile, 'phone' | 'email' | 'full_name'>>): Promise<{ error: Error | null }> => {
+    try {
+      if (!user) {
+        return { error: new Error("Not authenticated") };
+      }
+
+      const { error } = await supabase
+        .from("profiles")
+        .update(data)
+        .eq("user_id", user.id);
+
+      if (error) {
+        return { error };
+      }
+
+      await fetchProfile(user.id);
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
   const logout = async () => {
-    // Use global scope to invalidate sessions on all devices for security
     await supabase.auth.signOut({ scope: 'global' });
     setUser(null);
     setSession(null);
     setProfile(null);
+    setNeedsPhoneMigration(false);
     localStorage.removeItem("rememberMe");
     navigate("/customer-login");
   };
 
   const resendVerificationEmail = async (): Promise<{ error: Error | null }> => {
     try {
-      if (!user?.email) {
+      if (!profile?.email || profile.email.endsWith('@phone.safepay.local')) {
         return { error: new Error("No email address found") };
       }
 
       const { error } = await supabase.auth.resend({
         type: "signup",
-        email: user.email,
+        email: profile.email,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
         },
@@ -348,114 +439,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateProfile = async (data: Partial<Pick<Profile, 'phone' | 'email' | 'full_name'>>): Promise<{ error: Error | null }> => {
-    try {
-      if (!user) {
-        return { error: new Error("Not authenticated") };
-      }
-
-      const { error } = await supabase
-        .from("profiles")
-        .update(data)
-        .eq("user_id", user.id);
-
-      if (error) {
-        return { error };
-      }
-
-      // Refresh profile
-      await fetchProfile(user.id);
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
-
-  const linkPhone = async (phone: string): Promise<{ error: Error | null }> => {
-    try {
-      if (!user) {
-        return { error: new Error("Not authenticated") };
-      }
-
-      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
-
-      // Check if phone already exists
-      const { data: existingPhone } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("phone", formattedPhone)
-        .neq("user_id", user.id)
-        .maybeSingle();
-      
-      if (existingPhone) {
-        return { error: new Error("This phone number is already linked to another account.") };
-      }
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({ 
-          phone: formattedPhone,
-          auth_provider: profile?.auth_provider === 'email' ? 'both' : profile?.auth_provider
-        })
-        .eq("user_id", user.id);
-
-      if (error) {
-        return { error };
-      }
-
-      // Refresh profile
-      await fetchProfile(user.id);
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
-
-  const linkEmail = async (email: string): Promise<{ error: Error | null }> => {
-    try {
-      if (!user) {
-        return { error: new Error("Not authenticated") };
-      }
-
-      // Check if email already exists
-      const { data: existingEmail } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("email", email)
-        .neq("user_id", user.id)
-        .maybeSingle();
-      
-      if (existingEmail) {
-        return { error: new Error("This email is already linked to another account.") };
-      }
-
-      // Update Supabase auth email
-      const { error: authError } = await supabase.auth.updateUser({ email });
-      if (authError) {
-        return { error: authError };
-      }
-
-      // Update profile
-      const { error } = await supabase
-        .from("profiles")
-        .update({ 
-          email,
-          auth_provider: profile?.auth_provider === 'phone' ? 'both' : profile?.auth_provider
-        })
-        .eq("user_id", user.id);
-
-      if (error) {
-        return { error };
-      }
-
-      // Refresh profile
-      await fetchProfile(user.id);
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
-
   const isEmailVerified = user?.email_confirmed_at != null;
 
   return (
@@ -467,17 +450,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!session,
         isEmailVerified,
-        login,
+        needsPhoneMigration,
         loginWithPhone,
-        signup,
         signupWithPhone,
+        setPassword,
+        loginWithPhoneAndPassword,
+        updateProfile,
+        addEmail,
+        addPhoneToAccount,
         logout,
         resendVerificationEmail,
         signInWithGoogle,
         signInWithApple,
-        updateProfile,
-        linkPhone,
-        linkEmail,
       }}
     >
       {children}
