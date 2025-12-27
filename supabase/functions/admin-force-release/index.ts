@@ -240,7 +240,7 @@ Deno.serve(async (req) => {
       console.log(`Debited ₹${payment.amount} from escrow account`);
     }
 
-    // 4. Credit merchant wallet
+    // 4. Credit merchant wallet using LEDGER-FIRST approach for consistency
     const { data: merchantWallet } = await supabase
       .from("merchant_wallets")
       .select("*")
@@ -248,20 +248,44 @@ Deno.serve(async (req) => {
       .single();
 
     if (merchantWallet) {
-      await supabase
-        .from("merchant_wallets")
-        .update({
-          available_balance: merchantWallet.available_balance + payment.amount,
-          updated_at: now
-        })
-        .eq("id", merchantWallet.id);
-      console.log(`Credited ₹${payment.amount} to merchant wallet`);
-    } else {
-      await supabase.from("merchant_wallets").insert({
+      // Create ledger entry - balance will auto-sync via trigger
+      await supabase.from("merchant_wallet_transactions").insert({
         merchant_id: order.merchant_id,
-        available_balance: payment.amount,
-        currency: "INR"
+        transaction_type: "escrow_release",
+        amount: payment.amount,
+        balance_before: merchantWallet.available_balance,
+        balance_after: merchantWallet.available_balance + payment.amount,
+        status: "success",
+        reference_type: "order",
+        reference_id: order.id,
+        reason: `Admin force release: ${reason}`,
+        created_by: user.id,
       });
+      console.log(`LEDGER: Merchant wallet escrow_release entry: +₹${payment.amount}`);
+    } else {
+      // Create wallet first, then ledger entry
+      const { data: newWallet } = await supabase.from("merchant_wallets").insert({
+        merchant_id: order.merchant_id,
+        available_balance: 0,
+        pending_balance: 0,
+        currency: "INR"
+      }).select().single();
+      
+      if (newWallet) {
+        await supabase.from("merchant_wallet_transactions").insert({
+          merchant_id: order.merchant_id,
+          transaction_type: "escrow_release",
+          amount: payment.amount,
+          balance_before: 0,
+          balance_after: payment.amount,
+          status: "success",
+          reference_type: "order",
+          reference_id: order.id,
+          reason: `Admin force release: ${reason}`,
+          created_by: user.id,
+        });
+      }
+      console.log(`LEDGER: Created merchant wallet and escrow_release entry: +₹${payment.amount}`);
     }
 
     // FIX GAP 3: Log admin financial action with IP address

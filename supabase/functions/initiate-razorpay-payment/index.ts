@@ -78,7 +78,9 @@ serve(async (req) => {
     return json(400, { error: "orderId is required" });
   }
 
-  console.log(`Initiating Razorpay payment for order ${orderId} by user ${user.id}`);
+  // Generate idempotency key for this payment initiation
+  const idempotencyKey = `initiate-${orderId}-${user.id}`;
+  console.log(`Initiating Razorpay payment for order ${orderId} by user ${user.id}, idempotency: ${idempotencyKey}`);
 
   try {
     // 1. Fetch the order and verify ownership
@@ -100,10 +102,40 @@ serve(async (req) => {
       return json(400, { error: `Order already processed with status: ${order.status}` });
     }
 
-    // 3. Check for existing payment with Razorpay order
+    // 3. Verify merchant is active and not banned
+    const { data: merchant, error: merchantError } = await supabase
+      .from("merchants")
+      .select("user_id, status, business_name")
+      .eq("user_id", order.merchant_id)
+      .single();
+
+    if (merchantError || !merchant) {
+      console.error("Merchant not found:", merchantError);
+      return json(400, { error: "Merchant not found" });
+    }
+
+    if (merchant.status !== "active") {
+      console.error("Merchant not active:", merchant.status);
+      return json(400, { error: "Merchant is not available for orders" });
+    }
+
+    // Check if merchant is banned
+    const { data: banRecord } = await supabase
+      .from("user_bans")
+      .select("id")
+      .eq("user_id", order.merchant_id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (banRecord) {
+      console.error("Merchant is banned");
+      return json(400, { error: "Merchant is currently suspended" });
+    }
+
+    // 4. Check for existing payment with Razorpay order
     const { data: existingPayment } = await supabase
       .from("payments")
-      .select("id, razorpay_order_id, gateway_status")
+      .select("id, razorpay_order_id, gateway_status, amount")
       .eq("order_id", orderId)
       .maybeSingle();
 
@@ -111,6 +143,12 @@ serve(async (req) => {
     if (existingPayment?.gateway_status === "verified") {
       console.log(`Payment already verified for order ${orderId}`);
       return json(400, { error: "Payment already completed" });
+    }
+
+    // If payment exists with locked/escrow status, block
+    if (existingPayment?.gateway_status === "locked" || existingPayment?.gateway_status === "escrow") {
+      console.log(`Payment already locked in escrow for order ${orderId}`);
+      return json(400, { error: "Payment already locked in escrow" });
     }
 
     // If payment exists with valid Razorpay order, return existing (idempotent)
@@ -124,6 +162,7 @@ serve(async (req) => {
         orderId: orderId,
         key_id: razorpayKeyId,
         alreadyCreated: true,
+        idempotencyKey
       });
     }
 
