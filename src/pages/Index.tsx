@@ -7,12 +7,16 @@ import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { PageTransition } from "@/components/layout/PageTransition";
 
 export default function Index() {
-  const { isAuthenticated, user, profile, logout, isLoading } = useSupabaseAuth();
+  const { isAuthenticated, user, profile, logout, isLoading, isEmailVerified } = useSupabaseAuth();
   const navigate = useNavigate();
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
-      navigate("/dashboard");
+      if (!isEmailVerified) {
+        navigate("/customer-verify");
+      } else {
+        navigate("/dashboard");
+      }
     } else {
       navigate("/customer-signup");
     }
@@ -35,7 +39,7 @@ export default function Index() {
               ) : isAuthenticated ? (
                 <>
                   <span className="text-sm text-muted-foreground hidden sm:block">
-                    {profile?.full_name || profile?.phone || user?.email}
+                    {profile?.full_name || user?.email}
                   </span>
                   <Button variant="outline" size="sm" onClick={logout} className="border-border">
                     <LogOut className="h-4 w-4 mr-2" />
@@ -88,8 +92,13 @@ export default function Index() {
               <div className="glass-card inline-flex items-center gap-3 px-6 py-3 rounded-full animate-fade-in">
                 <div className="w-3 h-3 bg-success rounded-full animate-pulse" />
                 <span className="text-sm text-muted-foreground">
-                  Logged in as <span className="text-foreground font-medium">{profile?.phone || user?.email}</span>
+                  Logged in as <span className="text-foreground font-medium">{user?.email}</span>
                 </span>
+                {!isEmailVerified && (
+                  <Badge variant="destructive" className="text-xs">
+                    Email not verified
+                  </Badge>
+                )}
               </div>
             )}
           </div>

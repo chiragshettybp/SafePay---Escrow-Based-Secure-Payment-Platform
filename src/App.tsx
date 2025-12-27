@@ -9,7 +9,6 @@ import Index from "./pages/Index";
 import CustomerLogin from "./pages/CustomerLogin";
 import CustomerSignup from "./pages/CustomerSignup";
 import CustomerVerify from "./pages/CustomerVerify";
-import CustomerPhoneMigration from "./pages/CustomerPhoneMigration";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
@@ -214,7 +213,6 @@ const App = () => (
               <Route path="/customer-login" element={<CustomerLogin />} />
               <Route path="/customer-signup" element={<CustomerSignup />} />
               <Route path="/customer-verify" element={<CustomerVerify />} />
-              <Route path="/customer-phone-migration" element={<CustomerPhoneMigration />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/orders" element={<Orders />} />

@@ -78,9 +78,7 @@ export default function Profile() {
                   <h1 className="text-xl font-semibold text-foreground">
                     {profile?.full_name || "User"}
                   </h1>
-                  <p className="text-sm text-muted-foreground">
-                    {profile?.phone || "No phone set"}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{user?.email}</p>
                 </div>
                 <Button
                   onClick={() => navigate("/profile/edit")}
@@ -121,22 +119,18 @@ export default function Profile() {
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-border/50">
                     <div className="flex items-center gap-3">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Phone (Primary)</span>
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Email</span>
                     </div>
-                    <span className="text-sm font-medium">
-                      {profile?.phone || "Not set"}
-                    </span>
+                    <span className="text-sm font-medium">{user?.email}</span>
                   </div>
                   <div className="flex items-center justify-between py-2">
                     <div className="flex items-center gap-3">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Email (Optional)</span>
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Phone</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {profile?.email && !profile.email.endsWith('@phone.safepay.local') 
-                        ? profile.email 
-                        : "Not set"}
+                      {profile?.phone || "Not set"}
                     </span>
                   </div>
                 </>
@@ -259,14 +253,11 @@ export default function Profile() {
               <Button
                 variant="outline"
                 className="w-full justify-between"
-                onClick={() => navigate("/settings/security")}
+                onClick={() => navigate("/reset-password")}
               >
-                <span>Set Password (Optional)</span>
+                <span>Change Password</span>
                 <ChevronRight className="h-4 w-4" />
               </Button>
-              <p className="text-xs text-muted-foreground mt-2">
-                Your account is secured using your phone number. Password is optional for additional security.
-              </p>
             </CardContent>
           </Card>
         </div>
