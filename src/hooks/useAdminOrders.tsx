@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
@@ -58,7 +58,28 @@ export function useAdminOrders() {
   const [totalPages, setTotalPages] = useState(1);
   const pageSize = 20;
 
+  // Guards and refs for preventing race conditions
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isFetchingOrdersRef = useRef(false);
+  const isFetchingStatsRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
   const fetchOrders = useCallback(async () => {
+    // Prevent concurrent fetches
+    if (isFetchingOrdersRef.current) return;
+    isFetchingOrdersRef.current = true;
+
     try {
       setIsLoading(true);
       
@@ -66,7 +87,7 @@ export function useAdminOrders() {
         .from("orders")
         .select("*", { count: "exact" });
 
-      // Apply filters
+      // Apply filters with proper type casting
       if (filters.status) {
         query = query.eq("status", filters.status as "pending" | "in_progress" | "delivered" | "completed" | "disputed" | "refunded" | "cancelled" | "draft" | "escrow_locked");
       }
@@ -115,60 +136,82 @@ export function useAdminOrders() {
       const { data, error, count } = await query;
 
       if (error) throw error;
+      if (!mountedRef.current) return;
 
-      // Enrich orders with additional data
+      // Enrich orders with additional data (with error handling)
       const enrichedOrders: Order[] = await Promise.all(
         (data || []).map(async (order) => {
-          // Get payment status
-          const { data: paymentData } = await supabase
-            .from("payments")
-            .select("status")
-            .eq("order_id", order.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .single();
+          try {
+            // Get payment status
+            const { data: paymentData } = await supabase
+              .from("payments")
+              .select("status")
+              .eq("order_id", order.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-          // Get shipment status
-          const { data: trackingData } = await supabase
-            .from("tracking")
-            .select("status")
-            .eq("order_id", order.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .single();
+            // Get shipment status
+            const { data: trackingData } = await supabase
+              .from("tracking")
+              .select("status")
+              .eq("order_id", order.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-          // Get customer name
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("user_id", order.customer_id)
-            .single();
+            // Get customer name
+            const { data: profileData } = await supabase
+              .from("profiles")
+              .select("full_name")
+              .eq("user_id", order.customer_id)
+              .maybeSingle();
 
-          return {
-            ...order,
-            customer_name: profileData?.full_name || "Unknown",
-            merchant_business_name: order.merchant_name,
-            payment_status: paymentData?.status || "pending",
-            shipment_status: trackingData?.status || "not_shipped",
-          };
+            return {
+              ...order,
+              customer_name: profileData?.full_name || "Unknown",
+              merchant_business_name: order.merchant_name,
+              payment_status: paymentData?.status || "pending",
+              shipment_status: trackingData?.status || "not_shipped",
+            };
+          } catch (enrichError) {
+            console.error(`Error enriching order ${order.id}:`, enrichError);
+            return {
+              ...order,
+              customer_name: "Unknown",
+              merchant_business_name: order.merchant_name,
+              payment_status: "pending",
+              shipment_status: "not_shipped",
+            };
+          }
         })
       );
 
+      if (!mountedRef.current) return;
       setOrders(enrichedOrders);
       setTotalPages(Math.ceil((count || 0) / pageSize));
     } catch (error) {
       console.error("Error fetching orders:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load orders",
-        variant: "destructive",
-      });
+      if (mountedRef.current) {
+        toast({
+          title: "Error",
+          description: "Failed to load orders",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
+      isFetchingOrdersRef.current = false;
     }
   }, [filters, sortBy, page, toast]);
 
   const fetchStats = useCallback(async () => {
+    // Prevent concurrent fetches
+    if (isFetchingStatsRef.current) return;
+    isFetchingStatsRef.current = true;
+
     try {
       const [total, pending, inProgress, delivered, completed, disputed, refunded, cancelled] = await Promise.all([
         supabase.from("orders").select("id", { count: "exact", head: true }),
@@ -180,6 +223,8 @@ export function useAdminOrders() {
         supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "refunded"),
         supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "cancelled"),
       ]);
+
+      if (!mountedRef.current) return;
 
       setStats({
         total: total.count || 0,
@@ -193,6 +238,8 @@ export function useAdminOrders() {
       });
     } catch (error) {
       console.error("Error fetching stats:", error);
+    } finally {
+      isFetchingStatsRef.current = false;
     }
   }, []);
 
@@ -201,7 +248,20 @@ export function useAdminOrders() {
     fetchStats();
   }, [fetchOrders, fetchStats]);
 
-  // Real-time subscriptions
+  // Debounced refetch function
+  const debouncedRefetch = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) {
+        fetchOrders();
+        fetchStats();
+      }
+    }, 1000);
+  }, [fetchOrders, fetchStats]);
+
+  // Real-time subscriptions with debouncing
   useEffect(() => {
     const ordersChannel = supabase
       .channel("admin-orders-list")
@@ -209,8 +269,7 @@ export function useAdminOrders() {
         "postgres_changes",
         { event: "*", schema: "public", table: "orders" },
         () => {
-          fetchOrders();
-          fetchStats();
+          debouncedRefetch();
         }
       )
       .subscribe();
@@ -221,7 +280,7 @@ export function useAdminOrders() {
         "postgres_changes",
         { event: "*", schema: "public", table: "payments" },
         () => {
-          fetchOrders();
+          debouncedRefetch();
         }
       )
       .subscribe();
@@ -232,7 +291,7 @@ export function useAdminOrders() {
         "postgres_changes",
         { event: "*", schema: "public", table: "tracking" },
         () => {
-          fetchOrders();
+          debouncedRefetch();
         }
       )
       .subscribe();
@@ -242,7 +301,7 @@ export function useAdminOrders() {
       supabase.removeChannel(paymentsChannel);
       supabase.removeChannel(trackingChannel);
     };
-  }, [fetchOrders, fetchStats]);
+  }, [debouncedRefetch]);
 
   return {
     isLoading,
@@ -268,8 +327,29 @@ export function useAdminOrderDetails(orderId: string) {
   const [tracking, setTracking] = useState<Tracking | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Guards and refs
+  const isFetchingRef = useRef(false);
+  const isSubmittingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
   const fetchOrderDetails = useCallback(async () => {
     if (!orderId) return;
+    
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
 
     try {
       setIsLoading(true);
@@ -282,13 +362,14 @@ export function useAdminOrderDetails(orderId: string) {
         .single();
 
       if (orderError) throw orderError;
+      if (!mountedRef.current) return;
 
       // Fetch customer profile
       const { data: profileData } = await supabase
         .from("profiles")
         .select("full_name")
         .eq("user_id", orderData.customer_id)
-        .single();
+        .maybeSingle();
 
       // Fetch payment status
       const { data: paymentData } = await supabase
@@ -297,7 +378,7 @@ export function useAdminOrderDetails(orderId: string) {
         .eq("order_id", orderId)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       // Fetch shipment status
       const { data: trackingData } = await supabase
@@ -306,7 +387,9 @@ export function useAdminOrderDetails(orderId: string) {
         .eq("order_id", orderId)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
+
+      if (!mountedRef.current) return;
 
       setOrder({
         ...orderData,
@@ -324,6 +407,7 @@ export function useAdminOrderDetails(orderId: string) {
         .eq("order_id", orderId)
         .order("created_at", { ascending: false });
 
+      if (!mountedRef.current) return;
       setEvents(eventsData || []);
 
       // Fetch payments
@@ -333,16 +417,22 @@ export function useAdminOrderDetails(orderId: string) {
         .eq("order_id", orderId)
         .order("created_at", { ascending: false });
 
+      if (!mountedRef.current) return;
       setPayments(paymentsData || []);
     } catch (error) {
       console.error("Error fetching order details:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load order details",
-        variant: "destructive",
-      });
+      if (mountedRef.current) {
+        toast({
+          title: "Error",
+          description: "Failed to load order details",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
+      isFetchingRef.current = false;
     }
   }, [orderId, toast]);
 
@@ -350,7 +440,19 @@ export function useAdminOrderDetails(orderId: string) {
     fetchOrderDetails();
   }, [fetchOrderDetails]);
 
-  // Real-time subscriptions
+  // Debounced refetch
+  const debouncedRefetch = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) {
+        fetchOrderDetails();
+      }
+    }, 1000);
+  }, [fetchOrderDetails]);
+
+  // Real-time subscriptions with debouncing
   useEffect(() => {
     if (!orderId) return;
 
@@ -360,7 +462,7 @@ export function useAdminOrderDetails(orderId: string) {
         "postgres_changes",
         { event: "*", schema: "public", table: "orders", filter: `id=eq.${orderId}` },
         () => {
-          fetchOrderDetails();
+          debouncedRefetch();
         }
       )
       .subscribe();
@@ -371,7 +473,7 @@ export function useAdminOrderDetails(orderId: string) {
         "postgres_changes",
         { event: "*", schema: "public", table: "order_events", filter: `order_id=eq.${orderId}` },
         () => {
-          fetchOrderDetails();
+          debouncedRefetch();
         }
       )
       .subscribe();
@@ -380,13 +482,27 @@ export function useAdminOrderDetails(orderId: string) {
       supabase.removeChannel(orderChannel);
       supabase.removeChannel(eventsChannel);
     };
-  }, [orderId, fetchOrderDetails]);
+  }, [orderId, debouncedRefetch]);
 
   const updateOrderStatus = async (newStatus: string, reason?: string) => {
     if (!order) return;
+    
+    // Prevent concurrent submissions
+    if (isSubmittingRef.current) {
+      toast({
+        title: "Please wait",
+        description: "An action is already in progress",
+      });
+      return;
+    }
+    
+    isSubmittingRef.current = true;
 
     try {
       setIsSubmitting(true);
+
+      // Generate idempotency key
+      const idempotencyKey = `admin-order-${orderId}-${newStatus}-${Date.now()}`;
 
       const response = await supabase.functions.invoke("admin-order-action", {
         body: {
@@ -394,31 +510,42 @@ export function useAdminOrderDetails(orderId: string) {
           action: "update_status",
           newStatus,
           reason,
+          idempotencyKey,
         },
       });
 
       if (response.error) throw response.error;
 
-      toast({
-        title: "Success",
-        description: `Order status updated to ${newStatus}`,
-      });
+      if (mountedRef.current) {
+        toast({
+          title: "Success",
+          description: `Order status updated to ${newStatus}`,
+        });
 
-      await fetchOrderDetails();
+        await fetchOrderDetails();
+      }
     } catch (error) {
       console.error("Error updating order status:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update order status",
-        variant: "destructive",
-      });
+      if (mountedRef.current) {
+        toast({
+          title: "Error",
+          description: "Failed to update order status",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setIsSubmitting(false);
+      if (mountedRef.current) {
+        setIsSubmitting(false);
+      }
+      isSubmittingRef.current = false;
     }
   };
 
   const addAdminNote = async (note: string) => {
     if (!order) return;
+    
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     try {
       setIsSubmitting(true);
@@ -433,26 +560,36 @@ export function useAdminOrderDetails(orderId: string) {
 
       if (response.error) throw response.error;
 
-      toast({
-        title: "Success",
-        description: "Note added successfully",
-      });
+      if (mountedRef.current) {
+        toast({
+          title: "Success",
+          description: "Note added successfully",
+        });
 
-      await fetchOrderDetails();
+        await fetchOrderDetails();
+      }
     } catch (error) {
       console.error("Error adding note:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add note",
-        variant: "destructive",
-      });
+      if (mountedRef.current) {
+        toast({
+          title: "Error",
+          description: "Failed to add note",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setIsSubmitting(false);
+      if (mountedRef.current) {
+        setIsSubmitting(false);
+      }
+      isSubmittingRef.current = false;
     }
   };
 
   const cancelOrder = async (reason: string) => {
     if (!order) return;
+    
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     try {
       setIsSubmitting(true);
@@ -467,21 +604,28 @@ export function useAdminOrderDetails(orderId: string) {
 
       if (response.error) throw response.error;
 
-      toast({
-        title: "Success",
-        description: "Order cancelled successfully",
-      });
+      if (mountedRef.current) {
+        toast({
+          title: "Success",
+          description: "Order cancelled successfully",
+        });
 
-      await fetchOrderDetails();
+        await fetchOrderDetails();
+      }
     } catch (error) {
       console.error("Error cancelling order:", error);
-      toast({
-        title: "Error",
-        description: "Failed to cancel order",
-        variant: "destructive",
-      });
+      if (mountedRef.current) {
+        toast({
+          title: "Error",
+          description: "Failed to cancel order",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setIsSubmitting(false);
+      if (mountedRef.current) {
+        setIsSubmitting(false);
+      }
+      isSubmittingRef.current = false;
     }
   };
 
@@ -498,5 +642,3 @@ export function useAdminOrderDetails(orderId: string) {
     refetch: fetchOrderDetails,
   };
 }
-
-export default useAdminOrders;

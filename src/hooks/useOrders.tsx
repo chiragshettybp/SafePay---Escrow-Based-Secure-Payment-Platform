@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
@@ -32,6 +32,22 @@ export interface OrderMetrics {
 export function useOrders(statusFilter?: OrderStatus | null) {
   const { user } = useSupabaseAuth();
   const queryClient = useQueryClient();
+  
+  // Debounce realtime updates to prevent storms
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isConfirmingRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const { data: orders, isLoading, error, refetch } = useQuery({
     queryKey: ['orders', user?.id, statusFilter],
@@ -54,6 +70,9 @@ export function useOrders(statusFilter?: OrderStatus | null) {
       return data as Order[];
     },
     enabled: !!user?.id,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    staleTime: 30000, // Consider data fresh for 30 seconds
   });
 
   const { data: metrics } = useQuery({
@@ -70,7 +89,7 @@ export function useOrders(statusFilter?: OrderStatus | null) {
 
       const metricsData: OrderMetrics = {
         total: data.length,
-        pending: data.filter(o => o.status === 'pending' || o.status === 'in_progress').length,
+        pending: data.filter(o => o.status === 'pending' || o.status === 'in_progress' || o.status === 'escrow_locked').length,
         completed: data.filter(o => o.status === 'completed').length,
         refunded: data.filter(o => o.status === 'refunded').length,
       };
@@ -78,31 +97,50 @@ export function useOrders(statusFilter?: OrderStatus | null) {
       return metricsData;
     },
     enabled: !!user?.id,
+    retry: 2,
+    staleTime: 30000,
   });
 
   // Confirm delivery mutation - releases escrow to merchant
   const confirmDelivery = useMutation({
     mutationFn: async (orderId: string) => {
       if (!user?.id) throw new Error("Not authenticated");
-
-      // Call the release-escrow edge function
-      const { data, error } = await supabase.functions.invoke('release-escrow', {
-        body: {
-          orderId,
-          reason: 'delivery_confirmed'
-        }
-      });
-
-      if (error) throw error;
       
-      // Check if the response indicates an error
-      if (data?.error) {
-        throw new Error(data.error);
+      // Prevent double execution
+      if (isConfirmingRef.current) {
+        throw new Error("A confirmation is already in progress");
       }
+      
+      isConfirmingRef.current = true;
 
-      return data;
+      try {
+        // Generate idempotency key
+        const idempotencyKey = `confirm-${orderId}-${user.id}-${Date.now()}`;
+
+        // Call the release-escrow edge function
+        const { data, error } = await supabase.functions.invoke('release-escrow', {
+          body: {
+            orderId,
+            reason: 'delivery_confirmed',
+            idempotencyKey
+          }
+        });
+
+        if (error) throw error;
+        
+        // Check if the response indicates an error
+        if (data?.error) {
+          throw new Error(data.error);
+        }
+
+        return data;
+      } finally {
+        isConfirmingRef.current = false;
+      }
     },
     onSuccess: (data) => {
+      if (!mountedRef.current) return;
+      
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['order-metrics'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
@@ -120,6 +158,8 @@ export function useOrders(statusFilter?: OrderStatus | null) {
       }
     },
     onError: (error: Error) => {
+      if (!mountedRef.current) return;
+      
       toast({
         title: "Error",
         description: error.message || "Failed to confirm delivery. Please try again.",
@@ -147,14 +187,16 @@ export function useOrders(statusFilter?: OrderStatus | null) {
       }
 
       // Only allow disputes on orders that are in escrow or delivered
-      const disputeableStatuses = ['escrow_locked', 'in_progress', 'delivered'];
-      if (!disputeableStatuses.includes(order.status)) {
+      const disputeableStatuses: OrderStatus[] = ['escrow_locked', 'in_progress', 'delivered'];
+      if (!disputeableStatuses.includes(order.status as OrderStatus)) {
         throw new Error(`Cannot dispute an order with status: ${order.status}`);
       }
 
       return { orderId, shouldNavigate: true };
     },
-    onSuccess: ({ orderId }) => {
+    onSuccess: () => {
+      if (!mountedRef.current) return;
+      
       // Navigate to dispute creation page instead of directly updating status
       // The dispute creation will handle the status update server-side
       toast({
@@ -164,6 +206,8 @@ export function useOrders(statusFilter?: OrderStatus | null) {
       // Note: Navigation should be handled by the calling component
     },
     onError: (error: Error) => {
+      if (!mountedRef.current) return;
+      
       toast({
         title: "Error",
         description: error.message || "Failed to initiate dispute. Please try again.",
@@ -172,7 +216,20 @@ export function useOrders(statusFilter?: OrderStatus | null) {
     },
   });
 
-  // Real-time subscription
+  // Debounced refetch function
+  const debouncedRefetch = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) {
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        queryClient.invalidateQueries({ queryKey: ['order-metrics'] });
+      }
+    }, 1000);
+  }, [queryClient]);
+
+  // Real-time subscription with debouncing
   useEffect(() => {
     if (!user?.id) return;
 
@@ -188,10 +245,9 @@ export function useOrders(statusFilter?: OrderStatus | null) {
         },
         (payload) => {
           console.log('Order update received:', payload);
-          queryClient.invalidateQueries({ queryKey: ['orders'] });
-          queryClient.invalidateQueries({ queryKey: ['order-metrics'] });
+          debouncedRefetch();
           
-          if (payload.eventType === 'UPDATE') {
+          if (payload.eventType === 'UPDATE' && mountedRef.current) {
             const newOrder = payload.new as Order;
             toast({
               title: "Order Updated",
@@ -205,7 +261,7 @@ export function useOrders(statusFilter?: OrderStatus | null) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, queryClient]);
+  }, [user?.id, debouncedRefetch]);
 
   return {
     orders: orders || [],
@@ -226,6 +282,8 @@ export function useOrder(orderId: string) {
   return useQuery({
     queryKey: ['order', orderId],
     queryFn: async () => {
+      if (!orderId) return null;
+      
       const { data, error } = await supabase
         .from('orders')
         .select('*')
@@ -237,5 +295,7 @@ export function useOrder(orderId: string) {
       return data as Order | null;
     },
     enabled: !!user?.id && !!orderId,
+    retry: 2,
+    staleTime: 30000,
   });
 }

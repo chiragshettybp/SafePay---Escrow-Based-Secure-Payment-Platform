@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { merchantSupabase } from "@/integrations/supabase/merchantClient";
 import { useMerchantAuth } from "./useMerchantAuth";
 import { toast } from "sonner";
@@ -36,6 +36,22 @@ export interface MerchantMetrics {
 export function useMerchantOrders(statusFilter?: OrderStatus | null) {
   const { merchant } = useMerchantAuth();
   const queryClient = useQueryClient();
+  
+  // Debounce and guard refs
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isUpdatingRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // Fetch merchant orders
   const {
@@ -63,6 +79,9 @@ export function useMerchantOrders(statusFilter?: OrderStatus | null) {
       return data as MerchantOrder[];
     },
     enabled: !!merchant?.user_id,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    staleTime: 30000,
   });
 
   // Fetch merchant metrics
@@ -117,9 +136,24 @@ export function useMerchantOrders(statusFilter?: OrderStatus | null) {
       };
     },
     enabled: !!merchant?.user_id,
+    retry: 2,
+    staleTime: 30000,
   });
 
-  // Update shipment status mutation
+  // Valid status transitions for merchants
+  const validStatusTransitions: Record<OrderStatus, OrderStatus[]> = {
+    draft: [],
+    pending: ['in_progress'],
+    escrow_locked: ['in_progress'],
+    in_progress: ['delivered'],
+    delivered: [], // Only customer can confirm (to completed)
+    completed: [],
+    disputed: [],
+    refunded: [],
+    cancelled: [],
+  };
+
+  // Update shipment status mutation with validation
   const updateShipmentMutation = useMutation({
     mutationFn: async ({
       orderId,
@@ -128,29 +162,114 @@ export function useMerchantOrders(statusFilter?: OrderStatus | null) {
       orderId: string;
       status: OrderStatus;
     }) => {
-      const { error } = await merchantSupabase
-        .from("orders")
-        .update({
-          status,
-          delivered_at: status === "delivered" ? new Date().toISOString() : null,
-        })
-        .eq("id", orderId)
-        .eq("merchant_id", merchant?.user_id);
+      if (!merchant?.user_id) throw new Error("Not authenticated");
+      
+      // Prevent concurrent updates
+      if (isUpdatingRef.current) {
+        throw new Error("An update is already in progress");
+      }
+      
+      isUpdatingRef.current = true;
 
-      if (error) throw error;
+      try {
+        // First, fetch current order to validate transition
+        const { data: currentOrder, error: fetchError } = await merchantSupabase
+          .from("orders")
+          .select("id, status, merchant_id")
+          .eq("id", orderId)
+          .eq("merchant_id", merchant.user_id)
+          .single();
+
+        if (fetchError || !currentOrder) {
+          throw new Error("Order not found or access denied");
+        }
+
+        // Validate status transition
+        const currentStatus = currentOrder.status as OrderStatus;
+        const allowedTransitions = validStatusTransitions[currentStatus] || [];
+        
+        if (!allowedTransitions.includes(status)) {
+          throw new Error(`Invalid status transition from ${currentStatus} to ${status}`);
+        }
+
+        // Generate idempotency metadata
+        const updateMetadata = {
+          previous_status: currentStatus,
+          new_status: status,
+          updated_by: merchant.user_id,
+          timestamp: new Date().toISOString()
+        };
+
+        const updateData: Record<string, unknown> = {
+          status,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (status === "delivered") {
+          updateData.delivered_at = new Date().toISOString();
+        }
+
+        // Atomic update with status check (optimistic locking)
+        const { error, data } = await merchantSupabase
+          .from("orders")
+          .update(updateData)
+          .eq("id", orderId)
+          .eq("merchant_id", merchant.user_id)
+          .eq("status", currentStatus) // Ensure no race condition
+          .select()
+          .single();
+
+        if (error) {
+          // Check if it was a race condition
+          if (error.code === 'PGRST116') {
+            throw new Error("Order status has changed. Please refresh and try again.");
+          }
+          throw error;
+        }
+
+        // Create order event for audit trail
+        await merchantSupabase.from("order_events").insert({
+          order_id: orderId,
+          event_type: "merchant_status_update",
+          title: `Status updated to ${status}`,
+          description: `Merchant updated order status from ${currentStatus} to ${status}`,
+          metadata: updateMetadata,
+        });
+
+        return data;
+      } finally {
+        isUpdatingRef.current = false;
+      }
     },
     onSuccess: () => {
+      if (!mountedRef.current) return;
+      
       queryClient.invalidateQueries({ queryKey: ["merchantOrders"] });
       queryClient.invalidateQueries({ queryKey: ["merchantMetrics"] });
       toast.success("Order status updated successfully");
     },
-    onError: (error) => {
-      toast.error("Failed to update order status");
+    onError: (error: Error) => {
+      if (!mountedRef.current) return;
+      
+      toast.error(error.message || "Failed to update order status");
       console.error(error);
     },
   });
 
-  // Real-time subscription
+  // Debounced refetch function
+  const debouncedRefetch = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) {
+        queryClient.invalidateQueries({ queryKey: ["merchantOrders"] });
+        queryClient.invalidateQueries({ queryKey: ["merchantMetrics"] });
+      }
+    }, 1000);
+  }, [queryClient]);
+
+  // Real-time subscription with debouncing
   useEffect(() => {
     if (!merchant?.user_id) return;
 
@@ -165,8 +284,7 @@ export function useMerchantOrders(statusFilter?: OrderStatus | null) {
           filter: `merchant_id=eq.${merchant.user_id}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["merchantOrders"] });
-          queryClient.invalidateQueries({ queryKey: ["merchantMetrics"] });
+          debouncedRefetch();
         }
       )
       .subscribe();
@@ -174,7 +292,7 @@ export function useMerchantOrders(statusFilter?: OrderStatus | null) {
     return () => {
       merchantSupabase.removeChannel(channel);
     };
-  }, [merchant?.user_id, queryClient]);
+  }, [merchant?.user_id, debouncedRefetch]);
 
   return {
     orders,
