@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     // Get checkout session with merchant info
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('checkout_sessions')
-      .select('*, merchants(business_name)')
+      .select('*, merchants(id, user_id, business_name)')
       .eq('id', session_id)
       .single()
 
@@ -43,6 +43,11 @@ Deno.serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    // Get the merchant's user_id (auth UUID) - orders should be linked to user_id, not merchants table ID
+    const merchantData = session.merchants as { id: string; user_id: string; business_name: string } | null
+    const merchantUserId = merchantData?.user_id || session.merchant_id
+    const merchantBusinessName = merchantData?.business_name || 'Merchant'
 
     console.log('Session found:', { 
       id: session.id, 
@@ -254,7 +259,7 @@ Deno.serve(async (req) => {
 
     console.log('Creating order:', { 
       customer_id: effectiveCustomerId, 
-      merchant_id: session.merchant_id,
+      merchant_id: merchantUserId,
       amount: session.final_amount,
       status: orderStatus
     })
@@ -263,8 +268,8 @@ Deno.serve(async (req) => {
       .from('orders')
       .insert({
         customer_id: effectiveCustomerId,
-        merchant_id: session.merchant_id,
-        merchant_name: (session.merchants as any)?.business_name || 'Merchant',
+        merchant_id: merchantUserId,
+        merchant_name: merchantBusinessName,
         product_name: cartData[0]?.product_name || 'Order',
         product_description: cartData.map((i: any) => `${i.product_name} x${i.quantity}`).join(', '),
         amount: session.final_amount,
