@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Eye, EyeOff, Shield, Mail, Phone } from "lucide-react";
+import { Loader2, Eye, EyeOff, Shield } from "lucide-react";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -19,33 +19,24 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { PageTransition } from "@/components/layout/PageTransition";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const emailFormSchema = z.object({
+const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
   rememberMe: z.boolean().default(false),
 });
 
-const phoneFormSchema = z.object({
-  phone: z.string().min(10, { message: "Please enter a valid phone number" }).max(15),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
-  rememberMe: z.boolean().default(false),
-});
-
-type EmailFormValues = z.infer<typeof emailFormSchema>;
-type PhoneFormValues = z.infer<typeof phoneFormSchema>;
+type FormValues = z.infer<typeof formSchema>;
 
 const CustomerLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
-  const { login, loginWithPhone, signInWithGoogle, signInWithApple } = useSupabaseAuth();
+  const { login, signInWithGoogle, signInWithApple } = useSupabaseAuth();
   const navigate = useNavigate();
 
-  const emailForm = useForm<EmailFormValues>({
-    resolver: zodResolver(emailFormSchema),
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       email: "",
       password: "",
@@ -53,19 +44,9 @@ const CustomerLogin = () => {
     },
   });
 
-  const phoneForm = useForm<PhoneFormValues>({
-    resolver: zodResolver(phoneFormSchema),
-    defaultValues: {
-      phone: "",
-      password: "",
-      rememberMe: localStorage.getItem("rememberMe") === "true",
-    },
-  });
+  const isFormValid = form.formState.isValid;
 
-  const isEmailFormValid = emailForm.formState.isValid;
-  const isPhoneFormValid = phoneForm.formState.isValid;
-
-  async function onEmailSubmit(data: EmailFormValues) {
+  async function onSubmit(data: FormValues) {
     if (isLoading) return;
     
     setIsLoading(true);
@@ -96,38 +77,12 @@ const CustomerLogin = () => {
     setIsLoading(false);
   }
 
-  async function onPhoneSubmit(data: PhoneFormValues) {
-    if (isLoading) return;
-    
-    setIsLoading(true);
-    setError(null);
-
-    const { error: loginError } = await loginWithPhone(data.phone, data.password, data.rememberMe);
-
-    if (loginError) {
-      setError(getErrorMessage(loginError.message));
-      setIsLoading(false);
-      return;
-    }
-
-    toast({
-      title: "Welcome back!",
-      description: "You have successfully logged in.",
-    });
-
-    navigate("/dashboard");
-    setIsLoading(false);
-  }
-
   const getErrorMessage = (message: string): string => {
     if (message.includes("Invalid login credentials")) {
-      return "Invalid credentials. Please try again.";
+      return "Invalid email or password. Please try again.";
     }
     if (message.includes("Email not confirmed")) {
       return "Please verify your email address before logging in.";
-    }
-    if (message.includes("No account found")) {
-      return "No account found with this phone number. Please sign up first.";
     }
     return message;
   };
@@ -164,20 +119,6 @@ const CustomerLogin = () => {
               </p>
             </div>
 
-            {/* Auth Method Toggle */}
-            <Tabs value={authMethod} onValueChange={(v) => setAuthMethod(v as 'email' | 'phone')} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="email" className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  Email
-                </TabsTrigger>
-                <TabsTrigger value="phone" className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  Phone
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
             {/* Error Alert */}
             {error && (
               <Alert variant="destructive" className="animate-fade-in">
@@ -185,215 +126,105 @@ const CustomerLogin = () => {
               </Alert>
             )}
 
-            {/* Email Login Form */}
-            {authMethod === 'email' && (
-              <Form {...emailForm}>
-                <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-5">
-                  <FormField
-                    control={emailForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-foreground">Email</FormLabel>
-                        <FormControl>
+            {/* Login Form */}
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-foreground">Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="you@example.com"
+                          {...field}
+                          type="email"
+                          autoComplete="email"
+                          className="h-12 bg-card border-border focus:border-primary transition-colors"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
+                        <FormLabel className="text-foreground">Password</FormLabel>
+                        <Link
+                          to="/reset-password"
+                          className="text-xs text-primary hover:text-primary/80 transition-colors"
+                        >
+                          Forgot password?
+                        </Link>
+                      </div>
+                      <FormControl>
+                        <div className="relative">
                           <Input
-                            placeholder="you@example.com"
+                            placeholder="••••••••"
                             {...field}
-                            type="email"
-                            autoComplete="email"
-                            className="h-12 bg-card border-border focus:border-primary transition-colors"
+                            type={showPassword ? "text" : "password"}
+                            autoComplete="current-password"
+                            className="h-12 bg-card border-border focus:border-primary transition-colors pr-12"
                           />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={emailForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                          <FormLabel className="text-foreground">Password</FormLabel>
-                          <Link
-                            to="/reset-password"
-                            className="text-xs text-primary hover:text-primary/80 transition-colors"
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                           >
-                            Forgot password?
-                          </Link>
+                            {showPassword ? (
+                              <EyeOff className="h-5 w-5" />
+                            ) : (
+                              <Eye className="h-5 w-5" />
+                            )}
+                          </button>
                         </div>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              placeholder="••••••••"
-                              {...field}
-                              type={showPassword ? "text" : "password"}
-                              autoComplete="current-password"
-                              className="h-12 bg-card border-border focus:border-primary transition-colors pr-12"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              {showPassword ? (
-                                <EyeOff className="h-5 w-5" />
-                              ) : (
-                                <Eye className="h-5 w-5" />
-                              )}
-                            </button>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                  <FormField
-                    control={emailForm.control}
-                    name="rememberMe"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            className="border-border data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                          />
-                        </FormControl>
-                        <FormLabel className="text-sm font-normal text-muted-foreground cursor-pointer">
-                          Remember me
-                        </FormLabel>
-                      </FormItem>
-                    )}
-                  />
+                <FormField
+                  control={form.control}
+                  name="rememberMe"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          className="border-border data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm font-normal text-muted-foreground cursor-pointer">
+                        Remember me
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
 
-                  <Button
-                    type="submit"
-                    className="w-full h-12 text-base font-medium"
-                    disabled={isLoading || !isEmailFormValid}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Signing in...
-                      </>
-                    ) : (
-                      "Sign In"
-                    )}
-                  </Button>
-                </form>
-              </Form>
-            )}
-
-            {/* Phone Login Form */}
-            {authMethod === 'phone' && (
-              <Form {...phoneForm}>
-                <form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-5">
-                  <FormField
-                    control={phoneForm.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-foreground">Phone Number</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                              +91
-                            </span>
-                            <Input
-                              placeholder="9876543210"
-                              {...field}
-                              type="tel"
-                              inputMode="numeric"
-                              autoComplete="tel"
-                              className="h-12 bg-card border-border focus:border-primary transition-colors pl-12"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={phoneForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex items-center justify-between">
-                          <FormLabel className="text-foreground">Password</FormLabel>
-                          <Link
-                            to="/reset-password"
-                            className="text-xs text-primary hover:text-primary/80 transition-colors"
-                          >
-                            Forgot password?
-                          </Link>
-                        </div>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              placeholder="••••••••"
-                              {...field}
-                              type={showPassword ? "text" : "password"}
-                              autoComplete="current-password"
-                              className="h-12 bg-card border-border focus:border-primary transition-colors pr-12"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              {showPassword ? (
-                                <EyeOff className="h-5 w-5" />
-                              ) : (
-                                <Eye className="h-5 w-5" />
-                              )}
-                            </button>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={phoneForm.control}
-                    name="rememberMe"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            className="border-border data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                          />
-                        </FormControl>
-                        <FormLabel className="text-sm font-normal text-muted-foreground cursor-pointer">
-                          Remember me
-                        </FormLabel>
-                      </FormItem>
-                    )}
-                  />
-
-                  <Button
-                    type="submit"
-                    className="w-full h-12 text-base font-medium"
-                    disabled={isLoading || !isPhoneFormValid}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Signing in...
-                      </>
-                    ) : (
-                      "Sign In"
-                    )}
-                  </Button>
-                </form>
-              </Form>
-            )}
+                <Button
+                  type="submit"
+                  className="w-full h-12 text-base font-medium"
+                  disabled={isLoading || !isFormValid}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    "Sign In"
+                  )}
+                </Button>
+              </form>
+            </Form>
 
             {/* Divider */}
             <div className="relative">
@@ -453,9 +284,9 @@ const CustomerLogin = () => {
               Don't have an account?{" "}
               <Link
                 to="/customer-signup"
-                className="font-medium text-primary hover:text-primary/80 transition-colors"
+                className="text-primary font-medium hover:text-primary/80 transition-colors"
               >
-                Create account
+                Sign up
               </Link>
             </p>
           </div>
