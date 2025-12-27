@@ -17,7 +17,17 @@ export default function PublicPaymentLinkCheckout() {
   const [showDetails, setShowDetails] = useState(true);
 
   const handleProceed = async () => {
-    if (!paymentLink || !merchant) return;
+    // Prevent double-click
+    if (isCreatingSession) return;
+    
+    if (!paymentLink || !merchant) {
+      toast({
+        title: "Error",
+        description: "Payment link data not loaded. Please refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     // Validate merchant slug matches
     if (merchant.slug !== merchantSlug) {
@@ -49,9 +59,22 @@ export default function PublicPaymentLinkCheckout() {
       return;
     }
 
+    // Validate amount is positive
+    if (!paymentLink.amount || paymentLink.amount <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "This payment link has an invalid amount.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsCreatingSession(true);
       setShowDetails(false);
+
+      // Generate idempotency key to prevent duplicate sessions on retry
+      const idempotencyKey = `session_${paymentLink.id}_${Date.now()}`;
 
       // Create checkout session with payment link data
       // Server-side trigger will validate the payment link
@@ -77,6 +100,7 @@ export default function PublicPaymentLinkCheckout() {
             payment_link_code: paymentLink.link_code,
             success_redirect: paymentLink.success_redirect_url,
             cancel_redirect: paymentLink.cancel_redirect_url,
+            idempotency_key: idempotencyKey,
           },
         })
         .select()
@@ -98,11 +122,20 @@ export default function PublicPaymentLinkCheckout() {
             variant: "destructive",
           });
         } else {
-          throw sessionError;
+          console.error("Session creation error:", sessionError);
+          toast({
+            title: "Error",
+            description: "Failed to start checkout. Please try again.",
+            variant: "destructive",
+          });
         }
         setIsCreatingSession(false);
         setShowDetails(true);
         return;
+      }
+
+      if (!session?.id) {
+        throw new Error("No session ID returned");
       }
 
       // Redirect to checkout

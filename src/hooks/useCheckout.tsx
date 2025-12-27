@@ -466,12 +466,16 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
         throw new Error('Payment method required');
       }
 
+      // Generate idempotency key to prevent double-submission
+      const idempotencyKey = `checkout_${sessionId}_${Date.now()}`;
+
       // Call edge function to complete checkout (uses service role to bypass RLS)
       const { data: result, error: invokeError } = await supabase.functions.invoke(
         'complete-checkout',
         {
           body: {
             session_id: sessionId,
+            idempotency_key: idempotencyKey,
           },
         }
       );
