@@ -3606,31 +3606,43 @@ export type Database = {
       profiles: {
         Row: {
           account_status: string
+          auth_provider: string | null
           avatar_url: string | null
           created_at: string
+          email: string | null
+          email_verified: boolean | null
           full_name: string | null
           id: string
           phone: string | null
+          phone_verified: boolean | null
           updated_at: string
           user_id: string
         }
         Insert: {
           account_status?: string
+          auth_provider?: string | null
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
+          email_verified?: boolean | null
           full_name?: string | null
           id?: string
           phone?: string | null
+          phone_verified?: boolean | null
           updated_at?: string
           user_id: string
         }
         Update: {
           account_status?: string
+          auth_provider?: string | null
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
+          email_verified?: boolean | null
           full_name?: string | null
           id?: string
           phone?: string | null
+          phone_verified?: boolean | null
           updated_at?: string
           user_id?: string
         }
