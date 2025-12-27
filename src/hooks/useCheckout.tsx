@@ -429,12 +429,12 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
     },
   });
 
-  // Complete checkout mutation
+  // Complete checkout mutation - uses edge function to bypass RLS for guest checkout
   const completeCheckout = useMutation({
     mutationFn: async (data?: { order_id?: string; payment_id?: string }) => {
       if (!sessionId || !session) throw new Error('No session');
 
-      // Phone must be collected (no OTP verification required)
+      // Basic validations
       if (!session.phone_number) {
         throw new Error('Phone number required');
       }
@@ -447,90 +447,30 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
         throw new Error('Payment method required');
       }
 
-      // For online payments, create order in 'pending' status (to avoid draft audit logging issue)
-      // For COD, create order in 'in_progress' status
-      // The order status will be updated to 'in_progress' after successful payment verification
-      const orderStatus = session.selected_payment_method === 'cod' ? 'in_progress' : 'pending';
-
-      // Create order - for payment link flows, user_id should already be set
-      // by the resolve-payment-link-user edge function called during phone collection.
-      // For authenticated users, we use their auth id.
-      const currentUser = (await supabase.auth.getUser()).data.user;
-      let effectiveCustomerId = session.user_id || currentUser?.id;
-      
-      // If still no user_id and this is a payment link flow with phone collected,
-      // call the user resolution endpoint to create/associate the user
-      if (!effectiveCustomerId && session.phone_number && session.payment_link_id) {
-        try {
-          const { data: resolveData, error: resolveError } = await supabase.functions.invoke(
-            'resolve-payment-link-user',
-            {
-              body: {
-                checkout_session_id: sessionId,
-                phone_number: session.phone_number,
-                payment_link_id: session.payment_link_id,
-              },
-            }
-          );
-          
-          if (resolveError) {
-            console.error('User resolution failed:', resolveError);
-          } else if (resolveData?.user_id) {
-            effectiveCustomerId = resolveData.user_id;
-            // Refetch session to get updated user_id
-            await refetchSession();
-          }
-        } catch (err) {
-          console.error('Failed to resolve user:', err);
+      // Call edge function to complete checkout (uses service role to bypass RLS)
+      const { data: result, error: invokeError } = await supabase.functions.invoke(
+        'complete-checkout',
+        {
+          body: {
+            session_id: sessionId,
+          },
         }
+      );
+
+      if (invokeError) {
+        console.error('Checkout invoke error:', invokeError);
+        throw new Error(invokeError.message || 'Failed to complete checkout');
       }
-      
-      // Final check - if we still don't have a customer ID, we can't proceed
-      if (!effectiveCustomerId) {
-        throw new Error('Unable to process checkout. Please try again or contact support.');
+
+      if (result?.error) {
+        throw new Error(result.error);
       }
 
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          customer_id: effectiveCustomerId,
-          merchant_id: session.merchant_id,
-          merchant_name: session.merchants?.business_name || 'Merchant',
-          product_name: session.cart_data?.[0]?.product_name || 'Order',
-          product_description: session.cart_data?.map(i => `${i.product_name} x${i.quantity}`).join(', '),
-          amount: session.final_amount,
-          status: orderStatus,
-          // Include phone_snapshot for audit trail
-          phone_snapshot: session.phone_number || session.phone_snapshot,
-        })
-        .select()
-        .single();
+      if (!result?.order_id) {
+        throw new Error('Failed to create order');
+      }
 
-      if (orderError) throw orderError;
-
-      // Update session
-      const { error: updateError } = await supabase
-        .from('checkout_sessions')
-        .update({
-          status: session.selected_payment_method === 'cod' ? 'completed' : 'active',
-          current_step: session.selected_payment_method === 'cod' ? 'confirmation' : 'payment',
-          order_id: order.id,
-          completed_at: session.selected_payment_method === 'cod' ? new Date().toISOString() : null,
-        })
-        .eq('id', sessionId);
-
-      if (updateError) throw updateError;
-
-      // Log event
-      await supabase.from('checkout_events').insert({
-        session_id: sessionId,
-        event_type: session.selected_payment_method === 'cod' ? 'checkout_completed' : 'order_created',
-        event_data: { order_id: order.id, payment_method: session.selected_payment_method },
-        step: session.selected_payment_method === 'cod' ? 'confirmation' : 'payment',
-        previous_step: 'payment',
-      });
-
-      return { order_id: order.id };
+      return { order_id: result.order_id };
     },
     onSuccess: (data) => {
       toast({
