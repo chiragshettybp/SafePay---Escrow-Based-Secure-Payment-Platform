@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { User, Session } from "@supabase/supabase-js";
 import { merchantSupabase } from "@/integrations/supabase/merchantClient";
@@ -51,105 +51,133 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
   const [isMerchant, setIsMerchant] = useState(false);
   const navigate = useNavigate();
 
-  const ensureMerchantProfile = async (u: User) => {
-    try {
-      if (!u.email) return;
+  // Refs for preventing race conditions
+  const isLoggingIn = useRef(false);
+  const isSigningUp = useRef(false);
+  const isLoggingOut = useRef(false);
+  const isFetchingMerchant = useRef(false);
+  const mountedRef = useRef(true);
 
-      const { data: existing, error: fetchError } = await merchantSupabase
+  const fetchMerchant = useCallback(async (userId: string) => {
+    // Prevent concurrent fetches
+    if (isFetchingMerchant.current) return;
+    isFetchingMerchant.current = true;
+
+    try {
+      const { data, error } = await merchantSupabase
         .from("merchants")
-        .select("id")
-        .eq("user_id", u.id)
+        .select("*")
+        .eq("user_id", userId)
         .maybeSingle();
 
-      if (fetchError) throw fetchError;
-      if (existing) return;
+      if (error) {
+        console.error("Error fetching merchant:", error);
+        return;
+      }
 
-      // Merchant profile must be created via the merchant-signup edge function
-      // This fallback is only for edge cases - merchants should always sign up properly
-      console.warn("Merchant profile missing - user should re-register via merchant signup");
-    } catch (error) {
-      console.error("Error checking merchant profile:", error);
+      if (mountedRef.current) {
+        if (data) {
+          setMerchant(data as unknown as Merchant);
+          setIsMerchant(true);
+        } else {
+          setMerchant(null);
+          setIsMerchant(false);
+        }
+      }
+    } catch (err) {
+      console.error("Merchant fetch error:", err);
+    } finally {
+      isFetchingMerchant.current = false;
     }
-  };
+  }, []);
 
-  const fetchMerchant = async (userId: string) => {
-    const { data, error } = await merchantSupabase
-      .from("merchants")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
+  const checkMerchantRole = useCallback(async (userId: string): Promise<boolean> => {
+    try {
+      const { data } = await merchantSupabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("role", "merchant")
+        .maybeSingle();
 
-    if (error) {
-      console.error("Error fetching merchant:", error);
-      return;
+      return !!data;
+    } catch (err) {
+      console.error("Role check error:", err);
+      return false;
     }
-
-    if (data) {
-      setMerchant(data as unknown as Merchant);
-      setIsMerchant(true);
-    } else {
-      setMerchant(null);
-      setIsMerchant(false);
-    }
-  };
-
-  const checkMerchantRole = async (userId: string) => {
-    const { data } = await merchantSupabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .eq("role", "merchant")
-      .maybeSingle();
-
-    return !!data;
-  };
+  }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     // Set up auth state listener FIRST
     const {
       data: { subscription },
     } = merchantSupabase.auth.onAuthStateChange((event, session) => {
+      if (!mountedRef.current) return;
+
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
         // Defer Supabase calls with setTimeout to prevent deadlock
         setTimeout(() => {
-          void ensureMerchantProfile(session.user).then(() => {
+          if (mountedRef.current) {
             fetchMerchant(session.user.id);
-          });
+          }
         }, 0);
       } else {
         setMerchant(null);
         setIsMerchant(false);
       }
+
+      if (event === 'SIGNED_OUT') {
+        setMerchant(null);
+        setIsMerchant(false);
+        setIsLoading(false);
+      }
     });
 
     // THEN check for existing session
     merchantSupabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mountedRef.current) return;
+
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        void ensureMerchantProfile(session.user).then(() => {
-          fetchMerchant(session.user.id);
-        });
+        fetchMerchant(session.user.id);
       }
 
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      mountedRef.current = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchMerchant]);
 
-  const login = async (
+  const login = useCallback(async (
     email: string,
     password: string,
     rememberMe?: boolean
   ): Promise<{ error: Error | null }> => {
+    // Prevent concurrent login attempts
+    if (isLoggingIn.current) {
+      return { error: new Error("Login already in progress") };
+    }
+    isLoggingIn.current = true;
+
     try {
+      // Validate inputs
+      const trimmedEmail = email.trim().toLowerCase();
+      if (!trimmedEmail || !password) {
+        return { error: new Error("Email and password are required") };
+      }
+
       const { data, error } = await merchantSupabase.auth.signInWithPassword({
-        email,
+        email: trimmedEmail,
         password,
       });
 
@@ -158,9 +186,6 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (data.user) {
-        // Create merchant profile if needed
-        await ensureMerchantProfile(data.user);
-
         // Check for merchant role
         const hasMerchantRole = await checkMerchantRole(data.user.id);
         if (!hasMerchantRole) {
@@ -185,20 +210,36 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
       return { error: null };
     } catch (error) {
       return { error: error as Error };
+    } finally {
+      isLoggingIn.current = false;
     }
-  };
+  }, [checkMerchantRole, fetchMerchant]);
 
-  const signup = async (data: MerchantSignupData): Promise<{ error: Error | null }> => {
+  const signup = useCallback(async (data: MerchantSignupData): Promise<{ error: Error | null }> => {
+    // Prevent concurrent signup attempts
+    if (isSigningUp.current) {
+      return { error: new Error("Signup already in progress") };
+    }
+    isSigningUp.current = true;
+
     try {
+      // Validate inputs
+      const trimmedEmail = data.email.trim().toLowerCase();
+      const trimmedBusinessName = data.businessName.trim();
+      
+      if (!trimmedEmail || !data.password || !trimmedBusinessName) {
+        return { error: new Error("Email, password, and business name are required") };
+      }
+
       const { error } = await merchantSupabase.functions.invoke("merchant-signup", {
         body: {
-          email: data.email,
+          email: trimmedEmail,
           password: data.password,
-          businessName: data.businessName,
-          phone: data.phone || null,
+          businessName: trimmedBusinessName,
+          phone: data.phone?.trim() || null,
           category: data.category || null,
-          gstNumber: data.gstNumber || null,
-          address: data.address || null,
+          gstNumber: data.gstNumber?.trim() || null,
+          address: data.address?.trim() || null,
         },
       });
 
@@ -209,26 +250,39 @@ export function MerchantAuthProvider({ children }: { children: ReactNode }) {
       return { error: null };
     } catch (error) {
       return { error: error as Error };
+    } finally {
+      isSigningUp.current = false;
     }
-  };
+  }, []);
 
-  const logout = async () => {
-    // Use global scope to invalidate sessions on all devices for security
-    await merchantSupabase.auth.signOut({ scope: 'global' });
-    setUser(null);
-    setSession(null);
-    setMerchant(null);
-    setIsMerchant(false);
-    localStorage.removeItem("merchantRememberMe");
-    navigate("/merchant/login");
-  };
+  const logout = useCallback(async () => {
+    // Prevent concurrent logout attempts
+    if (isLoggingOut.current) return;
+    isLoggingOut.current = true;
 
+    try {
+      // Use global scope to invalidate sessions on all devices for security
+      await merchantSupabase.auth.signOut({ scope: 'global' });
+    } catch (err) {
+      console.error("Logout error:", err);
+    } finally {
+      if (mountedRef.current) {
+        setUser(null);
+        setSession(null);
+        setMerchant(null);
+        setIsMerchant(false);
+      }
+      localStorage.removeItem("merchantRememberMe");
+      isLoggingOut.current = false;
+      navigate("/merchant/login");
+    }
+  }, [navigate]);
 
-  const refreshMerchant = async () => {
+  const refreshMerchant = useCallback(async () => {
     if (user) {
       await fetchMerchant(user.id);
     }
-  };
+  }, [user, fetchMerchant]);
 
   const isApproved = merchant?.status === "active";
 
@@ -261,20 +315,24 @@ export function useMerchantAuth() {
   return context;
 }
 
-// TC-AUTH-02: Protected route for merchant pages
+// Protected route for merchant pages
 export function MerchantProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading, isMerchant } = useMerchantAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     // Skip protection for login/signup pages
     const publicPaths = ['/merchant/login', '/merchant/signup'];
     if (publicPaths.includes(location.pathname)) {
+      hasRedirected.current = false;
       return;
     }
 
-    if (!isLoading && (!isAuthenticated || !isMerchant)) {
+    // Prevent multiple redirects
+    if (!isLoading && (!isAuthenticated || !isMerchant) && !hasRedirected.current) {
+      hasRedirected.current = true;
       navigate('/merchant/login', { replace: true });
     }
   }, [isAuthenticated, isLoading, isMerchant, navigate, location.pathname]);

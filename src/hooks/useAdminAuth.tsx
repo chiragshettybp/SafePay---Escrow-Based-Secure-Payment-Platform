@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -32,16 +32,28 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const location = useLocation();
 
+  // Refs for preventing race conditions
+  const isLoggingIn = useRef(false);
+  const isLoggingOut = useRef(false);
+  const isVerifying = useRef(false);
+  const mountedRef = useRef(true);
+
   // Check if current route is an admin route
   const isAdminRoute = location.pathname.startsWith('/admin');
 
   const verifySession = useCallback(async (): Promise<boolean> => {
+    // Prevent concurrent verification
+    if (isVerifying.current) return !!user;
+    isVerifying.current = true;
+
     try {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       
       if (!currentSession) {
-        setUser(null);
-        setSession(null);
+        if (mountedRef.current) {
+          setUser(null);
+          setSession(null);
+        }
         return false;
       }
 
@@ -55,27 +67,42 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         },
       });
 
+      if (!response.ok) {
+        if (mountedRef.current) {
+          setUser(null);
+          setSession(null);
+        }
+        return false;
+      }
+
       const data = await response.json();
 
-      if (data.valid) {
+      if (data.valid && mountedRef.current) {
         setUser(data.user);
         setSession(currentSession);
         return true;
       } else {
-        // Not a valid admin session
-        setUser(null);
-        setSession(null);
+        if (mountedRef.current) {
+          setUser(null);
+          setSession(null);
+        }
         return false;
       }
     } catch (error) {
       console.error('Session verification error:', error);
-      setUser(null);
-      setSession(null);
+      if (mountedRef.current) {
+        setUser(null);
+        setSession(null);
+      }
       return false;
+    } finally {
+      isVerifying.current = false;
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     // Only verify admin session when on admin routes
     if (!isAdminRoute) {
       setIsLoading(false);
@@ -87,6 +114,8 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mountedRef.current) return;
+
         if (event === 'SIGNED_OUT') {
           setUser(null);
           setSession(null);
@@ -94,7 +123,13 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         } else if (session) {
           // Defer verification to avoid blocking
           setTimeout(() => {
-            verifySession().finally(() => setIsLoading(false));
+            if (mountedRef.current) {
+              verifySession().finally(() => {
+                if (mountedRef.current) {
+                  setIsLoading(false);
+                }
+              });
+            }
           }, 0);
         } else {
           setIsLoading(false);
@@ -103,13 +138,37 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     );
 
     // Initial session check for admin routes
-    verifySession().finally(() => setIsLoading(false));
+    verifySession().finally(() => {
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
+    });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mountedRef.current = false;
+      subscription.unsubscribe();
+    };
   }, [verifySession, isAdminRoute]);
 
-  const login = async (email: string, password: string, pin: string): Promise<{ error: string | null }> => {
+  const login = useCallback(async (email: string, password: string, pin: string): Promise<{ error: string | null }> => {
+    // Prevent concurrent login attempts
+    if (isLoggingIn.current) {
+      return { error: "Login already in progress" };
+    }
+    isLoggingIn.current = true;
+
     try {
+      // Validate inputs
+      const trimmedEmail = email.trim().toLowerCase();
+      if (!trimmedEmail || !password || !pin) {
+        return { error: "Email, password, and PIN are required" };
+      }
+
+      // Validate PIN format
+      if (!/^\d{6}$/.test(pin)) {
+        return { error: "PIN must be 6 digits" };
+      }
+
       const response = await fetch(`${SUPABASE_URL}/functions/v1/admin-login`, {
         method: 'POST',
         headers: {
@@ -117,7 +176,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
           'apikey': SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          email,
+          email: trimmedEmail,
           password,
           pin,
           userAgent: navigator.userAgent,
@@ -137,8 +196,10 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
           refresh_token: data.session.refresh_token,
         });
 
-        setSession(data.session);
-        setUser(data.user);
+        if (mountedRef.current) {
+          setSession(data.session);
+          setUser(data.user);
+        }
         return { error: null };
       }
 
@@ -146,15 +207,29 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Login error:', error);
       return { error: 'Network error. Please try again.' };
+    } finally {
+      isLoggingIn.current = false;
     }
-  };
+  }, []);
 
-  const logout = async () => {
-    // Use global scope to invalidate all admin sessions on all devices
-    await supabase.auth.signOut({ scope: 'global' });
-    setUser(null);
-    setSession(null);
-  };
+  const logout = useCallback(async () => {
+    // Prevent concurrent logout attempts
+    if (isLoggingOut.current) return;
+    isLoggingOut.current = true;
+
+    try {
+      // Use global scope to invalidate all admin sessions on all devices
+      await supabase.auth.signOut({ scope: 'global' });
+    } catch (err) {
+      console.error("Logout error:", err);
+    } finally {
+      if (mountedRef.current) {
+        setUser(null);
+        setSession(null);
+      }
+      isLoggingOut.current = false;
+    }
+  }, []);
 
   return (
     <AdminAuthContext.Provider
@@ -185,12 +260,22 @@ export function useAdminAuth() {
 export function AdminProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAdminAuth();
   const navigate = useNavigate();
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    // Prevent multiple redirects
+    if (!isLoading && !isAuthenticated && !hasRedirected.current) {
+      hasRedirected.current = true;
       navigate('/admin/login', { replace: true });
     }
   }, [isAuthenticated, isLoading, navigate]);
+
+  // Reset redirect flag when authentication changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      hasRedirected.current = false;
+    }
+  }, [isAuthenticated]);
 
   if (isLoading) {
     return (

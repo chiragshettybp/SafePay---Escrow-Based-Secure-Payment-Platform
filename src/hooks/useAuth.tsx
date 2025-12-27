@@ -1,5 +1,16 @@
+/**
+ * DEPRECATED: This legacy auth hook is no longer used.
+ * 
+ * SECURITY WARNING: localStorage-based authentication is INSECURE.
+ * All authentication MUST go through Supabase Auth.
+ * 
+ * Use the appropriate auth hook for your user type:
+ * - Customer: useSupabaseAuth from '@/hooks/useSupabaseAuth'
+ * - Merchant: useMerchantAuth from '@/hooks/useMerchantAuth'  
+ * - Admin: useAdminAuth from '@/hooks/useAdminAuth'
+ */
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 interface User {
@@ -18,78 +29,38 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * @deprecated Use Supabase-based AuthProvider from useSupabaseAuth instead
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Check for stored user on mount
-    const checkAuth = async () => {
-      try {
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
-        }
-      } catch (error) {
-        console.error("Auth error:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    checkAuth();
-  }, []);
-
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
-    
-    try {
-      // In a real app, validate credentials with an API
-      // For demo, just store the email
-      const userData = { email };
-      localStorage.setItem("user", JSON.stringify(userData));
-      setUser(userData);
-    } catch (error) {
-      console.error("Login error:", error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
+  // SECURITY: All methods redirect to proper Supabase auth
+  const login = async (_email: string, _password: string) => {
+    console.warn("SECURITY: Legacy login attempted. Redirecting to secure login.");
+    navigate("/customer-login");
   };
 
-  const signup = async (name: string, email: string, password: string) => {
-    setIsLoading(true);
-    
-    try {
-      // In a real app, register with an API
-      // For demo, just store the name and email
-      const userData = { name, email };
-      localStorage.setItem("user", JSON.stringify(userData));
-      setUser(userData);
-    } catch (error) {
-      console.error("Signup error:", error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
+  const signup = async (_name: string, _email: string, _password: string) => {
+    console.warn("SECURITY: Legacy signup attempted. Redirecting to secure signup.");
+    navigate("/customer-signup");
   };
 
   const logout = () => {
+    // Clear any legacy localStorage data
     localStorage.removeItem("user");
-    setUser(null);
-    navigate("/login");
+    navigate("/customer-login");
   };
 
   return (
     <AuthContext.Provider
       value={{
-        user,
-        isLoading,
+        user: null,
+        isLoading: false,
         login,
         signup,
         logout,
-        isAuthenticated: !!user,
+        isAuthenticated: false,
       }}
     >
       {children}
@@ -97,6 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * @deprecated Use useSupabaseAuth, useMerchantAuth, or useAdminAuth instead
+ */
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

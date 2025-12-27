@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,8 +49,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  
+  // Refs for preventing race conditions and concurrent operations
+  const isLoggingIn = useRef(false);
+  const isSigningUp = useRef(false);
+  const isLoggingOut = useRef(false);
+  const isFetchingProfile = useRef(false);
+  const mountedRef = useRef(true);
 
   const fetchProfile = useCallback(async (userId: string) => {
+    // Prevent concurrent profile fetches
+    if (isFetchingProfile.current) return;
+    isFetchingProfile.current = true;
+    
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -63,32 +74,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setProfile(data as Profile | null);
+      if (mountedRef.current) {
+        setProfile(data as Profile | null);
+      }
     } catch (err) {
       console.error("Profile fetch error:", err);
+    } finally {
+      isFetchingProfile.current = false;
     }
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (!mountedRef.current) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
 
         // Defer profile fetch to avoid deadlock
         if (session?.user) {
           setTimeout(() => {
-            fetchProfile(session.user.id);
+            if (mountedRef.current) {
+              fetchProfile(session.user.id);
+            }
           }, 0);
         } else {
           setProfile(null);
+        }
+
+        // Handle specific events
+        if (event === 'SIGNED_OUT') {
+          setProfile(null);
+          setIsLoading(false);
         }
       }
     );
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mountedRef.current) return;
+      
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -99,31 +128,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mountedRef.current = false;
+      subscription.unsubscribe();
+    };
   }, [fetchProfile]);
 
-  const refreshSession = async () => {
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (currentUser) {
-      setUser(currentUser);
-      await fetchProfile(currentUser.id);
-    }
-  };
-
-  const checkPhoneExists = async (phone: string): Promise<boolean> => {
-    const formattedPhone = formatPhone(phone);
-    const { data } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("phone", formattedPhone)
-      .maybeSingle();
-    return !!data;
-  };
-
-  const login = async (email: string, password: string, rememberMe?: boolean): Promise<{ error: Error | null }> => {
+  const refreshSession = useCallback(async () => {
     try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser && mountedRef.current) {
+        setUser(currentUser);
+        await fetchProfile(currentUser.id);
+      }
+    } catch (err) {
+      console.error("Session refresh error:", err);
+    }
+  }, [fetchProfile]);
+
+  const checkPhoneExists = useCallback(async (phone: string): Promise<boolean> => {
+    try {
+      const formattedPhone = formatPhone(phone);
+      const { data } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("phone", formattedPhone)
+        .maybeSingle();
+      return !!data;
+    } catch (err) {
+      console.error("Phone check error:", err);
+      return false;
+    }
+  }, []);
+
+  const login = useCallback(async (email: string, password: string, rememberMe?: boolean): Promise<{ error: Error | null }> => {
+    // Prevent concurrent login attempts
+    if (isLoggingIn.current) {
+      return { error: new Error("Login already in progress") };
+    }
+    isLoggingIn.current = true;
+
+    try {
+      // Validate inputs
+      const trimmedEmail = email.trim().toLowerCase();
+      if (!trimmedEmail || !password) {
+        return { error: new Error("Email and password are required") };
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+        email: trimmedEmail,
         password,
       });
 
@@ -141,18 +194,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null };
     } catch (error) {
       return { error: error as Error };
+    } finally {
+      isLoggingIn.current = false;
     }
-  };
+  }, []);
 
-  const signup = async (
+  const signup = useCallback(async (
     email: string, 
     password: string, 
     fullName: string, 
     phone: string
   ): Promise<{ error: Error | null }> => {
+    // Prevent concurrent signup attempts
+    if (isSigningUp.current) {
+      return { error: new Error("Signup already in progress") };
+    }
+    isSigningUp.current = true;
+
     try {
       const formattedPhone = formatPhone(phone);
       const trimmedEmail = email.trim().toLowerCase();
+      const trimmedName = fullName.trim();
+      
+      // Validate inputs
+      if (!trimmedEmail || !password || !trimmedName || !phone) {
+        return { error: new Error("All fields are required") };
+      }
       
       // Validate phone format (10 digits starting with 6-9)
       const phoneDigits = phone.replace(/\D/g, '');
@@ -174,7 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            full_name: fullName.trim(),
+            full_name: trimmedName,
             phone: formattedPhone,
           },
         },
@@ -197,23 +264,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null };
     } catch (error) {
       return { error: error as Error };
+    } finally {
+      isSigningUp.current = false;
     }
-  };
+  }, [checkPhoneExists]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
+    // Prevent concurrent logout attempts
+    if (isLoggingOut.current) return;
+    isLoggingOut.current = true;
+
     try {
       await supabase.auth.signOut({ scope: 'global' });
     } catch (err) {
       console.error("Logout error:", err);
+    } finally {
+      if (mountedRef.current) {
+        setUser(null);
+        setSession(null);
+        setProfile(null);
+      }
+      localStorage.removeItem("rememberMe");
+      isLoggingOut.current = false;
+      navigate("/customer-login");
     }
-    setUser(null);
-    setSession(null);
-    setProfile(null);
-    localStorage.removeItem("rememberMe");
-    navigate("/customer-login");
-  };
+  }, [navigate]);
 
-  const resendVerificationEmail = async (): Promise<{ error: Error | null }> => {
+  const resendVerificationEmail = useCallback(async (): Promise<{ error: Error | null }> => {
     try {
       if (!user?.email) {
         return { error: new Error("No email address found") };
@@ -235,9 +312,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       return { error: error as Error };
     }
-  };
+  }, [user?.email]);
 
-  const signInWithGoogle = async (): Promise<{ error: Error | null }> => {
+  const signInWithGoogle = useCallback(async (): Promise<{ error: Error | null }> => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -254,9 +331,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       return { error: error as Error };
     }
-  };
+  }, []);
 
-  const signInWithApple = async (): Promise<{ error: Error | null }> => {
+  const signInWithApple = useCallback(async (): Promise<{ error: Error | null }> => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "apple",
@@ -273,9 +350,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       return { error: error as Error };
     }
-  };
+  }, []);
 
-  const updateProfile = async (data: Partial<Pick<Profile, 'phone' | 'full_name'>>): Promise<{ error: Error | null }> => {
+  const updateProfile = useCallback(async (data: Partial<Pick<Profile, 'phone' | 'full_name'>>): Promise<{ error: Error | null }> => {
     try {
       if (!user) {
         return { error: new Error("Not authenticated") };
@@ -299,7 +376,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       return { error: error as Error };
     }
-  };
+  }, [user, fetchProfile]);
 
   const isEmailVerified = user?.email_confirmed_at != null;
 
