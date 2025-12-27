@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -30,6 +30,7 @@ interface AuthContextType {
   updateProfile: (data: Partial<Pick<Profile, 'phone' | 'full_name'>>) => Promise<{ error: Error | null }>;
   refreshSession: () => Promise<void>;
   checkPhoneExists: (phone: string) => Promise<boolean>;
+  resetPassword: (email: string) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,6 +44,9 @@ const formatPhone = (phone: string): string => {
   return `+91${cleaned}`;
 };
 
+// Rate limiting for resend operations
+const RESEND_COOLDOWN_MS = 60000; // 60 seconds
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -55,7 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isSigningUp = useRef(false);
   const isLoggingOut = useRef(false);
   const isFetchingProfile = useRef(false);
+  const isResendingEmail = useRef(false);
+  const isResettingPassword = useRef(false);
   const mountedRef = useRef(true);
+  const lastResendTime = useRef<number>(0);
+  const lastResetTime = useRef<number>(0);
 
   const fetchProfile = useCallback(async (userId: string) => {
     // Prevent concurrent profile fetches
@@ -171,8 +179,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Validate inputs
       const trimmedEmail = email.trim().toLowerCase();
-      if (!trimmedEmail || !password) {
-        return { error: new Error("Email and password are required") };
+      if (!trimmedEmail) {
+        return { error: new Error("Email is required") };
+      }
+      if (!password) {
+        return { error: new Error("Password is required") };
+      }
+      if (password.length < 8) {
+        return { error: new Error("Password must be at least 8 characters") };
       }
 
       const { error } = await supabase.auth.signInWithPassword({
@@ -217,8 +231,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const trimmedName = fullName.trim();
       
       // Validate inputs
-      if (!trimmedEmail || !password || !trimmedName || !phone) {
-        return { error: new Error("All fields are required") };
+      if (!trimmedEmail) {
+        return { error: new Error("Email is required") };
+      }
+      if (!password) {
+        return { error: new Error("Password is required") };
+      }
+      if (password.length < 8) {
+        return { error: new Error("Password must be at least 8 characters") };
+      }
+      if (!trimmedName) {
+        return { error: new Error("Full name is required") };
+      }
+      if (!phone) {
+        return { error: new Error("Phone number is required") };
       }
       
       // Validate phone format (10 digits starting with 6-9)
@@ -291,6 +317,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   const resendVerificationEmail = useCallback(async (): Promise<{ error: Error | null }> => {
+    // Prevent concurrent resend attempts
+    if (isResendingEmail.current) {
+      return { error: new Error("Resend already in progress") };
+    }
+    
+    // Rate limiting check
+    const now = Date.now();
+    if (now - lastResendTime.current < RESEND_COOLDOWN_MS) {
+      const remainingSecs = Math.ceil((RESEND_COOLDOWN_MS - (now - lastResendTime.current)) / 1000);
+      return { error: new Error(`Please wait ${remainingSecs} seconds before resending`) };
+    }
+    
+    isResendingEmail.current = true;
+    
     try {
       if (!user?.email) {
         return { error: new Error("No email address found") };
@@ -308,11 +348,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
       }
 
+      lastResendTime.current = Date.now();
       return { error: null };
     } catch (error) {
       return { error: error as Error };
+    } finally {
+      isResendingEmail.current = false;
     }
   }, [user?.email]);
+
+  const resetPassword = useCallback(async (email: string): Promise<{ error: Error | null }> => {
+    // Prevent concurrent reset attempts
+    if (isResettingPassword.current) {
+      return { error: new Error("Password reset already in progress") };
+    }
+    
+    // Rate limiting check
+    const now = Date.now();
+    if (now - lastResetTime.current < RESEND_COOLDOWN_MS) {
+      const remainingSecs = Math.ceil((RESEND_COOLDOWN_MS - (now - lastResetTime.current)) / 1000);
+      return { error: new Error(`Please wait ${remainingSecs} seconds before requesting again`) };
+    }
+    
+    isResettingPassword.current = true;
+    
+    try {
+      const trimmedEmail = email.trim().toLowerCase();
+      if (!trimmedEmail) {
+        return { error: new Error("Email is required") };
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      lastResetTime.current = Date.now();
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    } finally {
+      isResettingPassword.current = false;
+    }
+  }, []);
 
   const signInWithGoogle = useCallback(async (): Promise<{ error: Error | null }> => {
     try {
@@ -398,6 +479,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updateProfile,
         refreshSession,
         checkPhoneExists,
+        resetPassword,
       }}
     >
       {children}
@@ -411,4 +493,49 @@ export function useSupabaseAuth() {
     throw new Error("useSupabaseAuth must be used within an AuthProvider");
   }
   return context;
+}
+
+// Customer Protected Route Component
+export function CustomerProtectedRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isLoading, isEmailVerified } = useSupabaseAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const hasRedirected = useRef(false);
+
+  useEffect(() => {
+    // Prevent multiple redirects
+    if (!isLoading && !hasRedirected.current) {
+      if (!isAuthenticated) {
+        hasRedirected.current = true;
+        navigate('/customer-login', { 
+          replace: true, 
+          state: { from: location.pathname } 
+        });
+      } else if (!isEmailVerified) {
+        hasRedirected.current = true;
+        navigate('/customer-verify', { replace: true });
+      }
+    }
+  }, [isAuthenticated, isLoading, isEmailVerified, navigate, location.pathname]);
+
+  // Reset redirect flag when authentication changes
+  useEffect(() => {
+    if (isAuthenticated && isEmailVerified) {
+      hasRedirected.current = false;
+    }
+  }, [isAuthenticated, isEmailVerified]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !isEmailVerified) {
+    return null;
+  }
+
+  return <>{children}</>;
 }

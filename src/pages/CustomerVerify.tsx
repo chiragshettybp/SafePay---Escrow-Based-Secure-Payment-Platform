@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const RESEND_COOLDOWN = 60; // seconds
 const POLL_INTERVAL = 5000; // 5 seconds
+const MAX_POLL_ATTEMPTS = 120; // 10 minutes max polling
 
 const CustomerVerify = () => {
   const [isResending, setIsResending] = useState(false);
@@ -28,6 +29,11 @@ const CustomerVerify = () => {
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const { user, isEmailVerified, resendVerificationEmail, isLoading, refreshSession } = useSupabaseAuth();
   const navigate = useNavigate();
+  
+  // Refs for cleanup and preventing concurrent operations
+  const mountedRef = useRef(true);
+  const pollCountRef = useRef(0);
+  const isCheckingRef = useRef(false);
 
   // Check if email is verified and redirect
   useEffect(() => {
@@ -43,39 +49,72 @@ const CustomerVerify = () => {
   // Cooldown timer
   useEffect(() => {
     if (cooldown > 0) {
-      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      const timer = setTimeout(() => {
+        if (mountedRef.current) {
+          setCooldown(cooldown - 1);
+        }
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [cooldown]);
 
-  // Poll for verification status
+  // Poll for verification status with cleanup
   const checkVerification = useCallback(async () => {
+    // Prevent concurrent checks
+    if (isCheckingRef.current || !mountedRef.current) return false;
+    isCheckingRef.current = true;
+    
     try {
+      pollCountRef.current += 1;
+      
+      // Stop polling after max attempts
+      if (pollCountRef.current > MAX_POLL_ATTEMPTS) {
+        return false;
+      }
+      
       const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (!mountedRef.current) return false;
+      
       if (currentUser?.email_confirmed_at) {
         await refreshSession();
-        toast({
-          title: "Email verified!",
-          description: "Your email has been verified successfully.",
-        });
-        navigate("/");
+        if (mountedRef.current) {
+          toast({
+            title: "Email verified!",
+            description: "Your email has been verified successfully.",
+          });
+          navigate("/");
+        }
         return true;
       }
     } catch (err) {
       console.error("Verification check error:", err);
+    } finally {
+      isCheckingRef.current = false;
     }
     return false;
   }, [navigate, refreshSession]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    pollCountRef.current = 0;
+    
     if (!user || isEmailVerified) return;
 
     // Initial check
     checkVerification();
 
     // Poll every 5 seconds
-    const interval = setInterval(checkVerification, POLL_INTERVAL);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (mountedRef.current && pollCountRef.current < MAX_POLL_ATTEMPTS) {
+        checkVerification();
+      }
+    }, POLL_INTERVAL);
+    
+    return () => {
+      mountedRef.current = false;
+      clearInterval(interval);
+    };
   }, [user, isEmailVerified, checkVerification]);
 
   const handleResend = async () => {
@@ -86,8 +125,10 @@ const CustomerVerify = () => {
 
     const { error: resendError } = await resendVerificationEmail();
 
+    if (!mountedRef.current) return;
+
     if (resendError) {
-      if (resendError.message.includes("rate") || resendError.message.includes("Rate")) {
+      if (resendError.message.includes("rate") || resendError.message.includes("Rate") || resendError.message.includes("wait")) {
         setError("Too many requests. Please wait before trying again.");
         setCooldown(RESEND_COOLDOWN);
       } else {
@@ -105,10 +146,14 @@ const CustomerVerify = () => {
   };
 
   const handleRefreshStatus = async () => {
+    if (isCheckingStatus) return;
+    
     setIsCheckingStatus(true);
     setError(null);
     
     const verified = await checkVerification();
+    
+    if (!mountedRef.current) return;
     
     if (!verified) {
       toast({

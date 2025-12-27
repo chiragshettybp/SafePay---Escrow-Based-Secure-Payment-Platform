@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/hooks/useSupabaseAuth";
+import { AuthProvider, CustomerProtectedRoute } from "@/hooks/useSupabaseAuth";
 import { AdminAuthProvider, AdminProtectedRoute } from "@/hooks/useAdminAuth";
 import Index from "./pages/Index";
 import CustomerLogin from "./pages/CustomerLogin";
@@ -215,44 +215,44 @@ const App = () => (
               <Route path="/customer-signup" element={<CustomerSignup />} />
               <Route path="/customer-verify" element={<CustomerVerify />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/order/:orderId" element={<OrderDetails />} />
-              <Route path="/order/:orderId/tracking" element={<OrderTracking />} />
-              <Route path="/order/:orderId/confirm" element={<ConfirmDelivery />} />
-              <Route path="/order/:orderId/report" element={<ReportIssue />} />
-              <Route path="/dispute/:orderId/raise" element={<RaiseDispute />} />
-              <Route path="/dispute/:disputeId/upload" element={<DisputeUpload />} />
-              <Route path="/dispute/:disputeId/status" element={<DisputeStatus />} />
-              <Route path="/dispute/:disputeId/result" element={<DisputeResult />} />
-              <Route path="/disputes" element={<Disputes />} />
-              <Route path="/refunds" element={<Refunds />} />
-              <Route path="/refund/:refundId" element={<RefundInitiated />} />
-              <Route path="/refund/:refundId/success" element={<RefundSuccess />} />
-              <Route path="/refund/:refundId/failed" element={<RefundFailed />} />
-              <Route path="/wallet" element={<Wallet />} />
-              <Route path="/wallet/transactions" element={<WalletTransactions />} />
-              <Route path="/wallet/bank-account" element={<WalletBankAccount />} />
-              <Route path="/wallet/withdraw" element={<WalletWithdraw />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/profile/edit" element={<EditProfile />} />
-              <Route path="/profile/kyc" element={<Kyc />} />
-              <Route path="/payment/new" element={<NewPayment />} />
-              <Route path="/payment/review/:orderId" element={<PaymentReview />} />
-              <Route path="/payment/pay/:orderId" element={<PaymentPay />} />
-              <Route path="/payment/success/:orderId" element={<PaymentSuccess />} />
-              <Route path="/payment/failed/:orderId" element={<PaymentFailed />} />
+              <Route path="/dashboard" element={<CustomerProtectedRoute><Dashboard /></CustomerProtectedRoute>} />
+              <Route path="/orders" element={<CustomerProtectedRoute><Orders /></CustomerProtectedRoute>} />
+              <Route path="/order/:orderId" element={<CustomerProtectedRoute><OrderDetails /></CustomerProtectedRoute>} />
+              <Route path="/order/:orderId/tracking" element={<CustomerProtectedRoute><OrderTracking /></CustomerProtectedRoute>} />
+              <Route path="/order/:orderId/confirm" element={<CustomerProtectedRoute><ConfirmDelivery /></CustomerProtectedRoute>} />
+              <Route path="/order/:orderId/report" element={<CustomerProtectedRoute><ReportIssue /></CustomerProtectedRoute>} />
+              <Route path="/dispute/:orderId/raise" element={<CustomerProtectedRoute><RaiseDispute /></CustomerProtectedRoute>} />
+              <Route path="/dispute/:disputeId/upload" element={<CustomerProtectedRoute><DisputeUpload /></CustomerProtectedRoute>} />
+              <Route path="/dispute/:disputeId/status" element={<CustomerProtectedRoute><DisputeStatus /></CustomerProtectedRoute>} />
+              <Route path="/dispute/:disputeId/result" element={<CustomerProtectedRoute><DisputeResult /></CustomerProtectedRoute>} />
+              <Route path="/disputes" element={<CustomerProtectedRoute><Disputes /></CustomerProtectedRoute>} />
+              <Route path="/refunds" element={<CustomerProtectedRoute><Refunds /></CustomerProtectedRoute>} />
+              <Route path="/refund/:refundId" element={<CustomerProtectedRoute><RefundInitiated /></CustomerProtectedRoute>} />
+              <Route path="/refund/:refundId/success" element={<CustomerProtectedRoute><RefundSuccess /></CustomerProtectedRoute>} />
+              <Route path="/refund/:refundId/failed" element={<CustomerProtectedRoute><RefundFailed /></CustomerProtectedRoute>} />
+              <Route path="/wallet" element={<CustomerProtectedRoute><Wallet /></CustomerProtectedRoute>} />
+              <Route path="/wallet/transactions" element={<CustomerProtectedRoute><WalletTransactions /></CustomerProtectedRoute>} />
+              <Route path="/wallet/bank-account" element={<CustomerProtectedRoute><WalletBankAccount /></CustomerProtectedRoute>} />
+              <Route path="/wallet/withdraw" element={<CustomerProtectedRoute><WalletWithdraw /></CustomerProtectedRoute>} />
+              <Route path="/profile" element={<CustomerProtectedRoute><Profile /></CustomerProtectedRoute>} />
+              <Route path="/profile/edit" element={<CustomerProtectedRoute><EditProfile /></CustomerProtectedRoute>} />
+              <Route path="/profile/kyc" element={<CustomerProtectedRoute><Kyc /></CustomerProtectedRoute>} />
+              <Route path="/payment/new" element={<CustomerProtectedRoute><NewPayment /></CustomerProtectedRoute>} />
+              <Route path="/payment/review/:orderId" element={<CustomerProtectedRoute><PaymentReview /></CustomerProtectedRoute>} />
+              <Route path="/payment/pay/:orderId" element={<CustomerProtectedRoute><PaymentPay /></CustomerProtectedRoute>} />
+              <Route path="/payment/success/:orderId" element={<CustomerProtectedRoute><PaymentSuccess /></CustomerProtectedRoute>} />
+              <Route path="/payment/failed/:orderId" element={<CustomerProtectedRoute><PaymentFailed /></CustomerProtectedRoute>} />
               {/* Customer Settings Routes */}
-              <Route path="/settings" element={<CustomerSettings />} />
-              <Route path="/settings/profile" element={<CustomerSettingsProfile />} />
-              <Route path="/settings/security" element={<CustomerSettingsSecurity />} />
-              <Route path="/settings/notifications" element={<CustomerSettingsNotifications />} />
-              <Route path="/settings/privacy" element={<CustomerSettingsPrivacy />} />
+              <Route path="/settings" element={<CustomerProtectedRoute><CustomerSettings /></CustomerProtectedRoute>} />
+              <Route path="/settings/profile" element={<CustomerProtectedRoute><CustomerSettingsProfile /></CustomerProtectedRoute>} />
+              <Route path="/settings/security" element={<CustomerProtectedRoute><CustomerSettingsSecurity /></CustomerProtectedRoute>} />
+              <Route path="/settings/notifications" element={<CustomerProtectedRoute><CustomerSettingsNotifications /></CustomerProtectedRoute>} />
+              <Route path="/settings/privacy" element={<CustomerProtectedRoute><CustomerSettingsPrivacy /></CustomerProtectedRoute>} />
               {/* Customer Support Routes */}
-              <Route path="/support" element={<CustomerSupport />} />
-              <Route path="/support/create" element={<CustomerSupportCreate />} />
-              <Route path="/support/tickets" element={<CustomerSupportTickets />} />
-              <Route path="/support/ticket/:ticketId" element={<CustomerSupportTicketDetails />} />
+              <Route path="/support" element={<CustomerProtectedRoute><CustomerSupport /></CustomerProtectedRoute>} />
+              <Route path="/support/create" element={<CustomerProtectedRoute><CustomerSupportCreate /></CustomerProtectedRoute>} />
+              <Route path="/support/tickets" element={<CustomerProtectedRoute><CustomerSupportTickets /></CustomerProtectedRoute>} />
+              <Route path="/support/ticket/:ticketId" element={<CustomerProtectedRoute><CustomerSupportTicketDetails /></CustomerProtectedRoute>} />
               <Route path="/support/faq" element={<CustomerSupportFaq />} />
               {/* Merchant Routes */}
               <Route path="/merchant" element={<MerchantRouteRoot />}>
