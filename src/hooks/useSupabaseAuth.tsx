@@ -1,14 +1,17 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-interface Profile {
+export interface Profile {
   id: string;
   user_id: string;
   full_name: string | null;
   phone: string | null;
   avatar_url: string | null;
+  account_status: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface AuthContextType {
@@ -25,9 +28,20 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signInWithApple: () => Promise<{ error: Error | null }>;
   updateProfile: (data: Partial<Pick<Profile, 'phone' | 'full_name'>>) => Promise<{ error: Error | null }>;
+  refreshSession: () => Promise<void>;
+  checkPhoneExists: (phone: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Format phone to +91 format
+const formatPhone = (phone: string): string => {
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('91') && cleaned.length === 12) {
+    return `+${cleaned}`;
+  }
+  return `+91${cleaned}`;
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -36,20 +50,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
+  const fetchProfile = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
 
-    if (error) {
-      console.error("Error fetching profile:", error);
-      return;
+      if (error) {
+        console.error("Error fetching profile:", error);
+        return;
+      }
+
+      setProfile(data as Profile | null);
+    } catch (err) {
+      console.error("Profile fetch error:", err);
     }
-
-    setProfile(data as Profile | null);
-  };
+  }, []);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -82,12 +100,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [fetchProfile]);
+
+  const refreshSession = async () => {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (currentUser) {
+      setUser(currentUser);
+      await fetchProfile(currentUser.id);
+    }
+  };
+
+  const checkPhoneExists = async (phone: string): Promise<boolean> => {
+    const formattedPhone = formatPhone(phone);
+    const { data } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("phone", formattedPhone)
+      .maybeSingle();
+    return !!data;
+  };
 
   const login = async (email: string, password: string, rememberMe?: boolean): Promise<{ error: Error | null }> => {
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password,
       });
 
@@ -115,42 +151,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     phone: string
   ): Promise<{ error: Error | null }> => {
     try {
-      const redirectUrl = `${window.location.origin}/`;
-      // Format phone with country code
-      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+      const formattedPhone = formatPhone(phone);
+      const trimmedEmail = email.trim().toLowerCase();
       
+      // Validate phone format (10 digits starting with 6-9)
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (phoneDigits.length !== 10 || !/^[6-9]/.test(phoneDigits)) {
+        return { error: new Error("Please enter a valid 10-digit Indian mobile number") };
+      }
+
       // Check if phone already exists - phone is the unique identifier
-      const { data: existingPhone } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("phone", formattedPhone)
-        .maybeSingle();
-      
-      if (existingPhone) {
+      const phoneExists = await checkPhoneExists(phone);
+      if (phoneExists) {
         return { error: new Error("This phone number is already registered. Please sign in instead.") };
       }
 
-      // Check if email already exists
-      const { data: existingEmail } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("phone", formattedPhone)
-        .maybeSingle();
-      
-      const { error } = await supabase.auth.signUp({
-        email,
+      const redirectUrl = `${window.location.origin}/customer-verify`;
+
+      const { data, error } = await supabase.auth.signUp({
+        email: trimmedEmail,
         password,
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            full_name: fullName,
+            full_name: fullName.trim(),
             phone: formattedPhone,
           },
         },
       });
 
       if (error) {
+        // Handle specific errors
+        if (error.message.includes("already registered")) {
+          return { error: new Error("This email is already registered. Please sign in instead.") };
+        }
         return { error };
+      }
+
+      // Check if user was created but email confirmation is required
+      if (data.user && !data.session) {
+        // User created, needs email verification
+        return { error: null };
       }
 
       return { error: null };
@@ -160,8 +201,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    // Use global scope to invalidate sessions on all devices for security
-    await supabase.auth.signOut({ scope: 'global' });
+    try {
+      await supabase.auth.signOut({ scope: 'global' });
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
     setUser(null);
     setSession(null);
     setProfile(null);
@@ -179,7 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         type: "signup",
         email: user.email,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/customer-verify`,
         },
       });
 
@@ -239,7 +283,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { error } = await supabase
         .from("profiles")
-        .update(data)
+        .update({
+          ...data,
+          updated_at: new Date().toISOString(),
+        })
         .eq("user_id", user.id);
 
       if (error) {
@@ -272,6 +319,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         signInWithApple,
         updateProfile,
+        refreshSession,
+        checkPhoneExists,
       }}
     >
       {children}
