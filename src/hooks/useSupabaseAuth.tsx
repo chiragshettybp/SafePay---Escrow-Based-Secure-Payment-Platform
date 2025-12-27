@@ -21,12 +21,11 @@ interface AuthContextType {
   profile: Profile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  isEmailVerified: boolean;
   needsPhoneMigration: boolean;
-  // Phone-based auth (PRIMARY)
+  // Phone-based auth (PRIMARY - ONLY method for customers)
   loginWithPhone: (phone: string) => Promise<{ error: Error | null; isNewUser?: boolean }>;
   signupWithPhone: (phone: string, fullName: string) => Promise<{ error: Error | null }>;
-  // Password management (OPTIONAL)
+  // Password management (OPTIONAL - for additional security)
   setPassword: (password: string) => Promise<{ error: Error | null }>;
   loginWithPhoneAndPassword: (phone: string, password: string) => Promise<{ error: Error | null }>;
   // Profile management
@@ -36,7 +35,7 @@ interface AuthContextType {
   // Session management
   logout: () => Promise<void>;
   resendVerificationEmail: () => Promise<{ error: Error | null }>;
-  // OAuth (still available)
+  // OAuth (for social login - still requires phone migration after)
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signInWithApple: () => Promise<{ error: Error | null }>;
 }
@@ -439,8 +438,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const isEmailVerified = user?.email_confirmed_at != null;
-
   return (
     <AuthContext.Provider
       value={{
@@ -449,7 +446,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         isLoading,
         isAuthenticated: !!session,
-        isEmailVerified,
         needsPhoneMigration,
         loginWithPhone,
         signupWithPhone,

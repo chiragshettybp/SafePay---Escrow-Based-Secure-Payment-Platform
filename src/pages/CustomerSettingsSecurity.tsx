@@ -84,41 +84,41 @@ const CustomerSettingsSecurity = () => {
           <div className="mb-6">
             <h1 className="text-2xl sm:text-3xl font-bold">Security</h1>
             <p className="text-muted-foreground mt-1">
-              Manage your password and security settings
+              Your account is secured using your phone number. Password is optional.
             </p>
           </div>
 
           <div className="space-y-6">
-            {/* Change Password */}
+            {/* Set/Change Password */}
             <Card>
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-lg">Change Password</CardTitle>
+                <CardTitle className="text-lg">Set Password (Optional)</CardTitle>
                 <CardDescription>
-                  Update your password to keep your account secure
+                  Add a password for extra security. This is optional as your phone number is your primary login.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 pt-0 space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current Password</Label>
+                  <Label htmlFor="newPassword">New Password</Label>
                   <div className="relative">
                     <Input
-                      id="currentPassword"
-                      type={showCurrentPassword ? "text" : "password"}
-                      value={passwordForm.currentPassword}
+                      id="newPassword"
+                      type={showNewPassword ? "text" : "password"}
+                      value={passwordForm.newPassword}
                       onChange={(e) =>
                         setPasswordForm((prev) => ({
                           ...prev,
-                          currentPassword: e.target.value,
+                          newPassword: e.target.value,
                         }))
                       }
-                      placeholder="Enter current password"
+                      placeholder="Enter new password"
                     />
                     <button
                       type="button"
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      onClick={() => setShowNewPassword(!showNewPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
-                      {showCurrentPassword ? (
+                      {showNewPassword ? (
                         <EyeOff className="h-4 w-4" />
                       ) : (
                         <Eye className="h-4 w-4" />

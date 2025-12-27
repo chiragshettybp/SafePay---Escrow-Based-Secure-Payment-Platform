@@ -20,7 +20,8 @@ import {
   Save,
   RefreshCw,
   ArrowLeft,
-  CheckCircle
+  CheckCircle,
+  Info
 } from 'lucide-react';
 import { useAdminCheckoutSettings, OtpSettings } from '@/hooks/useAdminCheckoutSettings';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -136,61 +137,34 @@ export default function AdminCheckoutSettingsOtp() {
           </div>
         ) : (
           <>
-            {/* OTP Enablement */}
-            <Card>
+            {/* OTP Status - Disabled */}
+            <Card className="border-blue-500/30 bg-blue-500/5">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <KeyRound className="h-4 w-4" />
-                  OTP Enablement
+                  OTP Authentication Status
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg border">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <KeyRound className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Enable OTP Login for Checkout</p>
-                      <p className="text-sm text-muted-foreground">
-                        Require OTP verification during checkout login
-                      </p>
-                    </div>
+                <div className="flex items-center gap-3 p-4 rounded-lg border bg-muted/50">
+                  <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <Phone className="h-5 w-5 text-blue-600" />
                   </div>
-                  <Switch
-                    checked={localSettings.otp_enabled ?? false}
-                    onCheckedChange={() => handleToggle('otp_enabled')}
-                  />
+                  <div className="flex-1">
+                    <p className="font-medium">Phone Number Authentication</p>
+                    <p className="text-sm text-muted-foreground">
+                      Customers authenticate using phone number only. OTP is disabled.
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                    Active
+                  </Badge>
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-lg border">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Shield className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Require OTP Before Payment</p>
-                      <p className="text-sm text-muted-foreground">
-                        Additional OTP verification step before payment
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={localSettings.require_otp_before_payment ?? false}
-                    onCheckedChange={() => handleToggle('require_otp_before_payment')}
-                  />
+                <div className="p-3 rounded-lg bg-muted text-sm text-muted-foreground">
+                  <CheckCircle className="h-4 w-4 inline mr-2 text-green-500" />
+                  Phone number is the primary customer identifier. No OTP verification is required.
                 </div>
-
-                {!localSettings.otp_enabled && (
-                  <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-                    <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-300">
-                      <AlertTriangle className="h-4 w-4" />
-                      <span className="text-sm">
-                        OTP is disabled. Ensure guest checkout is enabled to allow users to proceed.
-                      </span>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
 

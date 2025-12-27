@@ -176,7 +176,7 @@ const CustomerLogin = () => {
 
             {/* Info Text */}
             <p className="text-center text-xs text-muted-foreground">
-              By continuing, you agree to our{" "}
+              Your phone number is your account identifier. By continuing, you agree to our{" "}
               <Link to="/terms" className="text-primary hover:underline">
                 Terms
               </Link>{" "}
