@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import CustomerLogin from "./pages/CustomerLogin";
 import CustomerSignup from "./pages/CustomerSignup";
 import CustomerVerify from "./pages/CustomerVerify";
+import ClaimAccount from "./pages/ClaimAccount";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
@@ -322,6 +323,8 @@ const App = () => (
               <Route path="/pay/:merchantSlug/failed" element={<PublicCheckoutFailed />} />
               <Route path="/pay/:merchantSlug/expired" element={<PublicCheckoutExpired />} />
               <Route path="/pay/receipt/:paymentId" element={<PublicPaymentReceipt />} />
+              {/* Account Claim Route (for payment link users) */}
+              <Route path="/claim-account" element={<ClaimAccount />} />
               {/* Admin Routes */}
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/reset-password" element={<AdminResetPassword />} />
