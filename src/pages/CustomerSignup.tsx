@@ -24,7 +24,10 @@ import { PageTransition } from "@/components/layout/PageTransition";
 const formSchema = z.object({
   fullName: z.string().min(2, { message: "Name must be at least 2 characters" }).max(100),
   email: z.string().email({ message: "Please enter a valid email address" }).max(255),
-  phone: z.string().optional(),
+  phone: z.string()
+    .min(10, { message: "Phone number must be at least 10 digits" })
+    .max(10, { message: "Phone number must be 10 digits" })
+    .regex(/^[6-9]\d{9}$/, { message: "Please enter a valid Indian mobile number" }),
   password: z.string().min(8, { message: "Password must be at least 8 characters" }),
   confirmPassword: z.string(),
   acceptTerms: z.boolean().refine(val => val === true, {
@@ -97,7 +100,7 @@ const CustomerSignup = () => {
       data.email,
       data.password,
       data.fullName,
-      data.phone || undefined
+      data.phone
     );
 
     if (signupError) {
@@ -197,8 +200,8 @@ const CustomerSignup = () => {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-foreground">
-                        Phone Number <span className="text-muted-foreground">(Optional)</span>
+                <FormLabel className="text-foreground">
+                        Phone Number <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
                         <div className="relative">

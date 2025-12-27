@@ -19,7 +19,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isEmailVerified: boolean;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<{ error: Error | null }>;
-  signup: (email: string, password: string, fullName: string, phone?: string) => Promise<{ error: Error | null }>;
+  signup: (email: string, password: string, fullName: string, phone: string) => Promise<{ error: Error | null }>;
   logout: () => Promise<void>;
   resendVerificationEmail: () => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
@@ -112,24 +112,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string, 
     password: string, 
     fullName: string, 
-    phone?: string
+    phone: string
   ): Promise<{ error: Error | null }> => {
     try {
       const redirectUrl = `${window.location.origin}/`;
-      const formattedPhone = phone && !phone.startsWith('+') ? `+91${phone}` : phone;
+      // Format phone with country code
+      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
       
-      // Check if phone already exists
-      if (formattedPhone) {
-        const { data: existingPhone } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("phone", formattedPhone)
-          .maybeSingle();
-        
-        if (existingPhone) {
-          return { error: new Error("This phone number is already registered. Please sign in or use a different number.") };
-        }
+      // Check if phone already exists - phone is the unique identifier
+      const { data: existingPhone } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("phone", formattedPhone)
+        .maybeSingle();
+      
+      if (existingPhone) {
+        return { error: new Error("This phone number is already registered. Please sign in instead.") };
       }
+
+      // Check if email already exists
+      const { data: existingEmail } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("phone", formattedPhone)
+        .maybeSingle();
       
       const { error } = await supabase.auth.signUp({
         email,
@@ -138,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           emailRedirectTo: redirectUrl,
           data: {
             full_name: fullName,
-            phone: formattedPhone || null,
+            phone: formattedPhone,
           },
         },
       });
