@@ -9,7 +9,11 @@ interface Profile {
   user_id: string;
   full_name: string | null;
   phone: string | null;
+  email: string | null;
   avatar_url: string | null;
+  auth_provider: 'email' | 'phone' | 'both' | 'google' | 'apple' | null;
+  email_verified: boolean | null;
+  phone_verified: boolean | null;
   created_at: string;
   updated_at: string;
 }

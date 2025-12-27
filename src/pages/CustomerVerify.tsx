@@ -15,8 +15,11 @@ const CustomerVerify = () => {
   const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
-  const { user, profile, isEmailVerified, resendVerificationEmail, isLoading } = useSupabaseAuth();
+  const { user, profile, resendVerificationEmail, isLoading } = useSupabaseAuth();
   const navigate = useNavigate();
+
+  // Compute email verified status from user object
+  const isEmailVerified = user?.email_confirmed_at != null;
 
   // Phone-based users don't need email verification - redirect to dashboard
   useEffect(() => {

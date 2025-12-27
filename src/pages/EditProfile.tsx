@@ -19,7 +19,7 @@ export default function EditProfile() {
 
   const [formData, setFormData] = useState({
     full_name: "",
-    phone: "",
+    email: "",
   });
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -27,7 +27,7 @@ export default function EditProfile() {
   if (profile && !isInitialized) {
     setFormData({
       full_name: profile.full_name || "",
-      phone: profile.phone || "",
+      email: profile.email && !profile.email.endsWith('@phone.safepay.local') ? profile.email : "",
     });
     setIsInitialized(true);
   }
@@ -144,33 +144,40 @@ export default function EditProfile() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  value={user?.email || ""}
-                  disabled
-                  className="h-12 bg-muted"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Email cannot be changed
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="phone">Phone Number (Primary)</Label>
                 {isLoading ? (
                   <Skeleton className="h-10 w-full" />
                 ) : (
                   <Input
                     id="phone"
-                    name="phone"
-                    type="tel"
-                    value={formData.phone}
+                    value={profile?.phone || ""}
+                    disabled
+                    className="h-12 bg-muted"
+                  />
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Phone number is your primary login method and cannot be changed here.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email (Optional)</Label>
+                {isLoading ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : (
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email || ""}
                     onChange={handleChange}
-                    placeholder="Enter your phone number"
+                    placeholder="For receipts & notifications (optional)"
                     className="h-12"
                   />
                 )}
+                <p className="text-xs text-muted-foreground">
+                  Email is optional and used only for receipts and communication.
+                </p>
               </div>
             </CardContent>
           </Card>
