@@ -5142,6 +5142,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_payment_link_stats: {
+        Args: { link_id: string; payment_amount: number }
+        Returns: undefined
+      }
       log_draft_action: {
         Args: {
           p_action_type: string
