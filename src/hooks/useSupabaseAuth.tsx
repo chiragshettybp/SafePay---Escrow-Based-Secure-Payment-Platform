@@ -10,7 +10,7 @@ interface Profile {
   phone: string | null;
   email: string | null;
   avatar_url: string | null;
-  auth_provider: 'email' | 'phone' | 'both' | 'google' | 'apple';
+  auth_provider: 'email' | 'phone' | 'both' | 'google' | 'apple' | 'phone_password';
   email_verified: boolean;
   phone_verified: boolean;
 }
@@ -22,22 +22,16 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   needsPhoneMigration: boolean;
-  // Phone-based auth (PRIMARY - ONLY method for customers)
-  loginWithPhone: (phone: string) => Promise<{ error: Error | null; isNewUser?: boolean }>;
-  signupWithPhone: (phone: string, fullName: string) => Promise<{ error: Error | null }>;
-  // Password management (OPTIONAL - for additional security)
-  setPassword: (password: string) => Promise<{ error: Error | null }>;
-  loginWithPhoneAndPassword: (phone: string, password: string) => Promise<{ error: Error | null }>;
+  // Phone + Password auth (PRIMARY - ONLY method for customers)
+  loginWithPhoneAndPassword: (phone: string, password: string) => Promise<{ error: Error | null; isNewUser?: boolean }>;
+  signupWithPhoneAndPassword: (phone: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  resetPassword: (phone: string, newPassword: string) => Promise<{ error: Error | null }>;
   // Profile management
   updateProfile: (data: Partial<Pick<Profile, 'phone' | 'email' | 'full_name'>>) => Promise<{ error: Error | null }>;
   addEmail: (email: string) => Promise<{ error: Error | null }>;
   addPhoneToAccount: (phone: string) => Promise<{ error: Error | null }>;
   // Session management
   logout: () => Promise<void>;
-  resendVerificationEmail: () => Promise<{ error: Error | null }>;
-  // OAuth (for social login - still requires phone migration after)
-  signInWithGoogle: () => Promise<{ error: Error | null }>;
-  signInWithApple: () => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -54,7 +48,7 @@ const formatPhone = (phone: string): string => {
   return phone.startsWith('+') ? phone : `+91${cleaned}`;
 };
 
-// Helper to create pseudo-email for phone-based auth
+// Helper to create pseudo-email for phone-based auth (Supabase requires email)
 const phoneToEmail = (phone: string): string => {
   const cleaned = phone.replace(/\+/g, '');
   return `${cleaned}@phone.safepay.local`;
@@ -121,8 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // PRIMARY: Login with phone number (no password required)
-  const loginWithPhone = async (phone: string): Promise<{ error: Error | null; isNewUser?: boolean }> => {
+  // PRIMARY: Login with phone number and password
+  const loginWithPhoneAndPassword = async (phone: string, password: string): Promise<{ error: Error | null; isNewUser?: boolean }> => {
     try {
       const formattedPhone = formatPhone(phone);
       
@@ -138,27 +132,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!existingProfile) {
-        // User doesn't exist - return indicator to redirect to signup
-        return { error: new Error("No account found. Please sign up first."), isNewUser: true };
+        return { error: new Error("No account found with this phone number. Please sign up first."), isNewUser: true };
       }
 
-      // User exists - sign them in using the phone-based email
+      // User exists - sign them in using the phone-based email and their password
       const phoneEmail = phoneToEmail(formattedPhone);
-      
-      // For phone-only auth, we use a deterministic password based on phone
-      // This is secure because the phone itself is the identity
-      const phonePassword = `phone_${formattedPhone}_safepay_auth`;
       
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: phoneEmail,
-        password: phonePassword,
+        password,
       });
 
       if (signInError) {
-        // If sign in fails, the user might have been created with email
-        // Try to look up their real email
-        if (existingProfile.email && !existingProfile.email.endsWith('@phone.safepay.local')) {
-          return { error: new Error("This account was created with email. Please add a phone number to continue.") };
+        if (signInError.message.includes("Invalid login credentials")) {
+          return { error: new Error("Incorrect phone number or password. Please try again.") };
         }
         return { error: signInError };
       }
@@ -169,8 +156,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // PRIMARY: Signup with phone number
-  const signupWithPhone = async (phone: string, fullName: string): Promise<{ error: Error | null }> => {
+  // PRIMARY: Signup with phone number and password
+  const signupWithPhoneAndPassword = async (phone: string, password: string, fullName: string): Promise<{ error: Error | null }> => {
     try {
       const formattedPhone = formatPhone(phone);
       
@@ -185,18 +172,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: new Error("This phone number is already registered. Please log in instead.") };
       }
       
-      // Create user with phone-based pseudo-email
+      // Create user with phone-based pseudo-email and user's password
       const phoneEmail = phoneToEmail(formattedPhone);
-      const phonePassword = `phone_${formattedPhone}_safepay_auth`;
       
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: phoneEmail,
-        password: phonePassword,
+        password,
         options: {
           data: {
             full_name: fullName,
             phone: formattedPhone,
-            auth_provider: 'phone',
+            auth_provider: 'phone_password',
           },
         },
       });
@@ -213,7 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .update({ 
               phone: formattedPhone,
               phone_verified: true,
-              auth_provider: 'phone',
+              auth_provider: 'phone_password',
               email: null // Clear pseudo-email from profile display
             })
             .eq("user_id", signUpData.user!.id);
@@ -226,37 +212,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // OPTIONAL: Login with phone and password (for users who set password)
-  const loginWithPhoneAndPassword = async (phone: string, password: string): Promise<{ error: Error | null }> => {
+  // Reset password using phone number
+  const resetPassword = async (phone: string, newPassword: string): Promise<{ error: Error | null }> => {
     try {
       const formattedPhone = formatPhone(phone);
-      const phoneEmail = phoneToEmail(formattedPhone);
       
-      const { error } = await supabase.auth.signInWithPassword({
-        email: phoneEmail,
-        password,
-      });
+      // Check if user exists by phone
+      const { data: existingProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("phone", formattedPhone)
+        .maybeSingle();
 
-      if (error) {
-        return { error };
+      if (profileError || !existingProfile) {
+        return { error: new Error("No account found with this phone number.") };
       }
 
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
-
-  // OPTIONAL: Set password for account security
-  const setPassword = async (password: string): Promise<{ error: Error | null }> => {
-    try {
-      const { error } = await supabase.auth.updateUser({ password });
+      // For password reset, user must already be logged in or we need admin action
+      // Since we're implementing a simplified reset, we'll sign them in first
+      // In production, this would typically involve SMS verification
       
-      if (error) {
-        return { error };
+      // For now, if user is already authenticated, update their password
+      if (session) {
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) {
+          return { error };
+        }
+        return { error: null };
       }
 
-      return { error: null };
+      return { error: new Error("Please contact support to reset your password.") };
     } catch (error) {
       return { error: error as Error };
     }
@@ -284,10 +269,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Update profile with email
       const { error } = await supabase
         .from("profiles")
-        .update({ 
-          email,
-          auth_provider: 'both'
-        })
+        .update({ email })
         .eq("user_id", user.id);
 
       if (error) {
@@ -328,7 +310,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .update({ 
           phone: formattedPhone,
           phone_verified: true,
-          auth_provider: 'phone' // Switch to phone-based auth
+          auth_provider: 'phone_password'
         })
         .eq("user_id", user.id);
 
@@ -376,68 +358,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate("/customer-login");
   };
 
-  const resendVerificationEmail = async (): Promise<{ error: Error | null }> => {
-    try {
-      if (!profile?.email || profile.email.endsWith('@phone.safepay.local')) {
-        return { error: new Error("No email address found") };
-      }
-
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email: profile.email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-        },
-      });
-
-      if (error) {
-        return { error };
-      }
-
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
-
-  const signInWithGoogle = async (): Promise<{ error: Error | null }> => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/`,
-        },
-      });
-
-      if (error) {
-        return { error };
-      }
-
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
-
-  const signInWithApple = async (): Promise<{ error: Error | null }> => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "apple",
-        options: {
-          redirectTo: `${window.location.origin}/`,
-        },
-      });
-
-      if (error) {
-        return { error };
-      }
-
-      return { error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -447,17 +367,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!session,
         needsPhoneMigration,
-        loginWithPhone,
-        signupWithPhone,
-        setPassword,
         loginWithPhoneAndPassword,
+        signupWithPhoneAndPassword,
+        resetPassword,
         updateProfile,
         addEmail,
         addPhoneToAccount,
         logout,
-        resendVerificationEmail,
-        signInWithGoogle,
-        signInWithApple,
       }}
     >
       {children}

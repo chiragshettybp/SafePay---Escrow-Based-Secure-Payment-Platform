@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Shield, Phone } from "lucide-react";
+import { Loader2, Shield, Phone, Lock, Eye, EyeOff } from "lucide-react";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -25,6 +25,8 @@ const formSchema = z.object({
     .min(10, { message: "Please enter a valid phone number" })
     .max(15, { message: "Phone number is too long" })
     .regex(/^[0-9]+$/, { message: "Phone number must contain only digits" }),
+  password: z.string()
+    .min(8, { message: "Password must be at least 8 characters" }),
   rememberMe: z.boolean().default(false),
 });
 
@@ -33,13 +35,15 @@ type FormValues = z.infer<typeof formSchema>;
 const CustomerLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { loginWithPhone } = useSupabaseAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const { loginWithPhoneAndPassword } = useSupabaseAuth();
   const navigate = useNavigate();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       phone: "",
+      password: "",
       rememberMe: localStorage.getItem("rememberMe") === "true",
     },
   });
@@ -52,7 +56,7 @@ const CustomerLogin = () => {
     setIsLoading(true);
     setError(null);
 
-    const { error: loginError, isNewUser } = await loginWithPhone(data.phone);
+    const { error: loginError, isNewUser } = await loginWithPhoneAndPassword(data.phone, data.password);
 
     if (loginError) {
       if (isNewUser) {
@@ -106,7 +110,7 @@ const CustomerLogin = () => {
               </Alert>
             )}
 
-            {/* Phone Login Form */}
+            {/* Login Form */}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                 <FormField
@@ -140,22 +144,62 @@ const CustomerLogin = () => {
 
                 <FormField
                   control={form.control}
-                  name="rememberMe"
+                  name="password"
                   render={({ field }) => (
-                    <FormItem className="flex items-center space-x-2 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          className="border-border data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                        />
-                      </FormControl>
-                      <FormLabel className="text-sm font-normal text-muted-foreground cursor-pointer">
-                        Remember me
+                    <FormItem>
+                      <FormLabel className="text-foreground flex items-center gap-2">
+                        <Lock className="h-4 w-4" />
+                        Password
                       </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            placeholder="Enter your password"
+                            {...field}
+                            type={showPassword ? "text" : "password"}
+                            autoComplete="current-password"
+                            className="h-12 bg-card border-border focus:border-primary transition-colors pr-12"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                          </button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                <div className="flex items-center justify-between">
+                  <FormField
+                    control={form.control}
+                    name="rememberMe"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="border-border data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                          />
+                        </FormControl>
+                        <FormLabel className="text-sm font-normal text-muted-foreground cursor-pointer">
+                          Remember me
+                        </FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <Link
+                    to="/reset-password"
+                    className="text-sm text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
 
                 <Button
                   type="submit"
@@ -168,7 +212,7 @@ const CustomerLogin = () => {
                       Signing in...
                     </>
                   ) : (
-                    "Continue"
+                    "Sign In"
                   )}
                 </Button>
               </form>
@@ -176,7 +220,7 @@ const CustomerLogin = () => {
 
             {/* Info Text */}
             <p className="text-center text-xs text-muted-foreground">
-              Your phone number is your account identifier. By continuing, you agree to our{" "}
+              By continuing, you agree to our{" "}
               <Link to="/terms" className="text-primary hover:underline">
                 Terms
               </Link>{" "}

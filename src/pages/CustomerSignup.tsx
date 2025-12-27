@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Shield, Phone, User } from "lucide-react";
+import { Loader2, Shield, Phone, User, Lock, Eye, EyeOff } from "lucide-react";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -28,9 +28,19 @@ const formSchema = z.object({
     .min(10, { message: "Please enter a valid phone number" })
     .max(15, { message: "Phone number is too long" })
     .regex(/^[0-9]+$/, { message: "Phone number must contain only digits" }),
+  password: z.string()
+    .min(8, { message: "Password must be at least 8 characters" })
+    .regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter" })
+    .regex(/[a-z]/, { message: "Password must contain at least one lowercase letter" })
+    .regex(/[0-9]/, { message: "Password must contain at least one number" }),
+  confirmPassword: z.string()
+    .min(8, { message: "Please confirm your password" }),
   acceptTerms: z.boolean().refine(val => val === true, {
     message: "You must accept the terms and conditions",
   }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -38,7 +48,9 @@ type FormValues = z.infer<typeof formSchema>;
 const CustomerSignup = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { signupWithPhone } = useSupabaseAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const { signupWithPhoneAndPassword } = useSupabaseAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -47,12 +59,31 @@ const CustomerSignup = () => {
     defaultValues: {
       fullName: "",
       phone: searchParams.get("phone") || "",
+      password: "",
+      confirmPassword: "",
       acceptTerms: false,
     },
     mode: "onChange",
   });
 
   const isFormValid = form.formState.isValid;
+  const password = form.watch("password");
+
+  // Password strength indicator
+  const getPasswordStrength = () => {
+    if (!password) return { strength: 0, label: "" };
+    let strength = 0;
+    if (password.length >= 8) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[a-z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^A-Za-z0-9]/.test(password)) strength++;
+    
+    const labels = ["", "Weak", "Fair", "Good", "Strong", "Very Strong"];
+    return { strength, label: labels[strength] };
+  };
+
+  const passwordStrength = getPasswordStrength();
 
   // Pre-fill phone from URL if coming from login
   useEffect(() => {
@@ -68,8 +99,9 @@ const CustomerSignup = () => {
     setIsLoading(true);
     setError(null);
 
-    const { error: signupError } = await signupWithPhone(
+    const { error: signupError } = await signupWithPhoneAndPassword(
       data.phone,
+      data.password,
       data.fullName
     );
 
@@ -119,7 +151,7 @@ const CustomerSignup = () => {
 
             {/* Signup Form */}
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="fullName"
@@ -164,6 +196,99 @@ const CustomerSignup = () => {
                             autoComplete="tel"
                             className="h-12 bg-card border-border focus:border-primary transition-colors pl-12 text-lg tracking-wide"
                           />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-foreground flex items-center gap-2">
+                        <Lock className="h-4 w-4" />
+                        Password
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            placeholder="Create a strong password"
+                            {...field}
+                            type={showPassword ? "text" : "password"}
+                            autoComplete="new-password"
+                            className="h-12 bg-card border-border focus:border-primary transition-colors pr-12"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                          </button>
+                        </div>
+                      </FormControl>
+                      {password && (
+                        <div className="mt-2">
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((level) => (
+                              <div
+                                key={level}
+                                className={`h-1 flex-1 rounded-full transition-colors ${
+                                  level <= passwordStrength.strength
+                                    ? passwordStrength.strength <= 2
+                                      ? "bg-destructive"
+                                      : passwordStrength.strength <= 3
+                                      ? "bg-yellow-500"
+                                      : "bg-green-500"
+                                    : "bg-muted"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <p className={`text-xs mt-1 ${
+                            passwordStrength.strength <= 2
+                              ? "text-destructive"
+                              : passwordStrength.strength <= 3
+                              ? "text-yellow-600"
+                              : "text-green-600"
+                          }`}>
+                            {passwordStrength.label}
+                          </p>
+                        </div>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-foreground flex items-center gap-2">
+                        <Lock className="h-4 w-4" />
+                        Confirm Password
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            placeholder="Confirm your password"
+                            {...field}
+                            type={showConfirmPassword ? "text" : "password"}
+                            autoComplete="new-password"
+                            className="h-12 bg-card border-border focus:border-primary transition-colors pr-12"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                          </button>
                         </div>
                       </FormControl>
                       <FormMessage />
