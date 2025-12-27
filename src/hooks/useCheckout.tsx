@@ -232,7 +232,7 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
     },
   });
 
-  // Collect phone number mutation (replaces OTP flow)
+  // Collect phone number mutation - uses server-side resolution for payment links
   const collectPhone = useMutation({
     mutationFn: async (phoneNumber: string) => {
       if (!sessionId) throw new Error('No session');
@@ -242,21 +242,40 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
         throw new Error('Invalid phone number format');
       }
 
-      // Check if user exists with this phone
-      const { data: existingUser } = await supabase
-        .from('profiles')
-        .select('id, full_name, phone')
-        .eq('phone', phoneNumber)
-        .maybeSingle();
+      // For payment link flows, use the checkout-session edge function
+      // This ensures atomic user resolution on the server side
+      if (session?.payment_link_id) {
+        const { data: result, error: invokeError } = await supabase.functions.invoke(
+          'checkout-session/action',
+          {
+            body: {
+              session_id: sessionId,
+              action: 'collect_phone',
+              data: { phone_number: phoneNumber },
+            },
+          }
+        );
 
-      // Fetch current user
+        if (invokeError) {
+          console.error('Phone collection error:', invokeError);
+          throw new Error(invokeError.message || 'Failed to save phone number');
+        }
+
+        if (result?.error) {
+          throw new Error(result.error);
+        }
+
+        return { user: result?.user || null };
+      }
+
+      // Non-payment-link flow: simple update (user already authenticated or will authenticate)
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Update session - mark phone as collected and move to address step
       const updateData: Record<string, unknown> = {
         phone_number: phoneNumber,
+        phone_snapshot: phoneNumber,
         current_step: 'address',
-        user_id: existingUser?.id || user?.id || null,
+        user_id: user?.id || null,
       };
 
       const { error: updateError } = await supabase
@@ -270,12 +289,12 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
       await supabase.from('checkout_events').insert({
         session_id: sessionId,
         event_type: 'phone_collected',
-        event_data: { phone_number: phoneNumber.replace(/\d(?=\d{4})/g, '*'), returning_user: !!existingUser },
+        event_data: { phone_number: phoneNumber.replace(/\d(?=\d{4})/g, '*') },
         step: 'address',
         previous_step: 'login',
       });
 
-      return { user: existingUser };
+      return { user: null };
     },
     onSuccess: () => {
       toast({

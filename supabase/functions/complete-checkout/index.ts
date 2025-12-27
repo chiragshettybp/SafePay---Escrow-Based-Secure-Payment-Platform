@@ -99,64 +99,131 @@ Deno.serve(async (req) => {
         normalizedPhone = normalizedPhone.startsWith('91') ? `+${normalizedPhone}` : `+91${normalizedPhone}`
       }
 
-      // Check if user exists with this phone
+      // Check if user exists with this phone - use user_id column
       const { data: existingProfile, error: profileError } = await supabaseAdmin
         .from('profiles')
-        .select('user_id')
+        .select('user_id, phone')
         .eq('phone', normalizedPhone)
         .maybeSingle()
 
       if (existingProfile?.user_id) {
         effectiveCustomerId = existingProfile.user_id
-        console.log('Found existing user:', effectiveCustomerId)
+        console.log('Found existing user by profile phone:', effectiveCustomerId)
       } else {
-        // Create new user via auth admin API
-        console.log('Creating new user for phone:', normalizedPhone)
-        
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          phone: normalizedPhone,
-          phone_confirm: true,
-          user_metadata: {
-            account_source: 'payment_link',
-            created_via_checkout: session_id,
-          },
+        // Also check auth.users directly in case profile wasn't created yet
+        const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers({
+          page: 1,
+          perPage: 1,
         })
-
-        if (authError) {
-          // If user already exists (race condition), try to find them
-          if (authError.message?.includes('already') || authError.message?.includes('exists')) {
-            console.log('User may already exist, retrying lookup...')
-            const { data: retryProfile } = await supabaseAdmin
-              .from('profiles')
-              .select('user_id')
-              .eq('phone', normalizedPhone)
-              .maybeSingle()
-            
-            if (retryProfile?.user_id) {
-              effectiveCustomerId = retryProfile.user_id
-              console.log('Found user on retry:', effectiveCustomerId)
-            }
-          } else {
-            console.error('Auth user creation error:', authError)
-          }
-        } else if (authData?.user) {
-          effectiveCustomerId = authData.user.id
-          console.log('Created new user:', effectiveCustomerId)
-
-          // Ensure profile exists with correct fields
-          const { error: profileUpsertError } = await supabaseAdmin
+        
+        // Find user by phone in auth.users
+        const existingAuthUser = authUsers?.users?.find(u => u.phone === normalizedPhone)
+        
+        if (existingAuthUser) {
+          effectiveCustomerId = existingAuthUser.id
+          console.log('Found existing user in auth.users:', effectiveCustomerId)
+          
+          // Ensure profile exists
+          const { error: upsertError } = await supabaseAdmin
             .from('profiles')
             .upsert({
-              user_id: authData.user.id,
+              id: existingAuthUser.id,
+              user_id: existingAuthUser.id,
               phone: normalizedPhone,
               account_source: 'payment_link',
               account_claimed: false,
               auth_provider: 'payment_link',
               phone_verified: true,
             }, { onConflict: 'user_id' })
+          
+          if (upsertError) {
+            console.error('Profile upsert error:', upsertError)
+          }
+        } else {
+          // Create new user via auth admin API
+          console.log('Creating new user for phone:', normalizedPhone)
+          
+          const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            phone: normalizedPhone,
+            phone_confirm: true,
+            user_metadata: {
+              account_source: 'payment_link',
+              created_via_checkout: session_id,
+            },
+          })
 
-          if (profileUpsertError) {
-            console.error('Profile upsert error:', profileUpsertError)
+          if (authError) {
+            // Handle duplicate phone - try multiple lookup strategies
+            const isDuplicate = authError.message?.includes('already') || 
+                               authError.message?.includes('exists') ||
+                               authError.message?.includes('duplicate') ||
+                               authError.code === '23505'
+            
+            if (isDuplicate) {
+              console.log('User already exists, searching with different strategies...')
+              
+              // Strategy 1: Lookup by phone in profiles again (might have been created by trigger)
+              const { data: retryProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('user_id')
+                .eq('phone', normalizedPhone)
+                .maybeSingle()
+              
+              if (retryProfile?.user_id) {
+                effectiveCustomerId = retryProfile.user_id
+                console.log('Found user on retry (profiles):', effectiveCustomerId)
+              } else {
+                // Strategy 2: List all users and find by phone
+                const { data: allUsers } = await supabaseAdmin.auth.admin.listUsers({
+                  page: 1,
+                  perPage: 100,
+                })
+                
+                const matchingUser = allUsers?.users?.find(u => u.phone === normalizedPhone)
+                
+                if (matchingUser) {
+                  effectiveCustomerId = matchingUser.id
+                  console.log('Found user in auth list:', effectiveCustomerId)
+                  
+                  // Ensure profile exists for this user
+                  await supabaseAdmin
+                    .from('profiles')
+                    .upsert({
+                      id: matchingUser.id,
+                      user_id: matchingUser.id,
+                      phone: normalizedPhone,
+                      account_source: 'payment_link',
+                      account_claimed: false,
+                      auth_provider: 'payment_link',
+                      phone_verified: true,
+                    }, { onConflict: 'user_id' })
+                }
+              }
+            } else {
+              console.error('Auth user creation error:', authError)
+            }
+          } else if (authData?.user) {
+            effectiveCustomerId = authData.user.id
+            console.log('Created new user:', effectiveCustomerId)
+
+            // Wait a moment for trigger to create profile, then ensure correct fields
+            await new Promise(resolve => setTimeout(resolve, 100))
+            
+            const { error: profileUpsertError } = await supabaseAdmin
+              .from('profiles')
+              .upsert({
+                id: authData.user.id,
+                user_id: authData.user.id,
+                phone: normalizedPhone,
+                account_source: 'payment_link',
+                account_claimed: false,
+                auth_provider: 'payment_link',
+                phone_verified: true,
+              }, { onConflict: 'user_id' })
+
+            if (profileUpsertError) {
+              console.error('Profile upsert error:', profileUpsertError)
+            }
           }
         }
       }
