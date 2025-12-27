@@ -49,9 +49,10 @@ const formatPhone = (phone: string): string => {
 };
 
 // Helper to create pseudo-email for phone-based auth (Supabase requires email)
+// Using example.com which is a reserved domain that Supabase accepts
 const phoneToEmail = (phone: string): string => {
   const cleaned = phone.replace(/\+/g, '');
-  return `${cleaned}@phone.safepay.local`;
+  return `phone.${cleaned}@example.com`;
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -77,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(data as Profile | null);
     
     // Check if user needs phone migration (has email but no phone)
-    if (data && !data.phone && data.email && !data.email.endsWith('@phone.safepay.local')) {
+    if (data && !data.phone && data.email && !data.email.startsWith('phone.')) {
       setNeedsPhoneMigration(true);
     } else {
       setNeedsPhoneMigration(false);
