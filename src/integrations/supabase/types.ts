@@ -758,6 +758,7 @@ export type Database = {
           payment_id: string | null
           payment_link_id: string | null
           phone_number: string | null
+          phone_snapshot: string | null
           selected_payment_method:
             | Database["public"]["Enums"]["checkout_payment_method"]
             | null
@@ -801,6 +802,7 @@ export type Database = {
           payment_id?: string | null
           payment_link_id?: string | null
           phone_number?: string | null
+          phone_snapshot?: string | null
           selected_payment_method?:
             | Database["public"]["Enums"]["checkout_payment_method"]
             | null
@@ -844,6 +846,7 @@ export type Database = {
           payment_id?: string | null
           payment_link_id?: string | null
           phone_number?: string | null
+          phone_snapshot?: string | null
           selected_payment_method?:
             | Database["public"]["Enums"]["checkout_payment_method"]
             | null
@@ -3029,6 +3032,7 @@ export type Database = {
           merchant_id: string
           merchant_name: string
           merchant_net_amount: number | null
+          phone_snapshot: string | null
           platform_fee: number | null
           platform_fee_gst: number | null
           product_description: string | null
@@ -3066,6 +3070,7 @@ export type Database = {
           merchant_id: string
           merchant_name: string
           merchant_net_amount?: number | null
+          phone_snapshot?: string | null
           platform_fee?: number | null
           platform_fee_gst?: number | null
           product_description?: string | null
@@ -3103,6 +3108,7 @@ export type Database = {
           merchant_id?: string
           merchant_name?: string
           merchant_net_amount?: number | null
+          phone_snapshot?: string | null
           platform_fee?: number | null
           platform_fee_gst?: number | null
           product_description?: string | null
@@ -3272,6 +3278,80 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "payment_link_audit_log_payment_link_id_fkey"
+            columns: ["payment_link_id"]
+            isOneToOne: false
+            referencedRelation: "payment_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_link_user_associations: {
+        Row: {
+          association_type: string
+          checkout_session_id: string | null
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          order_id: string | null
+          payment_id: string | null
+          payment_link_id: string | null
+          phone_number: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          association_type: string
+          checkout_session_id?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          order_id?: string | null
+          payment_id?: string | null
+          payment_link_id?: string | null
+          phone_number: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          association_type?: string
+          checkout_session_id?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          order_id?: string | null
+          payment_id?: string | null
+          payment_link_id?: string | null
+          phone_number?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_link_user_associations_checkout_session_id_fkey"
+            columns: ["checkout_session_id"]
+            isOneToOne: false
+            referencedRelation: "checkout_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_link_user_associations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_link_user_associations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_link_user_associations_payment_link_id_fkey"
             columns: ["payment_link_id"]
             isOneToOne: false
             referencedRelation: "payment_links"
@@ -3605,7 +3685,10 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_claimed: boolean | null
+          account_source: string | null
           account_status: string
+          auth_provider: string | null
           avatar_url: string | null
           created_at: string
           full_name: string | null
@@ -3615,7 +3698,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_claimed?: boolean | null
+          account_source?: string | null
           account_status?: string
+          auth_provider?: string | null
           avatar_url?: string | null
           created_at?: string
           full_name?: string | null
@@ -3625,7 +3711,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_claimed?: boolean | null
+          account_source?: string | null
           account_status?: string
+          auth_provider?: string | null
           avatar_url?: string | null
           created_at?: string
           full_name?: string | null
