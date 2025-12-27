@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { MetricsCard } from "@/components/dashboard/MetricsCard";
 import { OrdersTable } from "@/components/dashboard/OrdersTable";
 import { useOrders, OrderStatus } from "@/hooks/useOrders";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import {
   ShoppingBag,
   Clock,
@@ -34,9 +35,24 @@ const statusOptions: { value: string; label: string }[] = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { needsPhoneMigration, isLoading: authLoading, isAuthenticated } = useSupabaseAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [metricFilter, setMetricFilter] = useState<string | null>(null);
+
+  // Redirect to phone migration if needed
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && needsPhoneMigration) {
+      navigate("/customer-phone-migration");
+    }
+  }, [needsPhoneMigration, authLoading, isAuthenticated, navigate]);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate("/customer-login");
+    }
+  }, [authLoading, isAuthenticated, navigate]);
 
   const effectiveFilter = metricFilter || (statusFilter !== "all" ? statusFilter : null);
   

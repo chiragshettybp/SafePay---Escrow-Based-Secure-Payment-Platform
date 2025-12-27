@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Mail, CheckCircle, RefreshCw, Shield } from "lucide-react";
+import { Loader2, Mail, CheckCircle, RefreshCw, Shield, Phone } from "lucide-react";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { toast } from "@/hooks/use-toast";
 import { PageTransition } from "@/components/layout/PageTransition";
@@ -15,19 +15,27 @@ const CustomerVerify = () => {
   const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
-  const { user, isEmailVerified, resendVerificationEmail, isLoading } = useSupabaseAuth();
+  const { user, profile, isEmailVerified, resendVerificationEmail, isLoading } = useSupabaseAuth();
   const navigate = useNavigate();
 
-  // Check if email is verified and redirect
+  // Phone-based users don't need email verification - redirect to dashboard
   useEffect(() => {
-    if (!isLoading && isEmailVerified) {
-      toast({
-        title: "Email verified!",
-        description: "Your email has been verified successfully.",
-      });
-      navigate("/");
+    if (!isLoading && profile) {
+      // If user signed up with phone (auth_provider is 'phone'), skip email verification
+      if (profile.auth_provider === 'phone' || (profile.phone && !profile.email)) {
+        navigate("/dashboard");
+        return;
+      }
+      // If email is already verified, redirect
+      if (isEmailVerified) {
+        toast({
+          title: "Email verified!",
+          description: "Your email has been verified successfully.",
+        });
+        navigate("/dashboard");
+      }
     }
-  }, [isEmailVerified, isLoading, navigate]);
+  }, [isEmailVerified, isLoading, navigate, profile]);
 
   // Cooldown timer
   useEffect(() => {
@@ -37,9 +45,9 @@ const CustomerVerify = () => {
     }
   }, [cooldown]);
 
-  // Poll for verification status
+  // Poll for verification status (only for email users)
   useEffect(() => {
-    if (!user || isEmailVerified) return;
+    if (!user || isEmailVerified || profile?.auth_provider === 'phone') return;
 
     const checkVerification = async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -48,14 +56,14 @@ const CustomerVerify = () => {
           title: "Email verified!",
           description: "Your email has been verified successfully.",
         });
-        navigate("/");
+        navigate("/dashboard");
       }
     };
 
     // Check every 5 seconds
     const interval = setInterval(checkVerification, 5000);
     return () => clearInterval(interval);
-  }, [user, isEmailVerified, navigate]);
+  }, [user, isEmailVerified, navigate, profile]);
 
   const handleResend = async () => {
     if (isResending || cooldown > 0) return;
@@ -93,7 +101,7 @@ const CustomerVerify = () => {
         title: "Email verified!",
         description: "Your email has been verified successfully.",
       });
-      navigate("/");
+      navigate("/dashboard");
     } else {
       toast({
         title: "Not verified yet",
@@ -103,6 +111,10 @@ const CustomerVerify = () => {
     }
     
     setIsCheckingStatus(false);
+  };
+
+  const handleSkipAndContinue = () => {
+    navigate("/dashboard");
   };
 
   if (isLoading) {
@@ -125,7 +137,7 @@ const CustomerVerify = () => {
               </div>
               <h1 className="text-2xl font-bold text-foreground">Session Expired</h1>
               <p className="text-muted-foreground">
-                Please sign in to verify your email.
+                Please sign in to continue.
               </p>
               <Button asChild className="w-full h-12">
                 <Link to="/customer-login">Go to Login</Link>
@@ -136,6 +148,35 @@ const CustomerVerify = () => {
       </div>
     );
   }
+
+  // For phone-based users, show different message
+  if (profile?.auth_provider === 'phone') {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <PageTransition>
+          <main className="flex-1 flex items-center justify-center px-4 py-8 sm:px-6">
+            <div className="w-full max-w-[420px] space-y-8 text-center">
+              <div className="mx-auto w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center">
+                <Phone className="h-10 w-10 text-green-500" />
+              </div>
+              <h1 className="text-2xl font-bold text-foreground">You're All Set!</h1>
+              <p className="text-muted-foreground">
+                Your account is active. You can optionally add an email later for receipts.
+              </p>
+              <Button asChild className="w-full h-12">
+                <Link to="/dashboard">Go to Dashboard</Link>
+              </Button>
+            </div>
+          </main>
+        </PageTransition>
+      </div>
+    );
+  }
+
+  // Get displayable email (skip pseudo-emails)
+  const displayEmail = user.email?.endsWith('@phone.safepay.local') 
+    ? null 
+    : user.email;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -152,13 +193,16 @@ const CustomerVerify = () => {
                 Verify Your Email
               </h1>
               
-              <p className="text-muted-foreground text-sm sm:text-base">
-                We've sent a verification link to
-              </p>
-              
-              <p className="text-foreground font-medium text-lg">
-                {user.email}
-              </p>
+              {displayEmail && (
+                <>
+                  <p className="text-muted-foreground text-sm sm:text-base">
+                    We've sent a verification link to
+                  </p>
+                  <p className="text-foreground font-medium text-lg">
+                    {displayEmail}
+                  </p>
+                </>
+              )}
             </div>
 
             {/* Error Alert */}
@@ -222,26 +266,26 @@ const CustomerVerify = () => {
                   </>
                 )}
               </Button>
+
+              {/* Skip option */}
+              <Button
+                onClick={handleSkipAndContinue}
+                variant="ghost"
+                className="w-full h-10 text-muted-foreground"
+              >
+                Skip for now
+              </Button>
             </div>
 
             {/* Links */}
             <div className="text-center space-y-2">
               <p className="text-sm text-muted-foreground">
-                Wrong email?{" "}
+                Wrong account?{" "}
                 <Link
                   to="/customer-signup"
                   className="font-medium text-primary hover:text-primary/80 transition-colors"
                 >
-                  Sign up with a different email
-                </Link>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Already verified?{" "}
-                <Link
-                  to="/customer-login"
-                  className="font-medium text-primary hover:text-primary/80 transition-colors"
-                >
-                  Sign in
+                  Create a new account
                 </Link>
               </p>
             </div>
