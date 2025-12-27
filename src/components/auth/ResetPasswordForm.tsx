@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -6,8 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, CheckCircle, ArrowLeft } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Loader2, CheckCircle, ArrowLeft, AlertCircle } from "lucide-react";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import {
   Form,
   FormControl,
@@ -18,7 +18,10 @@ import {
 } from "@/components/ui/form";
 
 const formSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address" }),
+  email: z.string()
+    .min(1, "Email is required")
+    .email({ message: "Please enter a valid email address" })
+    .max(255, "Email must be less than 255 characters"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -27,28 +30,35 @@ export function ResetPasswordForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isSubmittingRef = useRef(false);
+  const { resetPassword } = useSupabaseAuth();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       email: "",
     },
+    mode: "onChange",
   });
 
   async function onSubmit(data: FormValues) {
+    // Prevent concurrent submissions
+    if (isSubmittingRef.current || isLoading) return;
+    isSubmittingRef.current = true;
+    
     setIsLoading(true);
     setError(null);
     
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        data.email,
-        {
-          redirectTo: `${window.location.origin}/reset-password`,
-        }
-      );
+      const { error: resetError } = await resetPassword(data.email);
 
       if (resetError) {
-        setError(resetError.message);
+        // Handle rate limiting
+        if (resetError.message.includes("wait") || resetError.message.includes("Rate")) {
+          setError(resetError.message);
+        } else {
+          setError(resetError.message);
+        }
         return;
       }
       
@@ -58,6 +68,7 @@ export function ResetPasswordForm() {
       console.error("Reset password error:", err);
     } finally {
       setIsLoading(false);
+      isSubmittingRef.current = false;
     }
   }
 
@@ -87,6 +98,7 @@ export function ResetPasswordForm() {
     <div className="space-y-6">
       {error && (
         <Alert variant="destructive" className="animate-fade-in">
+          <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -110,6 +122,7 @@ export function ResetPasswordForm() {
                     placeholder="you@example.com" 
                     {...field} 
                     type="email"
+                    autoComplete="email"
                     className="h-12 bg-card border-border focus:border-primary transition-colors"
                   />
                 </FormControl>
@@ -118,7 +131,11 @@ export function ResetPasswordForm() {
             )}
           />
           
-          <Button type="submit" className="w-full h-12" disabled={isLoading}>
+          <Button 
+            type="submit" 
+            className="w-full h-12" 
+            disabled={isLoading || !form.formState.isValid}
+          >
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending reset link
