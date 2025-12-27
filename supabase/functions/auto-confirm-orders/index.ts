@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// FIX GAP 6: Auto-confirm orders after X days
+// Auto-confirm orders after X days with idempotency and ledger-first approach
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -31,10 +31,7 @@ Deno.serve(async (req) => {
 
     console.log(`Auto-confirming orders delivered before ${cutoffDate.toISOString()}`);
 
-    // Find orders that should be auto-confirmed:
-    // - Status is 'delivered'
-    // - No open disputes
-    // - Delivered more than X days ago
+    // Find eligible orders
     const { data: eligibleOrders, error: queryError } = await supabase
       .from("orders")
       .select(`
@@ -43,9 +40,12 @@ Deno.serve(async (req) => {
         merchant_id,
         amount,
         delivered_at,
+        status,
+        escrow_resolution_type,
         disputes!left(id, status)
       `)
       .eq("status", "delivered")
+      .is("escrow_resolution_type", null)
       .lt("delivered_at", cutoffDate.toISOString());
 
     if (queryError) {
@@ -66,6 +66,23 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
 
     for (const order of eligibleOrders) {
+      // Generate idempotency key
+      const idempotencyKey = `auto-confirm-${order.id}-${autoConfirmDays}`;
+
+      // Check if already processed (idempotency)
+      const { data: existingResolution } = await supabase
+        .from("escrow_resolution_log")
+        .select("id")
+        .eq("order_id", order.id)
+        .eq("resolution_type", "released")
+        .maybeSingle();
+
+      if (existingResolution) {
+        console.log(`Skipping order ${order.id} - already processed (idempotent)`);
+        skippedCount++;
+        continue;
+      }
+
       // Check for open disputes
       const hasOpenDispute = order.disputes?.some(
         (d: { status: string }) => d.status === "open" || d.status === "under_review"
@@ -87,22 +104,12 @@ Deno.serve(async (req) => {
       if (merchant?.status === "banned" || merchant?.status === "suspended") {
         console.log(`Skipping order ${order.id} - merchant is ${merchant.status}`);
         skippedCount++;
-
-        // Notify admin about this
-        await supabase.from("notifications").insert({
-          user_id: order.customer_id,
-          title: "Order Auto-Confirmation Delayed",
-          message: `Your order #${order.id.slice(0, 8)} could not be auto-confirmed. Please contact support.`,
-          type: "order",
-          order_id: order.id,
-        });
-
         continue;
       }
 
       try {
-        // Update order status
-        await supabase
+        // ATOMIC: Update order status with optimistic lock
+        const { error: updateError, data: updatedOrder } = await supabase
           .from("orders")
           .update({
             status: "completed",
@@ -110,7 +117,15 @@ Deno.serve(async (req) => {
             updated_at: now
           })
           .eq("id", order.id)
-          .eq("status", "delivered"); // Optimistic lock
+          .eq("status", "delivered")
+          .select()
+          .single();
+
+        if (updateError || !updatedOrder) {
+          console.log(`Skipping order ${order.id} - status changed (race condition)`);
+          skippedCount++;
+          continue;
+        }
 
         // Update payment
         await supabase
@@ -150,28 +165,31 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Credit merchant wallet
-        const { data: wallet } = await supabase
-          .from("merchant_wallets")
-          .select("*")
-          .eq("merchant_id", order.merchant_id)
-          .single();
+        // LEDGER-FIRST: Credit merchant wallet via ledger entry
+        await supabase.from("merchant_wallet_transactions").insert({
+          merchant_id: order.merchant_id,
+          transaction_type: "escrow_release",
+          amount: order.amount,
+          balance_before: 0,
+          balance_after: order.amount,
+          status: "success",
+          reference_type: "order",
+          reference_id: order.id,
+          reason: `Auto-confirmed after ${autoConfirmDays} days`,
+        });
 
-        if (wallet) {
-          await supabase
-            .from("merchant_wallets")
-            .update({
-              available_balance: wallet.available_balance + order.amount,
-              updated_at: now
-            })
-            .eq("id", wallet.id);
-        } else {
-          await supabase.from("merchant_wallets").insert({
-            merchant_id: order.merchant_id,
-            available_balance: order.amount,
-            currency: "INR"
-          });
-        }
+        // Log to escrow_resolution_log (immutable audit trail)
+        await supabase.from("escrow_resolution_log").insert({
+          order_id: order.id,
+          escrow_account_id: escrowAccount?.id || null,
+          resolution_type: "released",
+          previous_order_status: "delivered",
+          new_order_status: "completed",
+          amount: order.amount,
+          approval_source: "system",
+          reason: `Auto-confirmed after ${autoConfirmDays} days`,
+          idempotency_key: idempotencyKey,
+        });
 
         // Create order event
         await supabase.from("order_events").insert({
@@ -179,27 +197,27 @@ Deno.serve(async (req) => {
           event_type: "auto_confirmed",
           title: "Order Auto-Confirmed",
           description: `Order automatically confirmed after ${autoConfirmDays} days. Payment released to merchant.`,
-          metadata: { auto_confirm_days: autoConfirmDays }
+          metadata: { auto_confirm_days: autoConfirmDays, idempotency_key: idempotencyKey }
         });
 
-        // Notify customer
-        await supabase.from("notifications").insert({
-          user_id: order.customer_id,
-          title: "Order Auto-Confirmed",
-          message: `Your order #${order.id.slice(0, 8)} has been automatically confirmed after ${autoConfirmDays} days. Payment released to merchant.`,
-          type: "order",
-          order_id: order.id,
-        });
-
-        // Notify merchant
-        await supabase.from("merchant_notifications").insert({
-          merchant_id: order.merchant_id,
-          title: "Payment Auto-Released",
-          body: `Payment of ₹${order.amount} for order #${order.id.slice(0, 8)} has been auto-released to your wallet.`,
-          type: "payment",
-          related_order_id: order.id,
-          priority: "normal",
-        });
+        // Notify customer and merchant
+        await Promise.all([
+          supabase.from("notifications").insert({
+            user_id: order.customer_id,
+            title: "Order Auto-Confirmed",
+            message: `Your order #${order.id.slice(0, 8)} has been automatically confirmed after ${autoConfirmDays} days.`,
+            type: "order",
+            order_id: order.id,
+          }),
+          supabase.from("merchant_notifications").insert({
+            merchant_id: order.merchant_id,
+            title: "Payment Auto-Released",
+            body: `Payment of ₹${order.amount} for order #${order.id.slice(0, 8)} has been auto-released.`,
+            type: "payment",
+            related_order_id: order.id,
+            priority: "normal",
+          })
+        ]);
 
         confirmedCount++;
         console.log(`Auto-confirmed order ${order.id}`);

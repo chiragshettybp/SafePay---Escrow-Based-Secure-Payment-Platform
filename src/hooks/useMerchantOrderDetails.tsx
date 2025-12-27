@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { merchantSupabase } from "@/integrations/supabase/merchantClient";
 import { useMerchantAuth } from "./useMerchantAuth";
 import { toast } from "sonner";
@@ -77,9 +77,38 @@ export interface Dispute {
   updated_at: string;
 }
 
+// Valid status transitions for merchants
+const validMerchantTransitions: Record<OrderStatus, OrderStatus[]> = {
+  draft: [],
+  pending: ['in_progress'],
+  escrow_locked: ['in_progress'],
+  in_progress: ['delivered'],
+  delivered: [], // Only customer can confirm
+  completed: [],
+  disputed: [],
+  refunded: [],
+  cancelled: [],
+};
+
 export function useMerchantOrderDetails(orderId: string | undefined) {
   const { merchant } = useMerchantAuth();
   const queryClient = useQueryClient();
+  
+  // Guards and refs
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isUpdatingRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // Fetch order details with customer info
   const {
@@ -125,6 +154,8 @@ export function useMerchantOrderDetails(orderId: string | undefined) {
       } as MerchantOrderDetails;
     },
     enabled: !!orderId && !!merchant?.user_id,
+    retry: 2,
+    staleTime: 30000,
   });
 
   // Fetch tracking info
@@ -146,6 +177,8 @@ export function useMerchantOrderDetails(orderId: string | undefined) {
       return data as OrderTracking | null;
     },
     enabled: !!orderId,
+    retry: 2,
+    staleTime: 30000,
   });
 
   // Fetch tracking events
@@ -167,6 +200,8 @@ export function useMerchantOrderDetails(orderId: string | undefined) {
       return data as TrackingEvent[];
     },
     enabled: !!tracking?.id,
+    retry: 2,
+    staleTime: 30000,
   });
 
   // Fetch order events (timeline)
@@ -188,6 +223,8 @@ export function useMerchantOrderDetails(orderId: string | undefined) {
       return data as OrderEvent[];
     },
     enabled: !!orderId,
+    retry: 2,
+    staleTime: 30000,
   });
 
   // Fetch delivery proofs
@@ -208,6 +245,8 @@ export function useMerchantOrderDetails(orderId: string | undefined) {
       return data as DeliveryProof[];
     },
     enabled: !!orderId,
+    retry: 2,
+    staleTime: 30000,
   });
 
   // Fetch dispute info
@@ -229,40 +268,122 @@ export function useMerchantOrderDetails(orderId: string | undefined) {
       return data as Dispute | null;
     },
     enabled: !!orderId,
+    retry: 2,
+    staleTime: 30000,
   });
 
-  // Update order status mutation
+  // Update order status mutation with validation
   const updateStatusMutation = useMutation({
     mutationFn: async (status: OrderStatus) => {
       if (!orderId || !merchant?.user_id) throw new Error("Missing data");
-
-      const updateData: Record<string, unknown> = { status };
-      if (status === "delivered") {
-        updateData.delivered_at = new Date().toISOString();
+      
+      // Prevent concurrent updates
+      if (isUpdatingRef.current) {
+        throw new Error("An update is already in progress");
       }
+      
+      isUpdatingRef.current = true;
 
-      const { error } = await merchantSupabase
-        .from("orders")
-        .update(updateData)
-        .eq("id", orderId)
-        .eq("merchant_id", merchant.user_id);
+      try {
+        // First, fetch current order to validate transition
+        const { data: currentOrder, error: fetchError } = await merchantSupabase
+          .from("orders")
+          .select("id, status, merchant_id")
+          .eq("id", orderId)
+          .eq("merchant_id", merchant.user_id)
+          .single();
 
-      if (error) throw error;
+        if (fetchError || !currentOrder) {
+          throw new Error("Order not found or access denied");
+        }
+
+        // Validate status transition
+        const currentStatus = currentOrder.status as OrderStatus;
+        const allowedTransitions = validMerchantTransitions[currentStatus] || [];
+        
+        if (!allowedTransitions.includes(status)) {
+          throw new Error(`Invalid status transition from ${currentStatus} to ${status}`);
+        }
+
+        const updateData: Record<string, unknown> = { 
+          status,
+          updated_at: new Date().toISOString() 
+        };
+        
+        if (status === "delivered") {
+          updateData.delivered_at = new Date().toISOString();
+        }
+
+        // Atomic update with status check (optimistic locking)
+        const { error, data } = await merchantSupabase
+          .from("orders")
+          .update(updateData)
+          .eq("id", orderId)
+          .eq("merchant_id", merchant.user_id)
+          .eq("status", currentStatus) // Prevent race condition
+          .select()
+          .single();
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            throw new Error("Order status has changed. Please refresh and try again.");
+          }
+          throw error;
+        }
+
+        // Create order event for audit trail
+        await merchantSupabase.from("order_events").insert({
+          order_id: orderId,
+          event_type: "merchant_status_update",
+          title: `Status updated to ${status}`,
+          description: `Merchant updated order status from ${currentStatus} to ${status}`,
+          metadata: {
+            previous_status: currentStatus,
+            new_status: status,
+            updated_by: merchant.user_id,
+            timestamp: new Date().toISOString()
+          },
+        });
+
+        return data;
+      } finally {
+        isUpdatingRef.current = false;
+      }
     },
     onSuccess: () => {
+      if (!mountedRef.current) return;
+      
       queryClient.invalidateQueries({ queryKey: ["merchantOrderDetails"] });
       queryClient.invalidateQueries({ queryKey: ["merchantOrders"] });
       queryClient.invalidateQueries({ queryKey: ["merchantMetrics"] });
       queryClient.invalidateQueries({ queryKey: ["merchantOrderEvents"] });
       toast.success("Order status updated");
     },
-    onError: (error) => {
-      toast.error("Failed to update status");
+    onError: (error: Error) => {
+      if (!mountedRef.current) return;
+      
+      toast.error(error.message || "Failed to update status");
       console.error(error);
     },
   });
 
-  // Realtime subscription
+  // Debounced invalidation function
+  const debouncedInvalidate = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      if (mountedRef.current && orderId) {
+        queryClient.invalidateQueries({ queryKey: ["merchantOrderDetails", orderId] });
+        queryClient.invalidateQueries({ queryKey: ["merchantOrderEvents", orderId] });
+        queryClient.invalidateQueries({ queryKey: ["merchantOrderTracking", orderId] });
+        queryClient.invalidateQueries({ queryKey: ["merchantOrderDispute", orderId] });
+        queryClient.invalidateQueries({ queryKey: ["merchantDeliveryProofs", orderId] });
+      }
+    }, 1000);
+  }, [queryClient, orderId]);
+
+  // Realtime subscription with debouncing
   useEffect(() => {
     if (!orderId) return;
 
@@ -272,29 +393,28 @@ export function useMerchantOrderDetails(orderId: string | undefined) {
         "postgres_changes",
         { event: "*", schema: "public", table: "orders", filter: `id=eq.${orderId}` },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["merchantOrderDetails", orderId] });
-          queryClient.invalidateQueries({ queryKey: ["merchantOrderEvents", orderId] });
+          debouncedInvalidate();
         }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "tracking", filter: `order_id=eq.${orderId}` },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["merchantOrderTracking", orderId] });
+          debouncedInvalidate();
         }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "disputes", filter: `order_id=eq.${orderId}` },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["merchantOrderDispute", orderId] });
+          debouncedInvalidate();
         }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "delivery_proofs", filter: `order_id=eq.${orderId}` },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["merchantDeliveryProofs", orderId] });
+          debouncedInvalidate();
         }
       )
       .subscribe();
@@ -302,7 +422,7 @@ export function useMerchantOrderDetails(orderId: string | undefined) {
     return () => {
       merchantSupabase.removeChannel(channel);
     };
-  }, [orderId, queryClient]);
+  }, [orderId, debouncedInvalidate]);
 
   return {
     order,
