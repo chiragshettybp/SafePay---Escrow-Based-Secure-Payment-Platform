@@ -246,28 +246,142 @@ Deno.serve(async (req) => {
       switch (body.action) {
         case 'collect_phone': {
           const phoneNumber = body.data?.phone_number as string;
+          const isPaymentLink = session.payment_link_id !== null;
           
           if (!phoneNumber || !/^\+91\d{10}$/.test(phoneNumber)) {
             return json(400, { error: "Invalid phone number format. Use +91XXXXXXXXXX" });
           }
           
-          console.log(`[Checkout] Collecting phone: ${phoneNumber.replace(/\d(?=\d{4})/g, '*')}`);
+          const maskedPhone = phoneNumber.slice(0, 4) + '****' + phoneNumber.slice(-4);
+          console.log(`[Checkout] Collecting phone: ${maskedPhone}, isPaymentLink: ${isPaymentLink}`);
           
-          // Check if user exists with this phone number
-          const { data: existingUser } = await supabase
-            .from("profiles")
-            .select("id, full_name, phone")
-            .eq("phone", phoneNumber)
-            .single();
+          let resolvedUserId: string | null = null;
+          let existingUser: { id: string; full_name: string | null; phone: string } | null = null;
+          let associationType: 'created' | 'existing' | null = null;
           
-          // Update session with phone number and move to address step
+          // For payment links, use the resolve-payment-link-user function for atomic user resolution
+          if (isPaymentLink && !session.user_id) {
+            console.log(`[Checkout] Payment link flow - resolving user atomically`);
+            
+            // Call the resolve-payment-link-user function internally
+            try {
+              // Check if user exists with this phone number first
+              const { data: userByPhone } = await supabase
+                .from("profiles")
+                .select("id, full_name, phone, account_claimed, account_source")
+                .eq("phone", phoneNumber)
+                .maybeSingle();
+              
+              if (userByPhone) {
+                // Existing user - just associate
+                resolvedUserId = userByPhone.id;
+                existingUser = userByPhone;
+                associationType = 'existing';
+                
+                console.log(`[Checkout] Found existing user: ${resolvedUserId}`);
+                
+              } else {
+                // No user exists - create new unclaimed account via auth admin API
+                console.log(`[Checkout] Creating new user for payment link`);
+                
+                const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+                  phone: phoneNumber,
+                  phone_confirm: true,
+                  user_metadata: {
+                    account_source: 'payment_link',
+                    created_via: 'public_payment_link',
+                    checkout_session_id: body.session_id,
+                  },
+                  app_metadata: {
+                    account_claimed: false,
+                    auth_provider: 'payment_link',
+                  }
+                });
+                
+                if (authError) {
+                  // Handle race condition - user might have been created concurrently
+                  if (authError.message?.includes('already') || authError.message?.includes('exists') || authError.message?.includes('duplicate')) {
+                    console.log(`[Checkout] Race condition - re-fetching user`);
+                    const { data: retryUser } = await supabase
+                      .from("profiles")
+                      .select("id, full_name, phone")
+                      .eq("phone", phoneNumber)
+                      .single();
+                    
+                    if (retryUser) {
+                      resolvedUserId = retryUser.id;
+                      existingUser = retryUser;
+                      associationType = 'existing';
+                    }
+                  } else {
+                    console.error(`[Checkout] Failed to create user:`, authError);
+                  }
+                } else if (authUser?.user) {
+                  resolvedUserId = authUser.user.id;
+                  associationType = 'created';
+                  
+                  // Ensure profile has correct fields
+                  await supabase
+                    .from("profiles")
+                    .upsert({
+                      id: authUser.user.id,
+                      user_id: authUser.user.id,
+                      phone: phoneNumber,
+                      account_source: 'payment_link',
+                      account_claimed: false,
+                      auth_provider: 'payment_link',
+                      phone_verified: true,
+                    }, { onConflict: 'id' });
+                  
+                  console.log(`[Checkout] Created new user: ${resolvedUserId}`);
+                }
+              }
+              
+              // Create audit log for payment link user association
+              if (resolvedUserId && associationType) {
+                await supabase
+                  .from("payment_link_user_associations")
+                  .insert({
+                    checkout_session_id: body.session_id,
+                    payment_link_id: session.payment_link_id,
+                    user_id: resolvedUserId,
+                    phone_number: phoneNumber,
+                    association_type: associationType,
+                    ip_address: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip"),
+                    user_agent: req.headers.get("user-agent"),
+                    metadata: { step: 'collect_phone' }
+                  });
+              }
+              
+            } catch (resolveError) {
+              console.error(`[Checkout] User resolution error:`, resolveError);
+              // Non-blocking - continue with checkout even if user resolution fails
+            }
+            
+          } else {
+            // Non-payment-link flow - just look up existing user
+            const { data: userByPhone } = await supabase
+              .from("profiles")
+              .select("id, full_name, phone")
+              .eq("phone", phoneNumber)
+              .single();
+            
+            if (userByPhone) {
+              existingUser = userByPhone;
+              resolvedUserId = userByPhone.id;
+              associationType = 'existing';
+            }
+          }
+          
+          // Update session with phone number, user_id, and phone_snapshot
           const updateData: Record<string, unknown> = {
             phone_number: phoneNumber,
+            phone_snapshot: phoneNumber, // Immutable snapshot for audit
             current_step: 'address',
           };
           
-          if (existingUser) {
-            updateData.user_id = existingUser.id;
+          if (resolvedUserId) {
+            updateData.user_id = resolvedUserId;
           }
           
           await supabase
@@ -275,31 +389,46 @@ Deno.serve(async (req) => {
             .update(updateData)
             .eq("id", body.session_id);
           
-          // Log event
+          // Log event with association info
           await supabase.from("checkout_events").insert({
             session_id: body.session_id,
-            event_type: "phone_collected",
-            event_data: { phone_number: phoneNumber.replace(/\d(?=\d{4})/g, '*'), returning_user: !!existingUser },
+            event_type: associationType === 'created' 
+              ? "user_auto_created_via_payment_link" 
+              : "phone_collected",
+            event_data: { 
+              phone_masked: maskedPhone, 
+              returning_user: associationType === 'existing',
+              is_payment_link: isPaymentLink,
+              association_type: associationType,
+              user_resolved: !!resolvedUserId,
+            },
             step: 'address',
             previous_step: 'login',
           });
           
-          // Fetch addresses if user found
+          // Fetch addresses if user found/created
           let addresses: unknown[] = [];
-          if (existingUser) {
+          if (resolvedUserId) {
             const { data: userAddresses } = await supabase
               .from("customer_addresses")
               .select("*")
-              .eq("user_id", existingUser.id)
+              .eq("user_id", resolvedUserId)
               .order("is_default", { ascending: false });
             
             addresses = userAddresses || [];
           }
           
+          // Privacy: Never expose whether account existed or was created
+          // Use neutral messaging
           return json(200, { 
             message: "Phone number saved",
-            user: existingUser,
-            addresses
+            user: existingUser ? { id: existingUser.id, full_name: existingUser.full_name } : null,
+            addresses,
+            // Internal fields (not exposed to public UI but useful for frontend logic)
+            _internal: {
+              user_resolved: !!resolvedUserId,
+              // Don't expose association_type to prevent account enumeration
+            }
           });
         }
         

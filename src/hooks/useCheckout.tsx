@@ -51,6 +51,7 @@ export interface CheckoutSession {
   status: CheckoutStatus;
   current_step: CheckoutStep;
   phone_number: string | null;
+  phone_snapshot: string | null; // Immutable phone snapshot for audit
   email: string | null;
   is_guest: boolean;
   phone_collected: boolean; // Replaces otp_verified
@@ -67,6 +68,7 @@ export interface CheckoutSession {
   cod_fee: number;
   order_id: string | null;
   payment_id: string | null;
+  payment_link_id: string | null; // Track if from payment link
   created_at: string;
   updated_at: string;
   expires_at: string;
@@ -469,6 +471,8 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
           product_description: session.cart_data?.map(i => `${i.product_name} x${i.quantity}`).join(', '),
           amount: session.final_amount,
           status: orderStatus,
+          // Include phone_snapshot for audit trail
+          phone_snapshot: session.phone_number || session.phone_snapshot,
         })
         .select()
         .single();
