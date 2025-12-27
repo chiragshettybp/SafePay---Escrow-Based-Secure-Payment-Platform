@@ -452,13 +452,42 @@ export function useCheckout({ sessionId }: UseCheckoutOptions = {}) {
       // The order status will be updated to 'in_progress' after successful payment verification
       const orderStatus = session.selected_payment_method === 'cod' ? 'in_progress' : 'pending';
 
-      // Create order - for guest checkout, use a dummy customer_id placeholder
-      // The customer_id constraint requires a valid UUID, so we must have one
+      // Create order - for payment link flows, user_id should already be set
+      // by the resolve-payment-link-user edge function called during phone collection.
+      // For authenticated users, we use their auth id.
       const currentUser = (await supabase.auth.getUser()).data.user;
-      const effectiveCustomerId = session.user_id || currentUser?.id;
+      let effectiveCustomerId = session.user_id || currentUser?.id;
       
+      // If still no user_id and this is a payment link flow with phone collected,
+      // call the user resolution endpoint to create/associate the user
+      if (!effectiveCustomerId && session.phone_number && session.payment_link_id) {
+        try {
+          const { data: resolveData, error: resolveError } = await supabase.functions.invoke(
+            'resolve-payment-link-user',
+            {
+              body: {
+                checkout_session_id: sessionId,
+                phone_number: session.phone_number,
+                payment_link_id: session.payment_link_id,
+              },
+            }
+          );
+          
+          if (resolveError) {
+            console.error('User resolution failed:', resolveError);
+          } else if (resolveData?.user_id) {
+            effectiveCustomerId = resolveData.user_id;
+            // Refetch session to get updated user_id
+            await refetchSession();
+          }
+        } catch (err) {
+          console.error('Failed to resolve user:', err);
+        }
+      }
+      
+      // Final check - if we still don't have a customer ID, we can't proceed
       if (!effectiveCustomerId) {
-        throw new Error('User must be logged in to complete checkout');
+        throw new Error('Unable to process checkout. Please try again or contact support.');
       }
 
       const { data: order, error: orderError } = await supabase
