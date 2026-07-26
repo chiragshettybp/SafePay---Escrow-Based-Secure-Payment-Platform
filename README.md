@@ -1,50 +1,100 @@
-# Escrow Marketplace Platform
+# 🚀 SafePay
 
-A comprehensive escrow-based marketplace platform built with React, Vite, TypeScript, Tailwind CSS, and Supabase. The platform supports three user roles: **Customers**, **Merchants**, and **Admins**.
+**SafePay** is a secure payment platform designed to make online transactions safer for both buyers and sellers. It introduces a trusted payment flow where funds are held securely until both parties complete their part of the transaction.
 
-**URL**: https://lovable.dev/projects/4d2de453-c527-42d7-960d-21e41da7b69d
-
----
-
-## Table of Contents
-
-- [Technology Stack](#technology-stack)
-- [Getting Started](#getting-started)
-- [Customer Pages](#customer-pages)
-- [Merchant Pages](#merchant-pages)
-- [Admin Pages](#admin-pages)
-- [Shared/Common Pages](#sharedcommon-pages)
+Whether you're purchasing products, selling online, or managing digital deals, SafePay helps reduce payment disputes, fraud, and uncertainty with a simple and transparent experience.
 
 ---
 
-## Technology Stack
+# 📖 Overview
 
-- **Frontend**: React 18, TypeScript, Vite
-- **Styling**: Tailwind CSS, shadcn/ui components
-- **Backend**: Supabase (PostgreSQL, Auth, Edge Functions, Storage)
-- **State Management**: TanStack React Query
-- **Animations**: Framer Motion
-- **Charts**: Recharts
+SafePay is a payment platform built to provide trust in online transactions.
+
+It is designed for individuals, businesses, freelancers, and marketplaces that want a safer way to exchange money. By adding an extra layer of protection between payment and delivery, SafePay creates a more reliable buying and selling experience.
 
 ---
 
-## Getting Started
+# ❗ The Problem
 
-```sh
-# Clone the repository
-git clone <YOUR_GIT_URL>
+Online payments often require one side to trust the other without any guarantee.
 
-# Navigate to project directory
-cd <YOUR_PROJECT_NAME>
+Buyers worry about paying for products that never arrive, while sellers fear shipping goods without receiving payment. Disputes, scams, delayed refunds, and fraudulent transactions make online commerce stressful for everyone involved.
 
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
+Many existing solutions either lack transparency, involve complicated processes, or are designed only for large businesses. Smaller sellers and everyday users are often left without an easy way to protect their transactions.
 
 ---
+
+# 💡 Our Solution
+
+SafePay provides a secure payment workflow where transactions are protected from start to finish.
+
+Instead of transferring money immediately, payments are securely held until the agreed conditions are met. This gives buyers confidence before paying and gives sellers confidence before delivering.
+
+The goal is to make every transaction simple, transparent, and fair while reducing the risk of fraud and payment disputes.
+
+---
+
+# ✨ Key Features
+
+* 🔒 Secure payment flow designed to protect both buyers and sellers.
+* 💰 Funds are safely held until transaction conditions are completed.
+* 🤝 Builds trust between people who have never done business before.
+* 📦 Supports secure product and service transactions.
+* ⚡ Fast and straightforward payment experience with minimal friction.
+* 📱 Clean, user-friendly interface that is easy for anyone to use.
+* 🔔 Real-time transaction updates and payment status tracking.
+* 🧾 Transparent transaction history for better accountability.
+* 🛡️ Helps reduce scams, fraudulent payments, and common disputes.
+* 🌍 Designed to support individuals, businesses, and online marketplaces.
+
+---
+
+# 🎯 Who Is It For?
+
+SafePay is designed for:
+
+* 🛒 Online shoppers
+* 🏪 Small businesses
+* 💼 Freelancers
+* 📦 E-commerce sellers
+* 🛍️ Marketplace platforms
+* 👨‍💻 Developers building payment-enabled applications
+* 🏢 Businesses handling customer transactions
+* 🌍 Anyone looking for a safer way to send or receive payments
+
+---
+
+# 🌍 Vision
+
+Our vision is to make secure digital transactions accessible to everyone, not just large organisations. SafePay aims to become a trusted payment layer that helps people transact with confidence, regardless of where they are or who they are buying from.
+
+As the project evolves, it can expand to support more payment methods, stronger dispute resolution, business integrations, marketplace tools, and cross-border transactions. By focusing on trust, transparency, and simplicity, SafePay seeks to make online commerce safer for millions of users.
+
+---
+
+# 🤝 Contributing
+
+Contributions are always welcome!
+
+Whether you want to fix a bug, improve the documentation, suggest a new feature, or enhance the user experience, your support is greatly appreciated.
+
+* 🐞 Report bugs
+* 💡 Suggest new features
+* 📖 Improve documentation
+* 🔧 Submit pull requests
+
+Together, we can make SafePay even better.
+
+---
+
+# ⭐ Support
+
+If you found this project useful, consider giving it a **⭐ Star** on GitHub to support its development.
+
+Your support helps improve the project, encourages future contributions, and makes SafePay better for everyone.
+
+Thank you for checking out **SafePay**! 🚀
+
 
 ## Customer Pages
 
@@ -393,24 +443,6 @@ src/
 └── pages/              # Page components
 ```
 
----
-
-## Deployment
 
 Simply open [Lovable](https://lovable.dev/projects/4d2de453-c527-42d7-960d-21e41da7b69d) and click on Share → Publish.
 
-For custom domains, deploy using Netlify. See [Custom domains documentation](https://docs.lovable.dev/tips-tricks/custom-domain/).
-
----
-
-## Security Notes
-
-- All sensitive operations use Supabase Edge Functions
-- Row-Level Security (RLS) enforced on all database tables
-- Admin authentication uses PIN-based security with rate limiting
-- User roles stored in separate `user_roles` table to prevent privilege escalation
-- KYC verification required for financial operations
-
----
-
-*Last updated: December 2024*
